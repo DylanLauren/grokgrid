@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto'
-import type { AgentRecord } from './agents'
-import { HOUSE_WALLET, isAddress, isSig, json, parse, redis, signedBy } from './_lib'
+import type { AgentRecord } from './agents.js'
+import { HOUSE_WALLET, isAddress, isSig, json, parse, redis, signedBy } from './_lib.js'
 
 // Grok Bot posts what it just did here, one event per request, with
 //   Authorization: Bearer <INGEST_TOKEN>

@@ -1,4 +1,4 @@
-import { balances, hasStore, HOUSE_WALLET, json, parse, redis, solUsd, toHash } from './_lib'
+import { balances, hasStore, HOUSE_WALLET, json, parse, redis, solUsd, toHash } from './_lib.js'
 
 // The house bot's calls and wallet curve. Answers mode "demo" until Grok Bot has
 // posted its first trade, and the site plays the labelled demo story instead.

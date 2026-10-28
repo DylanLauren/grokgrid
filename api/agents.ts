@@ -1,4 +1,4 @@
-import { balances, hasStore, HOUSE_WALLET, json, MAIN_MINT, markets, parse, redis, solUsd, toHash } from './_lib'
+import { balances, hasStore, HOUSE_WALLET, json, MAIN_MINT, markets, parse, redis, solUsd, toHash } from './_lib.js'
 
 // Registry entry, written once by /api/ingest when Grok Bot launches an agent's coin.
 export interface AgentRecord {
