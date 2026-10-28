@@ -4,13 +4,13 @@ import { short } from '../lib/format'
 import { CallCard } from './CallCard'
 import './panels.css'
 
-export function CallsPanel({ feed }: { feed: Feed }) {
+export function CallsPanel({ feed, focus }: { feed: Feed; focus?: string }) {
   return (
     <>
       <PanelHead title="Calls" sub={`every trade he makes, called out as it happens. ${feed.mode === 'demo' ? 'sample calls until his wallet goes live.' : 'each one links to its transaction.'}`} />
       <div className="pn-list">
         {feed.calls.slice(0, 40).map((c) => (
-          <CallCard key={c.id} call={c} />
+          <CallCard key={c.id} call={c} focus={c.id === focus} />
         ))}
       </div>
     </>

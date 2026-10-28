@@ -46,6 +46,7 @@ export default function App() {
   const live = useLive(!onPage, view === 'phone', feed)
   const [touring, setTouring] = useState(() => !seenTour())
   const tucked = useTuck()
+  const [focusCall, setFocusCall] = useState<string>()
 
   // a plain click outside an open panel closes it and puts you back in the room
   useEffect(() => {
@@ -56,7 +57,10 @@ export default function App() {
       down = null
       const t = e.target as Element
       if (t.closest('.bar, .mini, .tour, .panel, .views, .calls-dock, .strip, .page, .ph-wrap, .watch')) return
-      if (tab === 'calls') setTab('desk')
+      if (tab === 'calls') {
+        setTab('desk')
+        setFocusCall(undefined)
+      }
       else if (view === 'phone') setView('third')
     }
     addEventListener('pointerdown', onDown)
@@ -130,7 +134,14 @@ export default function App() {
       <section className="calls-dock" aria-label="latest calls">
         {feed.calls.slice(0, 2).map((c, i) => (
           <div key={c.id} className={`dock-card ${i ? 'older' : ''}`}>
-            <CallCard call={c} compact />
+            <CallCard
+              call={c}
+              compact
+              onOpen={() => {
+                setFocusCall(c.id)
+                setTab('calls')
+              }}
+            />
           </div>
         ))}
       </section>
@@ -153,7 +164,7 @@ export default function App() {
 
       <aside className="panel" aria-hidden={tab !== 'calls'}>
         <button className="panel-x" onClick={() => setTab('desk')} aria-label="close">×</button>
-        <CallsPanel feed={feed} />
+        <CallsPanel feed={feed} focus={tab === 'calls' ? focusCall : undefined} />
       </aside>
 
       {tab === 'stats' && <StatsPage feed={feed} />}

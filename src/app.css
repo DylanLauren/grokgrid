@@ -110,6 +110,7 @@
 }
 .has-panel .panel { transform: none; }
 .has-panel .strip { opacity: 0; pointer-events: none; }
+.has-panel .calls-dock { opacity: 0; pointer-events: none; transform: translateY(12px); }
 .panel-x { position: absolute; right: 14px; top: 14px; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--hair-strong); font-size: 18px; color: var(--paper-70); transition: transform 0.3s, color 0.2s; }
 .panel-x:hover { color: var(--paper); transform: rotate(90deg); }
 .panel::-webkit-scrollbar { width: 6px; }
