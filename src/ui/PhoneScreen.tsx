@@ -21,7 +21,7 @@ export function PhoneScreen({ live, watching }: { feed: Feed; live: Live; watchi
       {PHONE_STREAM && (
         <div className={`ph ph-stream ph-video ${playing ? 'on' : ''}`}>
           <video ref={video} muted playsInline autoPlay />
-          <span className="ph-live mono"><i />live</span>
+          <span className="ph-live mono"><i />live screen</span>
         </div>
       )}
     </div>
@@ -74,8 +74,8 @@ function Stream({ ts, now }: { ts: number; now: number }) {
   if (!frame || now < frame.ts || now - frame.ts >= FRESH_MS) return <Offline />
   return (
     <div className="ph ph-stream">
-      <img src={frame.src} alt="Grok Bot's captured screen" />
-      <span className="ph-live mono"><i />screen feed</span>
+      <img src={frame.src} alt="Grok Bot’s captured working browser" />
+      <span className="ph-live mono"><i />live screen</span>
     </div>
   )
 }
@@ -85,7 +85,7 @@ function Offline() {
     <div className="ph ph-offline" role="status">
       <img src="/brands/grokbot.svg" width={48} height={48} alt="" />
       <strong>Screen offline</strong>
-      <span>Waiting for Grok Bot’s real screen.</span>
+      <span>Waiting for the working browser feed.</span>
     </div>
   )
 }

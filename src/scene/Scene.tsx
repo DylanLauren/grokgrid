@@ -207,7 +207,7 @@ export function Scene({ feed, live, view, paused, onPhone }: SceneProps) {
           <Html position={[-0.06, 0.03, -0.42]} center zIndexRange={[30, 20]}>
             <button className={`watch ${hover ? 'hot' : ''} ${view === 'third' && !paused ? '' : 'gone'}`} onClick={onPhone} tabIndex={view === 'third' ? 0 : -1}>
               <span className="watch-line" />
-              <span className="watch-pill">Watch me trade!</span>
+              <span className="watch-pill">Watch my screen</span>
             </button>
           </Html>
         </Later>

@@ -141,3 +141,20 @@ symlinks or paths outside the expected temporary parent, and deleting only the
 known `frame.jpg` and manifest before removing an empty directory. PID reuse or
 any uncertain ownership should leave files untouched for operator review. That
 recovery mechanism is a proposal, not an implemented startup behavior.
+
+## Local browser commissioning — October 28, 2026
+
+Grok successfully read the title, URL and public page text from the user's existing
+Chrome window on pump.fun through its local terminal. This established local
+observation, not autonomous trading. A pinned, phone-shaped window passed the
+publisher preflight and a real JPEG was accepted by production with matching
+`/api/live` and `/api/screen` timestamps. The continuous publisher subsequently
+produced advancing fresh frames in the interactive permission-granted session.
+
+The first LaunchAgent attempt could not validate the window while the interactive
+process could. It was unloaded and its plist moved out of LaunchAgents; unattended
+login restart is **not verified**. Do not claim durable restart support based on
+the interactive capture test. The initial local screen-only capability lasts
+24 hours; publication stops at expiry unless separately renewed. The publisher
+is pinned to one exact URL/title/window and stops or pauses after source changes.
+Stop it before wallet setup or other sensitive browsing.

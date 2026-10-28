@@ -39,7 +39,7 @@ export async function GET() {
     name: 'grok grid',
     color: '#ffffff',
     shape: 'sphere',
-    strategy: 'the house bot. trades on his phone at the desk, funds every bot below',
+    strategy: 'the house bot. wallet monitoring is active; automatic trading is paused',
     launchedAt: 0,
     wallet: HOUSE_WALLET,
     coin: { mint: MAIN_MINT, symbol: process.env.VITE_MAIN_TICKER || 'GRID', name: 'Grok Grid', image: '/favicon.svg', hue: '#f4f4f2' },
