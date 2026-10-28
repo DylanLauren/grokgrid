@@ -39,7 +39,7 @@ function useMood(feed: Feed): Mood {
     if (!last || last.id === seen.current) return
     seen.current = last.id
     setMood('tap')
-    const after: Mood = last.side === 'buy' ? 'buy' : last.pnlUsd >= 0 ? 'win' : 'loss'
+    const after: Mood = last.side === 'buy' ? 'buy' : last.pnlUsd === null ? 'idle' : last.pnlUsd >= 0 ? 'win' : 'loss'
     const a = setTimeout(() => setMood(after), 700)
     const b = setTimeout(() => setMood('idle'), 3800)
     return () => {

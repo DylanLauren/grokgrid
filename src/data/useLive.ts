@@ -9,7 +9,7 @@ export const FRESH_MS = 12_000 // a frame older than this means his screen strea
 const STEPS = (c: Call) =>
   c.side === 'buy'
     ? ['scrolling the trader list on X', `${c.symbol} came up twice in 10 minutes`, `opening ${c.symbol} on pump.fun`, 'checking holders and the dev wallet', `buying ${c.spentSol} SOL of ${c.symbol}`, 'confirmed on chain', 'posting the call']
-    : [`watching ${c.symbol}`, `${c.symbol} at ${(c.nowMc / 1e3).toFixed(0)}K mc`, `selling ${c.symbol}`, 'confirmed on chain', 'posting the call']
+    : [`watching ${c.symbol}`, `${c.symbol} at ${(c.nowMc === null ? 'unknown' : (c.nowMc / 1e3).toFixed(0))}K mc`, `selling ${c.symbol}`, 'confirmed on chain', 'posting the call']
 
 // Polls /api/live while the room is open, fast while his phone is being watched. Until he posts real actions,
 // it narrates the demo trades step by step.
@@ -46,7 +46,7 @@ export function useLive(active: boolean, fast: boolean, feed: Feed): Live {
   // demo narration: replay the steps of his latest trade, one every ~2.4s
   const last = feed.calls[0]
   useEffect(() => {
-    if (!active || real.current || !last) return
+    if (!active || real.current || feed.mode !== 'demo' || !last) return
     const steps = STEPS(last)
     let i = 0
     const push = () => {
@@ -57,7 +57,7 @@ export function useLive(active: boolean, fast: boolean, feed: Feed): Live {
     push()
     const t = setInterval(push, 2400)
     return () => clearInterval(t)
-  }, [active, last])
+  }, [active, last, feed.mode])
 
   return live
 }

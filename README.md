@@ -45,13 +45,9 @@ Launching is open while `VITE_BURN_WALLET` is set and at least one spare wallet 
 
 ### Free: screenshot feed (default)
 
-Grok Bot's Mac posts his real phone screen to `/api/ingest` about every 2 seconds and the phone in the room shows it. No video service needed.
+The capture worker posts actual frames from one explicitly pinned bot-controlled Mac window. It requires a screen-only capability and rejects desktop rectangle capture. Cloud idle suspension still prevents a continuous cloud feed; local capture requires Grok to actually use the selected window on an awake Mac.
 
-1. Open his phone window on the Mac: iPhone Mirroring, an Android emulator with the pump.fun app, or a phone-sized browser on pump.fun.
-2. Find its position with Cmd+Shift+4 (drag over it, read x, y, width, height), then run
-   `INGEST_TOKEN=... node scripts/phone-feed.mjs --rect x,y,w,h`
-   The first run asks for Screen Recording permission for Terminal.
-3. Open the site, click his phone: the frames show within a few seconds. Stop the script and the phone falls back to the redrawn app after 12 seconds.
+Follow [the phone setup guide](docs/phone-feed.md) to configure the private window identity and screen capability, then run `node scripts/phone-feed.mjs --config /absolute/private/config.json --check`. This check captures and uploads nothing. After confirming the actual source, run without `--check` to publish. If frames stop, the site shows Screen offline after 12 seconds.
 
 ### Paid: real-time video
 
@@ -63,7 +59,7 @@ The phone in the room plays his real phone screen as live video (WebRTC, under h
 2. On Grok Bot's computer, run his phone (an Android emulator with the pump.fun app, or a phone-sized browser window on pump.fun) and broadcast that window to the publish URL. OBS 30+ does this: Settings, Stream, Service "WHIP", Server = the publish URL; canvas 720x1560 portrait, 30 fps.
 3. Cost: $1 per 1,000 minutes watched. The site only connects while a visitor is in the phone view.
 
-Without a stream the phone shows the screenshots from `screen` events, and without those the redrawn app.
+Without a stream the phone shows fresh screenshots from `screen` events; without those it shows Screen offline.
 
 Until the first real event arrives, the site plays sample data and says so in the page subtitles.
 
@@ -106,3 +102,7 @@ registers and queues each mint once.
 Validation without a launch: `npm test`, `npm run build`, and
 `npx tsc -p api/tsconfig.json`. These do not prove a completed on-chain launch or
 an active trading worker; those require separate operational verification.
+
+## House worker readiness
+
+The [house worker](docs/trading-worker.md) reads the existing wallet observer and keeps a durable offline intent journal. It cannot sign or broadcast. Public launches stay paused until an executor is implemented and verified; adding spare wallets alone does not open them. Trade ingestion checks finalized wallet token/SOL balance movements, deduplicates receipts, and leaves historical USD profit unknown. See [the two-pillar acceptance checklist](docs/pillars-1-2-acceptance.md) for remaining operational checks.

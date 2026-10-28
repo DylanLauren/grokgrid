@@ -14,13 +14,14 @@ export interface Call {
   note: string // first person, lower case, one or two sentences
   sizeTokens: number
   spentSol: number
-  positionUsd: number
-  pnlUsd: number
-  entryMc: number
-  nowMc: number
+  positionUsd: number | null
+  pnlUsd: number | null
+  entryMc: number | null
+  nowMc: number | null
   sample?: boolean
   sig?: string // transaction signature, links to solscan
-  verified?: boolean // the signature was found on chain, signed by the bot's wallet
+  verification?: 'wallet-balance-movements'
+  verified?: boolean // receipt checks only the wallet token/SOL flows, not profit
 }
 
 export interface WalletPoint { ts: number; sol: number }
@@ -60,9 +61,9 @@ export interface Agent {
     real?: boolean // a real coin on chain (sample bots borrow real coins before launches start)
   }
   walletSol: number
-  pnlSol: number // since launch, realised + open
+  pnlSol: number | null // since launch, realised + open
   trades: number
-  winRate: number // percent of closed trades in profit
+  winRate: number | null // percent of closed trades in profit
   burnedMain: number // $GRID bought and burned from this coin's 20%
   last?: Pick<Call, 'side' | 'symbol' | 'spentSol' | 'pnlUsd' | 'ts' | 'sig'> & Partial<Pick<Call, 'mint' | 'image' | 'hue'>>
 }

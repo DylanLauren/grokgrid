@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { cachedCoins, realCoins, coinUpdatedAt } from './realCoins'
 import { demoFeed, makeCall } from './demo'
-import type { Feed } from './types'
+import type { Call, Feed } from './types'
 
 const POLL_MS = 10_000
 const DEMO_TICK_MS = 22_000
@@ -50,7 +50,7 @@ export function useFeed(): Feed {
         const r = Math.random
         const call = makeCall(r, Date.now(), n++, f.solUsd, cachedCoins())
         const last = f.curve[f.curve.length - 1]
-        const sol = Math.max(0.2, last.sol + call.pnlUsd / f.solUsd)
+        const sol = Math.max(0.2, last.sol + (call.pnlUsd ?? 0) / f.solUsd)
         return {
           ...f,
           calls: [call, ...f.calls].slice(0, 80),
@@ -75,7 +75,7 @@ export function stats(feed: Feed) {
   const now = Date.now()
   const solNow = feed.curve.at(-1)?.sol ?? 0
   const at = (ms: number) => feed.curve.find((p) => p.ts >= now - ms)?.sol ?? feed.curve[0]?.sol ?? 0
-  const sells = feed.calls.filter((c) => c.side === 'sell')
+  const sells = feed.calls.filter((c): c is Call & { pnlUsd: number } => c.side === 'sell' && c.pnlUsd !== null && Number.isFinite(c.pnlUsd))
   const wins = sells.filter((c) => c.pnlUsd > 0)
   const best = sells.reduce((a, c) => (c.pnlUsd > (a?.pnlUsd ?? -Infinity) ? c : a), sells[0])
   const worst = sells.reduce((a, c) => (c.pnlUsd < (a?.pnlUsd ?? Infinity) ? c : a), sells[0])
@@ -87,7 +87,7 @@ export function stats(feed: Feed) {
     pnl24h: pct(at(8.64e7)),
     pnlAll: pct(feed.curve[0]?.sol ?? 0),
     trades: feed.calls.length,
-    winRate: sells.length ? (wins.length / sells.length) * 100 : 0,
+    winRate: sells.length ? (wins.length / sells.length) * 100 : null,
     best,
     worst,
   }

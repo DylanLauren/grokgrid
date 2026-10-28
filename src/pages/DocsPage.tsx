@@ -11,8 +11,8 @@ const SECTIONS: [string, string, ReactNode][] = [
     'how',
     'How he trades',
     <Fragment key="b">
-      <p>He is a Grok Bot, xAI's agent with its own cloud computer. His wallet lives there and he trades pump.fun from that machine. Grok decides what to buy and sell, reads the trader lists and calls on X for ideas, and writes each callout in its own words.</p>
-      <p>Every trade he posts here carries its transaction signature, and the site checks that signature on chain before marking it verified. Open his phone in the room and you see his real phone screen, refreshed every couple of seconds while he trades. If his screen stops coming in, the phone redraws the app from his real trades and shows each step he reports.</p>
+      <p>GrokGrid is being connected to Grok Bot. Wallet monitoring is active; automatic trading and public agent launches are paused while execution and recovery are tested. Wallet keys stay outside the website.</p>
+      <p>Trade receipts are checked for finalized wallet token and SOL movements. That check does not establish profit or historical cost basis. The phone shows actual captured frames when available and displays offline when the feed stops. Sample activity is labeled separately.</p>
     </Fragment>,
   ],
   [

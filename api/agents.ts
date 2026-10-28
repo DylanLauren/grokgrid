@@ -50,7 +50,6 @@ export async function GET() {
     const last = lastCalls[i]
     const lastToken = last?.mint ? mkt[last.mint] : undefined
     const m = mkt[r.coin.mint]
-    const sells = Number(st.sells ?? 0)
     return {
       ...r,
       house: r.id === 'house' || undefined,
@@ -66,9 +65,9 @@ export async function GET() {
         feesSol: Number(st.feesSol ?? 0),
       },
       walletSol: bal[r.wallet] ?? 0,
-      pnlSol: Number(st.pnlSol ?? 0),
+      pnlSol: null,
       trades: Number(st.trades ?? 0),
-      winRate: sells ? (Number(st.wins ?? 0) / sells) * 100 : 0,
+      winRate: null,
       burnedMain: Number(st.burnedMain ?? 0),
       last: last ? { mint: last.mint, image: lastToken?.image || last.image, hue: last.hue || r.color, side: last.side, symbol: lastToken?.symbol || last.symbol, spentSol: last.spentSol, pnlUsd: last.pnlUsd, ts: last.ts, sig: last.sig } : undefined,
     }

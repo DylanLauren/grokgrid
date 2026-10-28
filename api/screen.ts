@@ -1,11 +1,16 @@
 import { hasStore, redis } from './_lib.js'
 
-// His latest phone frame as a JPEG. The page asks for /api/screen?t=<frame time>, so
-// every frame has its own URL and the edge can keep it.
-export async function GET() {
-  const [jpeg] = hasStore() ? await redis(['GET', 'gg:screen']) : [null]
-  if (typeof jpeg !== 'string') return new Response(null, { status: 404, headers: { 'Cache-Control': 'no-store' } })
+// Read the frame and its identity atomically; never cache private screen pixels.
+export async function GET(req: Request) {
+  const [pair] = hasStore() ? await redis(['MGET', 'gg:screen', 'gg:screen:ts']) : [null]
+  const [jpeg, timestamp] = Array.isArray(pair) ? pair : [null, null]
+  const ts = Number(timestamp)
+  const requested = new URL(req.url).searchParams.get('t')
+  const age = Date.now() - ts
+  if (typeof jpeg !== 'string' || !Number.isSafeInteger(ts) || ts <= 0 || age < 0 || age >= 12_000 || (requested !== null && requested !== String(ts))) {
+    return new Response(null, { status: 404, headers: { 'Cache-Control': 'no-store' } })
+  }
   return new Response(Buffer.from(jpeg, 'base64'), {
-    headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=60, s-maxage=60' },
+    headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store', 'X-Frame-Timestamp': String(ts), 'X-Content-Type-Options': 'nosniff' },
   })
 }
