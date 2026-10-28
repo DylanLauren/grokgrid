@@ -249,3 +249,29 @@ The helper's `phone-app-status.json` reports OS capture permission and superviso
 process state. `local-phone-supervisor-status.json` reports restart/hold state.
 Neither proves live pictures: `local-phone-status.json` lastSentAt and production
 frame timestamps remain the checks for current capture.
+
+## Restart observation qualification — October 28, 2026
+
+A read-only metadata check at 4:41:57 PM PDT observed local publishing and matching
+fresh production timestamps. After the parent-controlled publisher kill, checks
+at 4:42:38 and 4:42:58 observed expired production frames (404). At 4:43:18,
+4:43:39 and 4:43:49, fresh frames returned; the publisher lock PID changed from
+14102 to 14655. This supports recovery of the local publisher process after its
+configured backoff.
+
+A subsequent native-helper crash test requires qualification. At 4:44:02 a new
+helper PID 14818 and publisher PID 14820 were present and the local status said
+`sending`. From 4:44:23 through 4:45:24, however, local status reported
+`window-identity-mismatch` with its last successful send stuck at 4:44:04, while
+production timestamps continued advancing. The parent then visually confirmed
+that production showed the old cloud pump.fun welcome screen and that the local
+dedicated window had changed to a different page and geometry.
+
+**Production freshness during that mismatch does not prove local native-helper
+feed recovery.** The new process IDs establish process reopening, but another
+publisher contaminated the remote observations. The remaining sampler was
+stopped without further desktop or publishing changes. Before claiming complete
+native-helper feed recovery, stop the old cloud publisher, establish one exclusive
+actual source window, and repeat the controlled crash/recovery test. Merely seeing
+HTTP 200 or an advancing global frame timestamp is insufficient to identify which
+publisher produced the image.
