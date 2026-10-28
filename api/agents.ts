@@ -12,7 +12,7 @@ export interface AgentRecord {
   coin: { mint: string; symbol: string; name: string; image?: string; hue: string }
 }
 
-interface CallLite { side: 'buy' | 'sell'; symbol: string; spentSol: number; pnlUsd: number; ts: number; sig?: string }
+interface CallLite { mint?: string; image?: string; hue?: string; side: 'buy' | 'sell'; symbol: string; spentSol: number; pnlUsd: number; ts: number; sig?: string }
 
 // Every bot on the grid with its coin attached: registry from the store,
 // balances from the chain, market data from DexScreener.
@@ -25,9 +25,10 @@ export async function GET() {
   const ids = ['house', ...records.map((r) => r.id)]
 
   const perAgent = await redis(...ids.flatMap((id) => [['HGETALL', `gg:stats:${id}`], ['LINDEX', `gg:calls:${id}`, 0]]))
+  const lastCalls = ids.map((_, i) => parse<CallLite>(perAgent[i * 2 + 1]))
   const [bal, mkt, price] = await Promise.all([
     balances([HOUSE_WALLET, ...records.map((r) => r.wallet)]),
-    markets([MAIN_MINT, ...records.map((r) => r.coin.mint)]),
+    markets([MAIN_MINT, ...records.map((r) => r.coin.mint), ...lastCalls.flatMap((c) => c?.mint ? [c.mint] : [])]),
     solUsd(),
   ])
 
@@ -44,7 +45,8 @@ export async function GET() {
 
   const agents = [houseRecord, ...records].map((r, i) => {
     const st = toHash(perAgent[i * 2])
-    const last = parse<CallLite>(perAgent[i * 2 + 1])
+    const last = lastCalls[i]
+    const lastToken = last?.mint ? mkt[last.mint] : undefined
     const m = mkt[r.coin.mint]
     const sells = Number(st.sells ?? 0)
     return {
@@ -53,6 +55,8 @@ export async function GET() {
       launchedAt: r.launchedAt || Number(st.firstTs ?? Date.now()),
       coin: {
         ...r.coin,
+        symbol: m?.symbol || r.coin.symbol,
+        name: m?.name || r.coin.name,
         image: m?.image || r.coin.image,
         mcUsd: m?.mcUsd ?? 0,
         vol24hUsd: m?.vol24hUsd ?? 0,
@@ -64,7 +68,7 @@ export async function GET() {
       trades: Number(st.trades ?? 0),
       winRate: sells ? (Number(st.wins ?? 0) / sells) * 100 : 0,
       burnedMain: Number(st.burnedMain ?? 0),
-      last: last ? { side: last.side, symbol: last.symbol, spentSol: last.spentSol, pnlUsd: last.pnlUsd, ts: last.ts, sig: last.sig } : undefined,
+      last: last ? { mint: last.mint, image: lastToken?.image || last.image, hue: last.hue || r.color, side: last.side, symbol: lastToken?.symbol || last.symbol, spentSol: last.spentSol, pnlUsd: last.pnlUsd, ts: last.ts, sig: last.sig } : undefined,
     }
   })
 

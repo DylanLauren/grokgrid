@@ -24,3 +24,25 @@ test('live feed resolves token metadata by mint without rewriting executed trade
     for (const key of ['spentSol', 'pnlUsd', 'entryMc', 'nowMc', 'sig'] as const) assert.equal(body.calls[0][key], call[key])
   } finally { globalThis.fetch = original }
 })
+
+test('live Matrix last-trade entries retain the mint and resolve its picture', async () => {
+  const original = globalThis.fetch
+  const { GET: agents } = await import('../api/agents')
+  try {
+    globalThis.fetch = async (input, init) => {
+      const url = String(input)
+      if (url.includes('redis.test')) {
+        const body = String(init?.body)
+        return body.includes('gg:agents') ? Response.json([{ result: [] }]) : Response.json([{ result: ['trades', '1'] }, { result: JSON.stringify(call) }])
+      }
+      if (url.includes('jup.ag')) return Response.json({})
+      if (url.includes('dexscreener.com')) return Response.json([{ baseToken: { address: mint, symbol: 'Fartcoin', name: 'Fartcoin' }, info: { imageUrl: 'https://cdn.dexscreener.com/token.png' } }])
+      throw new Error('Unexpected request')
+    }
+    const body = await (await agents()).json()
+    assert.equal(body.mode, 'live')
+    assert.equal(body.agents[0].last.mint, mint)
+    assert.equal(body.agents[0].last.image, 'https://cdn.dexscreener.com/token.png')
+    assert.equal(body.agents[0].last.pnlUsd, call.pnlUsd)
+  } finally { globalThis.fetch = original }
+})
