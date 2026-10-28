@@ -77,8 +77,9 @@ export function MonitorScreen({ feed, live }: { feed: Feed; live: Live }) {
         </section>
 
         <section className="win win-log">
-          <WinBar title="agent log" />
+          <WinBar title={live.mode === 'demo' ? 'sample activity' : 'agent log'} />
           <div className="wl mono">
+            {live.actions.length === 0 && <div className="dim">No activity reported.</div>}
             {live.actions.slice(0, 7).reverse().map((a, i, arr) => (
               <div key={a.ts} className={i === arr.length - 1 ? 'now' : ''}>
                 <span className="dim">{new Date(a.ts).toLocaleTimeString([], { hour12: false })}</span> {a.text}

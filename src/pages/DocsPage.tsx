@@ -6,10 +6,10 @@ import { Page } from './Page'
 
 // body elements carry a key only because they sit in this array
 const SECTIONS: [string, string, ReactNode][] = [
-  ['what', 'What he is', <p key="b">A Grok Bot with his own phone, his own wallet and the pump.fun app. He sits at his desk, reads charts, trades, and tells you about every trade the moment he makes it, here and on X. He wins some and he loses some. You see both.</p>],
+  ['what', 'What he is', <p key="b">GrokGrid is a window into Grok Bot’s work on pump.fun. The phone can show his actual working browser while he observes the market. Wallet monitoring is active; automatic trading is currently disabled. A live screen means the capture is current, not that a trade is happening.</p>],
   [
     'how',
-    'How he trades',
+    'Current status',
     <Fragment key="b">
       <p>GrokGrid is being connected to Grok Bot. Wallet monitoring is active; automatic trading and public agent launches are paused while execution and recovery are tested. Wallet keys stay outside the website.</p>
       <p>Trade receipts are checked for finalized wallet token and SOL movements. That check does not establish profit or historical cost basis. The phone shows actual captured frames when available and displays offline when the feed stops. Sample activity is labeled separately.</p>
@@ -20,21 +20,21 @@ const SECTIONS: [string, string, ReactNode][] = [
     'Where the money goes',
     <Fragment key="b">
       <FlowDiagram />
-      <p>Creator fees from ${MAIN_TICKER} split two ways. 80% goes to the treasury, which runs his trading wallet and creates new grid bots and their wallets. 20% buys ${MAIN_TICKER} on the market and burns it.</p>
-      <p>Every grid bot is its own coin, and its creator fees split the same way: 80% to its trading wallet and 20% to buy ${MAIN_TICKER} and burn it. The split is written into each coin when it is created, by pump.fun's own fee sharing, so nobody can change it later.</p>
+      <p>The intended ${MAIN_TICKER} fee allocation is 80% to the treasury and 20% to the burn wallet. The official mint must be configured and verified before its buy-and-burn route can be activated. Automatic buying and burning are not active yet.</p>
+      <p>The prepared grid-bot launch flow sets 80% of creator fees to the bot’s trading wallet and 20% to the burn wallet. It checks the on-chain recipients and locked fee split before registering the bot. Fee allocation alone does not start a trading worker or execute a burn.</p>
     </Fragment>,
   ],
   [
     'launch',
     'Launching a bot',
     <Fragment key="b">
-      <p>Pick a look, name the coin, write one line on how it should trade and set its limits. Then approve one transaction in your wallet. That transaction creates the coin on pump.fun, opens its fee sharing, sets 80% to the bot's own trading wallet and 20% to the ${MAIN_TICKER} burn wallet, and locks that split for good. You can add a first buy in the same transaction. Your wallet needs about 0.03 SOL for fees, plus the first buy.</p>
-      <p>The site builds the transaction, your wallet shows it before you sign, and the site refuses to send anything your wallet changed. Grok Bot makes each bot's trading wallet and holds its key; the site only ever sees the public address. Once the coin is on chain the bot shows up in the matrix and Grok Bot starts trading it inside the limits you set.</p>
+      <p>Public launches are paused until agent execution and recovery are ready. The prepared flow lets you choose a look, name, strategy and limits, then review a coin-launch transaction in your wallet. It includes the 80/20 creator-fee allocation and can include an optional first buy.</p>
+      <p>Wallet assignment, confirmed coin creation, worker startup and enforced trading limits must all be verified before launches reopen. Showing a coin in the matrix does not by itself prove that its bot is trading. Trading-wallet keys stay outside the website.</p>
     </Fragment>,
   ],
-  ['example', 'A worked example', <p key="b">A grid bot's coin trades 100 SOL in a day. Its creator fees are paid in SOL. 80% goes to the bot to trade with. The other 20% buys ${MAIN_TICKER} and burns it. Ten busy bots means ten small buys of ${MAIN_TICKER} every day, without anyone deciding to do it.</p>],
+  ['example', 'A worked example', <p key="b">For an illustration of the planned allocation, 1 SOL of creator fees would assign 0.8 SOL to the trading wallet and 0.2 SOL to the burn wallet. That allocation is separate from trading volume. A buy or burn occurs only after its worker is implemented, configured and activated; this example is not a completed transaction.</p>],
   ['cost', 'What it costs', <CostTable key="b" />],
-  ['trust', 'Who can take my money', <p key="b">Nobody can take coins out of your wallet. Launching a bot is one transaction you sign yourself. Trading wallets for the house bot and for grid bots are held by Grok Bot, so the trading share of each bot's fees sits in those wallets, in the open, at the addresses below. Each wallet only ever holds its own trading budget. The burn wallet only ever buys and burns.</p>],
+  ['trust', 'Wallet control', <p key="b">You review and approve any launch transaction in your own wallet. House and agent trading-wallet keys are kept off the website in the operator-controlled runtime. The current worker cannot sign or spend. Public addresses below let you inspect on-chain balances; they do not prove that execution is enabled.</p>],
   ['down', 'If this site goes down', <p key="b">The coins, the fee split and every trade live on Solana, not here. The site is a window. If it closes, the chain still has all of it.</p>],
   [
     'hood',
@@ -49,7 +49,7 @@ const SECTIONS: [string, string, ReactNode][] = [
 export function DocsPage({ onTour }: { onTour: () => void }) {
   const on = useSpy()
   return (
-    <Page say="no secrets in here" n={6} label="docs" title="How it works" sub="what he is, how he trades, where the money goes, and who holds which keys.">
+    <Page say="no secrets in here" n={6} label="docs" title="How it works" sub="current capabilities, planned fee allocation, launch readiness and wallet control.">
       <div className="dc">
         <nav className="dc-toc" aria-label="sections">
           {SECTIONS.map(([id, title], i) => (

@@ -38,9 +38,12 @@ mint/freeze authorities. This does not prove project identity by itself: the
 operator must supply the official address. Missing/invalid mint blocks readiness.
 Funding or setting a mint never enables execution.
 
-Before enabling automatic trading, implement durable order intents, confirmed
-receipt reconciliation, per-agent limits, daily loss limits, validated strategy
-inputs, and a separately authorized local signer. Before enabling buy-and-burn,
+The [offline house worker](trading-worker.md) now provides durable intents,
+policy limits and opt-in read-only finalized-receipt reconciliation. These are
+planning and observation facilities, not a live executor. Before enabling
+automatic trading, complete independently verified position/risk accounting,
+validated strategy inputs, executable exit handling, and a separately authorized
+local signer with pre-broadcast durability and instruction validation. Before enabling buy-and-burn,
 implement a fresh quote with bounded slippage, exact output reconciliation, and
 an SPL burn of the acquired official token amount, with durable receipts and
 ambiguous-result holds. Never retry a purchase after an unknown broadcast outcome

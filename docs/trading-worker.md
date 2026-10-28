@@ -2,7 +2,7 @@
 
 This worker is an offline foundation, **not a live trader**. It reads the existing
 house observer, maintains a durable intent journal, and can evaluate hypothetical
-buy proposals. Its optional receipt adapter makes read-only RPC queries. It has no market strategy,
+buy and sell proposals. Its optional receipt adapter makes read-only RPC queries. It has no market strategy,
 key loader, signer, swap builder, broadcast transport, or automatic agent-launch consumer. No configuration
 can enable execution. The CLI does not simulate fills or claim a trade occurred.
 
@@ -55,9 +55,9 @@ have been investigated. Automatic stale-lock takeover is intentionally absent.
 ## Hypothetical proposals
 
 `--proposal /absolute/path/to/proposal.json` processes one offline proposal and
-exits. A proposal needs a unique `id`, pinned `agentId`, `wallet`, allowlisted
-`mint`, `side: "buy"`, integer-string `spendLamports`, integer `slippageBps`, and
-millisecond `createdAt`/`expiresAt`. It also requires a local `trading-risk.json`
+exits. Every proposal needs a unique `id`, pinned `agentId`, `wallet`, allowlisted
+`mint`, integer `slippageBps`, and millisecond `createdAt`/`expiresAt`.
+A buy adds `side: "buy"` and integer-string `spendLamports`. It requires a local `trading-risk.json`
 with `wallet`, `complete: true`, integer-string `exposureLamports` and
 `dailyLossLamports`, current `utcDay` and millisecond `observedAt`.
 
@@ -72,6 +72,37 @@ proposals, unknown mints and wallet changes. Idempotent repeated input returns t
 same record; reuse of an ID with different input fails. An accepted hypothetical
 proposal is always `blocked-execution-disabled`. It does not reserve on-chain
 funds. Unsubmitted proposals can expire, releasing only this local reservation.
+
+## Sell planning from actual positions
+
+A sell adds `side: "sell"`, positive integer-string `tokenUnits`, integer
+`tokenDecimals`, and a positive integer-string `minimumReceiveLamports`. The CLI
+independently queries both SPL token programs at finalized commitment for each
+sell proposal. It never trusts a cached or caller-provided inventory file to plan
+an exit. `--refresh-positions --once` performs just that read-only collection and
+writes `trading-positions.json`; provider failure writes `complete: false`, never
+fabricated zero inventory. Cost basis is always marked unverified.
+
+The policy requires a complete, fresh, wallet-matched snapshot, matching decimals,
+and enough spendable raw token units after same-mint pending sell reservations.
+The snapshot's finalized context slots must not predate any reconciled successful
+receipt. This prevents reusing old inventory after an earlier sale. No exposure or
+profit is inferred from a proposed or confirmed sell. Sell planning does not need
+invented cost basis/daily loss, and buy loss/exposure caps do not block an otherwise
+valid risk-reducing exit. Wallet SOL reserve and pending-intent limits still apply.
+
+Frozen, delegated, native or extension-bearing token accounts remain unavailable
+for selling. **All Token-2022 balances are recorded with zero spendable units**
+until mint-level transfer restrictions/extensions are independently inspected.
+This is a deliberate compatibility limit, not a claim those balances are zero.
+Only supported ordinary SPL-token balances can currently produce offline sell
+intents. Wrapped SOL is not accepted as a trade mint.
+
+Sell reconciliation requires the exact intended token debit and real SOL proceeds
+at least equal to the proposed minimum, net of network fee and owned-account rent
+adjustments. Partial fills or other-quote proceeds remain held for review. The
+minimum is an offline proposal constraint, not a validated quote or profit target.
+No transaction is built, signed, or sent.
 
 ## Ambiguous outcomes and read-only reconciliation
 
@@ -98,9 +129,10 @@ not decode swap instructions, prove cost basis, or rule out unrelated transfers
 within the same transaction. This adapter therefore does not complete trading
 accounting or authorize orders. Test fixtures exercise the contract; they are not
 on-chain trade evidence. Caller-supplied receipts alone must never be treated as
-verified chain data in a future integration. Confirmation currently requires exact planned
-spend; adapters with different spend semantics must remain held until explicitly
-reconciled, not relax the check silently.
+verified chain data in a future integration. Buy confirmation requires exact planned spend; sell confirmation requires exact
+planned token units and the minimum SOL proceeds. Different fill semantics remain
+held until explicitly reconciled, not relaxed silently. Finalized receipt slots
+are retained with the journal evidence.
 
 ## Remaining live-work prerequisites
 
@@ -111,10 +143,61 @@ reconciled, not relax the check silently.
   The implemented read-only adapter verifies balance movements only.
 - A separately authorized signer/transport, durable recording before broadcast,
   fresh quote and instruction validation, enforced authorized limits and stop switch.
-- Sell/exit handling and exposure release; the current proposal schema accepts buys
-  only and is intentionally unsuitable for a full trading strategy.
+- Live sell/exit transaction building, quotes, Token-2022 mint-extension support,
+  and verified accounting/exposure release. Offline sell proposals and balance-flow
+  reconciliation do not implement these execution functions.
 - Proven agent-launch assignment and per-agent execution, with isolated journals
   and wallet/rule bindings. The house observer does not consume that queue.
 
 Only after these are built and verified should activation be considered. The
 existing no-trade/no-signing instruction remains enforced by this implementation.
+
+## Local runtime protections
+
+The CLI requires an owned private runtime directory and regular owned private
+input files, opened with symlink following disabled. Status and position writes
+use unique exclusive temporary files and atomic rename. A competing journal writer
+leaves the prior status untouched rather than replacing a healthy worker status
+with a lock-contention failure. SIGINT/SIGTERM interrupt the polling delay; an
+in-progress read-only RPC remains bounded by its request timeout.
+
+## Periodic inventory and readiness
+
+The ordinary worker now refreshes finalized token positions automatically, without
+needing `--refresh-positions`. Successful refreshes are scheduled about every 60
+seconds; the 30-second observer tick performs a refresh when due. The protected
+`trading-position-refresh.json` persists attempts across `--once` launches and
+restarts. Provider failures back off for 60, 120, 240, then at most 300 seconds.
+The attempt is saved before the request, preventing an interrupted process from
+immediately hammering the provider after restart. RPC and attempt/cache updates
+run under the journal's exclusive writer lock. Explicit refreshes and sell
+proposals request fresh data immediately.
+
+A failed refresh records unavailable inventory, never a zero balance. Readiness
+uses a 90-second freshness bound. `inventoryMintCount` is `null` when missing,
+stale, or invalid, and `0` only for a fresh complete empty finalized snapshot.
+`trading-status.json` lists concrete blockers: unavailable wallet observation or
+inventory, insufficient spendable SOL, an empty mint allowlist, unresolved
+submissions, launch-identity conflicts, and the always-applicable absence of live
+execution, signer, validated strategy and verified accounting. It always reports
+`readyForLiveTrading: false`, `costBasisVerified: false`, and
+`riskAccountingVerified: false`. Healthy observation is not trading readiness.
+
+## Durable local launch observations
+
+The house observer's queue entries currently contain only `{id,mint,wallet,ts}`.
+The trading worker records valid entries from a fresh observer in its protected
+journal as `launchesObserved`. Repeated entries are idempotent. A changed wallet,
+mint, or queue timestamp for an existing ID permanently marks that original
+record as `identity-conflict`; it never silently reassigns the identity. Reuse of
+a wallet or mint by a different ID marks both records conflicted. House-wallet
+assignment also conflicts. Invalid and future-dated records are rejected.
+
+Every record remains `acknowledged: false`, `executionEnabled: false`, and
+`rules: "not-fetched"`. This is local observation only: no external queue item is
+consumed or acknowledged, no key is assigned, no bot is started, and no trading
+rule is inferred. The upstream endpoint exposes only the latest 50 entries, so
+this is not complete or durable external delivery. The local journal retains at
+most 1,000 observed identities and reports capacity/truncation instead of silently
+claiming full intake. A separate verified launch-delivery and per-agent execution
+integration is still required.

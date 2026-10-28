@@ -1,7 +1,8 @@
 import { EDGE_1S, hasStore, redis } from './_lib.js'
 
 // Read the frame and its identity atomically. Every viewer polls this, so the CDN
-// shares each frame for one second; a frame is never served older than that.
+// shares a successful response for one second. Origin reads reject frames aged
+// 12 seconds or more; errors are never cached.
 export async function GET(req: Request) {
   const [pair] = hasStore() ? await redis(['MGET', 'gg:screen', 'gg:screen:ts']) : [null]
   const [jpeg, timestamp] = Array.isArray(pair) ? pair : [null, null]
