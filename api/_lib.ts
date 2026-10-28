@@ -76,7 +76,7 @@ export async function signedBy(sig: string, wallet: string): Promise<boolean> {
   return tx.transaction.message.accountKeys.some((k) => k.signer && k.pubkey === wallet)
 }
 
-export interface Market { mcUsd: number; vol24hUsd: number; change24h: number; image?: string }
+export interface Market { mcUsd: number; vol24hUsd: number; change24h: number; image?: string; symbol: string; name: string }
 
 // Market data for up to 30 coins per call from DexScreener, picking each coin's deepest pair.
 export async function markets(mints: string[]): Promise<Record<string, Market>> {
@@ -87,7 +87,7 @@ export async function markets(mints: string[]): Promise<Record<string, Market>> 
       const res = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${list.slice(i, i + 30).join(',')}`)
       if (!res.ok) continue
       const pairs = (await res.json()) as {
-        baseToken: { address: string }
+        baseToken: { address: string; symbol?: string; name?: string }
         marketCap?: number
         fdv?: number
         volume?: { h24?: number }
@@ -101,7 +101,7 @@ export async function markets(mints: string[]): Promise<Record<string, Market>> 
         if (!best[a] || (p.liquidity?.usd ?? 0) > (best[a].liquidity?.usd ?? 0)) best[a] = p
       }
       for (const [a, p] of Object.entries(best)) {
-        out[a] = { mcUsd: p.marketCap ?? p.fdv ?? 0, vol24hUsd: p.volume?.h24 ?? 0, change24h: p.priceChange?.h24 ?? 0, image: p.info?.imageUrl }
+        out[a] = { mcUsd: p.marketCap ?? p.fdv ?? 0, vol24hUsd: p.volume?.h24 ?? 0, change24h: p.priceChange?.h24 ?? 0, image: p.info?.imageUrl, symbol: p.baseToken.symbol ?? '', name: p.baseToken.name ?? '' }
       }
     } catch {
       /* one bad batch should not blank the page */

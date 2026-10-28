@@ -46,7 +46,17 @@ export const LiveBot = forwardRef<HTMLDivElement, Props>(function LiveBot({ colo
         </div>
       </div>
       {habit === 'doze' && <span className="lb-z mono">z</span>}
-      {say && <span className="lb-say">{say}</span>}
+      {say && (
+        <span className="lb-say" aria-label={say}>
+          {shout
+            ? [...say].map((c, i) => (
+                <span key={i} aria-hidden className="lb-wave" style={{ '--i': i } as CSSProperties}>
+                  {c === ' ' ? '\u00a0' : c}
+                </span>
+              ))
+            : say}
+        </span>
+      )}
     </div>
   )
 })

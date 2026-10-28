@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { demoAgents, driftAgents } from './demoAgents'
-import type { AgentsFeed } from './types'
+import { demoAgents, driftAgents, withRealCoins } from './demoAgents'
+import type { AgentsFeed, RealCoin } from './types'
 
 const POLL_MS = 10_000
 const DEMO_TICK_MS = 4_000
@@ -30,13 +30,28 @@ export function useAgents(active: boolean): AgentsFeed {
         /* local dev without functions: stay on demo */
       }
     }
+    // until real bots launch, the sample bots carry real coins with live numbers
+    const coins = async () => {
+      if (mode.current !== 'demo') return
+      try {
+        const res = await fetch('/api/coins')
+        if (!res.ok) return
+        const { coins } = (await res.json()) as { coins: RealCoin[] }
+        if (alive && mode.current === 'demo') setFeed((f) => withRealCoins(f, coins))
+      } catch {
+        /* local dev without functions: keep the sample coins */
+      }
+    }
     pull()
+    coins()
     const poll = setInterval(pull, POLL_MS)
+    const coinPoll = setInterval(coins, 60_000)
     const demo = setInterval(() => mode.current === 'demo' && setFeed((f) => driftAgents(f)), DEMO_TICK_MS)
     return () => {
       alive = false
       ctrl?.abort()
       clearInterval(poll)
+      clearInterval(coinPoll)
       clearInterval(demo)
     }
   }, [active])

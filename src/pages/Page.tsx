@@ -1,5 +1,6 @@
 import { useRef, type CSSProperties, type ReactNode } from 'react'
 import { LiveBot, useEyesFollow } from '../ui/LiveBot'
+import { Scramble } from '../ui/Scramble'
 import './pages.css'
 
 // The frame every page shares: an index and label, a big title whose letters lift
@@ -24,7 +25,7 @@ export function Page({ n, label, title, sub, side, say, children }: { n: number;
         <header className="pg-head">
           <div className="pg-eyebrow mono">
             <span>[{String(n).padStart(2, '0')}]</span>
-            <span>{label}</span>
+            <Scramble text={label} />
             {side}
           </div>
           <h1 className="pg-title" aria-label={title}>

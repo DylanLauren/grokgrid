@@ -63,3 +63,9 @@
 @media (prefers-reduced-motion: reduce) {
   .lb .lb-habit, .lb .lb-body { animation: none !important; }
 }
+
+/* a bubble that stays out drifts gently and its letters ripple, so it never sits still */
+.lb.shout .lb-say { animation: lb-drift 4s ease-in-out infinite; }
+@keyframes lb-drift { 0%, 100% { transform: translate(0, 0) rotate(-1.5deg); } 50% { transform: translate(4px, -5px) rotate(1.5deg); } }
+.lb-wave { display: inline-block; animation: lb-wave 2.6s ease-in-out infinite; animation-delay: calc(var(--i) * 70ms); }
+@keyframes lb-wave { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-3px); } }

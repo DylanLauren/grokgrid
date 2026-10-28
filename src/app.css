@@ -17,12 +17,35 @@
   display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px;
   padding: 0 var(--edge);
   background: linear-gradient(#0a0a0af0, #0a0a0a00);
-  transition: background 0.3s;
+  transition: background 0.3s, transform 0.45s cubic-bezier(.2,.8,.2,1), opacity 0.3s;
 }
+.bar.tuck { transform: translateY(-110%); opacity: 0; pointer-events: none; }
+/* the folded bar: one bot in a box, top left */
+.mini {
+  position: absolute; z-index: 31; top: 12px; left: var(--edge);
+  width: 54px; height: 54px; display: grid; place-items: center; border-radius: 17px;
+  background: var(--glass); border: 1px solid var(--hair-strong); backdrop-filter: blur(14px);
+  box-shadow: 0 10px 30px #0008, inset 0 1px 0 #ffffff14;
+  opacity: 0; transform: translateY(-14px) scale(0.6); pointer-events: none;
+  transition: opacity 0.25s, transform 0.5s cubic-bezier(.3,1.6,.5,1), border-color 0.2s;
+}
+.mini.on { opacity: 1; transform: none; pointer-events: auto; transition-delay: 0.12s; }
+.mini:hover { border-color: var(--paper-50); }
+.mini svg { transition: transform 0.5s cubic-bezier(.3,1.6,.5,1); animation: boot-bob 2.4s ease-in-out infinite; }
+.mini:hover svg { transform: rotate(-14deg) scale(1.1); }
 .on-page .bar { background: #0a0a0ae6; backdrop-filter: blur(14px); border-bottom: 1px solid var(--hair); }
 .brand { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 560; letter-spacing: -0.035em; justify-self: start; }
-.brand svg { transition: transform 0.5s cubic-bezier(.3,1.6,.5,1); }
-.brand:hover svg { transform: rotate(-14deg) scale(1.08); }
+.brand > svg { transition: transform 0.5s cubic-bezier(.3,1.6,.5,1); }
+.brand:hover > svg { transform: rotate(-14deg) scale(1.08); }
+.crew { display: flex; align-items: flex-end; gap: 1px; margin-left: 4px; height: 28px; }
+.crew .lb-shadow { display: none; }
+.crew .lb { transition: transform 0.4s cubic-bezier(.3,1.6,.5,1); }
+/* hover the logo and the family does a wave, one after another */
+.brand:hover .crew .lb-body { animation: lb-jump 0.6s cubic-bezier(.3,0,.3,1) backwards; }
+.brand:hover .crew .lb:nth-child(2) .lb-body { animation-delay: 0.07s; }
+.brand:hover .crew .lb:nth-child(3) .lb-body { animation-delay: 0.14s; }
+.brand:hover .crew .lb:nth-child(4) .lb-body { animation-delay: 0.21s; }
+.brand:hover .crew .lb:nth-child(5) .lb-body { animation-delay: 0.28s; }
 .tabs { display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: var(--r-pill); }
 .tabs { background: #ffffff0b; border: 1px solid var(--hair); backdrop-filter: blur(10px); }
 .tabs button { height: 34px; padding: 0 15px; border-radius: var(--r-pill); font-size: 14px; color: var(--paper-70); transition: color 0.2s, background 0.25s; }
@@ -102,6 +125,7 @@
 @media (max-width: 900px) {
   .app { --edge: var(--pad); }
   .bar { grid-template-columns: auto 1fr; }
+  .crew .lb:nth-child(n + 3) { display: none; }
   .tabs { position: absolute; top: calc(var(--bar) + 2px); left: var(--pad); right: var(--pad); justify-content: space-between; overflow-x: auto; }
   .tabs button { flex: 1; padding: 0 8px; font-size: 13px; }
   .on-page .tabs { background: #111; }

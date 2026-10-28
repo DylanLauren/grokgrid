@@ -28,8 +28,20 @@
 .mx-th { font-size: 10.5px; color: var(--paper-50); text-transform: uppercase; letter-spacing: 0.06em; padding-top: 9px; padding-bottom: 9px; }
 .mx-row .r { text-align: right; justify-self: end; display: inline-flex; align-items: center; gap: 4px; }
 .mx-i { color: var(--paper-30); font-size: 11px; }
-.mx-face { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 10px; background: #f2f3f5; }
-.mx-face svg { width: 26px; height: 26px; }
+.mx-face { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border-radius: 12px; background: #f2f3f5; overflow: visible; transition: transform 0.35s cubic-bezier(.3,1.6,.5,1), box-shadow 0.3s; }
+.mx-face .lb-shadow { display: none; }
+
+/* hovering a bot's row: the row lights up, the bot jumps and the coin turns */
+.mx-row:not(.mx-th) { position: relative; transition: background 0.25s, transform 0.35s cubic-bezier(.2,.8,.2,1); }
+.mx-row:not(.mx-th)::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--paper); transform: scaleY(0); transition: transform 0.3s cubic-bezier(.2,.8,.2,1); }
+.mx-row:not(.mx-th):hover { background: #ffffff0a; }
+.mx-row:not(.mx-th):hover::before { transform: scaleY(1); }
+.mx-row:hover .mx-face { transform: scale(1.12) rotate(-4deg); box-shadow: 0 6px 18px #0008; }
+.mx-row:hover .mx-face .lb-body { animation: lb-jump 0.65s cubic-bezier(.3,0,.3,1); }
+.mx-row:hover .mx-face .lb-doze .lb-blink, .mx-row:hover .mx-face .lb-blink { transform: scaleY(1); }
+.mx-coin > span:first-child { transition: transform 0.6s cubic-bezier(.3,1.4,.5,1); }
+.mx-row:hover .mx-coin > span:first-child { transform: rotateY(360deg); }
+.mx-row:hover .mx-bot b { text-decoration: underline; text-decoration-color: var(--paper-30); text-underline-offset: 3px; }
 .mx-bot, .mx-coin { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .mx-bot > span:last-child, .mx-coin > span:last-child { display: grid; min-width: 0; }
 .mx-bot b, .mx-coin b { font-weight: 560; letter-spacing: -0.01em; }

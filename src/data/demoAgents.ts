@@ -1,4 +1,4 @@
-import type { Agent, AgentsFeed } from './types'
+import type { Agent, AgentsFeed, RealCoin } from './types'
 
 // Demo grid, shown only until the first real agent launches. Labelled "demo"
 // everywhere it appears; none of these bots or coins exist.
@@ -69,6 +69,23 @@ export function demoAgents(now = Date.now()): AgentsFeed {
   return { mode: 'demo', updatedAt: now, solUsd: 182, agents }
 }
 
+// Sample bots trading real coins: each sample bot takes one real pump.fun coin, with its
+// real logo and live market numbers. Bots and their wallets stay samples.
+export function withRealCoins(feed: AgentsFeed, coins: RealCoin[]): AgentsFeed {
+  if (!coins.length) return feed
+  return {
+    ...feed,
+    agents: feed.agents.map((a, i) => {
+      const c = coins[i % coins.length]
+      return {
+        ...a,
+        coin: { ...a.coin, mint: c.mint, symbol: c.symbol, name: c.name, image: c.image, mcUsd: c.mcUsd, vol24hUsd: c.vol24hUsd, change24h: c.change24h, real: true },
+        last: a.last && { ...a.last, symbol: coins[(i * 3 + 1) % coins.length].symbol },
+      }
+    }),
+  }
+}
+
 // Nudges the demo numbers so the page moves the way the live one will.
 export function driftAgents(feed: AgentsFeed, now = Date.now()): AgentsFeed {
   const r = Math.random
@@ -80,7 +97,9 @@ export function driftAgents(feed: AgentsFeed, now = Date.now()): AgentsFeed {
       const traded = r() < 0.12
       return {
         ...a,
-        coin: { ...a.coin, mcUsd: a.coin.mcUsd * k, vol24hUsd: a.coin.vol24hUsd + a.coin.mcUsd * r() * 0.004, change24h: a.coin.change24h + (k - 1) * 100, feesSol: a.coin.feesSol + r() * 0.002 },
+        coin: a.coin.real
+          ? { ...a.coin, feesSol: a.coin.feesSol + r() * 0.002 }
+          : { ...a.coin, mcUsd: a.coin.mcUsd * k, vol24hUsd: a.coin.vol24hUsd + a.coin.mcUsd * r() * 0.004, change24h: a.coin.change24h + (k - 1) * 100, feesSol: a.coin.feesSol + r() * 0.002 },
         trades: a.trades + (traded ? 1 : 0),
         walletSol: Math.max(0.05, a.walletSol + (traded ? (r() - 0.48) * 0.1 : 0)),
         last: traded ? { side: r() < 0.5 ? 'buy' : 'sell', symbol: a.last?.symbol ?? 'MOTH', spentSol: +(0.05 + r() * 0.4).toFixed(2), pnlUsd: (r() - 0.45) * 40, ts: now } : a.last,

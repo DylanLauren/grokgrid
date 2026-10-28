@@ -55,6 +55,7 @@ export interface Agent {
     vol24hUsd: number
     change24h: number // percent
     feesSol: number // creator fees earned so far
+    real?: boolean // a real coin on chain (sample bots borrow real coins before launches start)
   }
   walletSol: number
   pnlSol: number // since launch, realised + open
@@ -78,3 +79,6 @@ export interface Live {
   actions: { ts: number; text: string }[] // newest first
   screenTs: number
 }
+
+// A real coin from /api/coins, used by the sample grid.
+export interface RealCoin { mint: string; symbol: string; name: string; image?: string; mcUsd: number; vol24hUsd: number; change24h: number }

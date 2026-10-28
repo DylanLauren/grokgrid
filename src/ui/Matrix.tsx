@@ -3,7 +3,7 @@ import { BOT_WALLET, MAIN_MINT, MAIN_NAME, MAIN_TICKER, solscan } from '../confi
 import type { Agent, AgentsFeed, Feed } from '../data/types'
 import { stats } from '../data/useFeed'
 import { ago, mc, pct, short, signedUsd, usd } from '../lib/format'
-import { BotMark } from './BotMark'
+import { LiveBot, type Habit } from './LiveBot'
 import { CoinChip } from './CoinChip'
 import './matrix.css'
 
@@ -100,19 +100,21 @@ export function MatrixPanel({ grid, feed }: { grid: AgentsFeed; feed: Feed }) {
           <Row key={a.id} a={a} i={i} solUsd={grid.solUsd} now={now} />
         ))}
       </div>
-      {grid.mode === 'demo' && <p className="mx-fine">demo bots and coins, none of them exist. real agents appear here the moment they launch, each with its coin attached.</p>}
+      {grid.mode === 'demo' && <p className="mx-fine">sample bots on real pump.fun coins: the coins, logos and market numbers are live, the bots are samples. real bots replace them the moment they launch.</p>}
     </div>
   )
 }
 
+const HABITS: Habit[] = ['look', 'bounce', 'float', 'sway', 'tilt', 'flip', 'hop', 'squish', 'doze']
+
 function Row({ a, i, solUsd, now }: { a: Agent; i: number; solUsd: number; now: number }) {
-  const live = !!a.coin.mint && !a.id.startsWith('demo')
+  const live = !!a.coin.mint && (a.coin.real || !a.id.startsWith('demo'))
   return (
     <div className={`mx-row ${a.house ? 'house' : ''}`} role="row">
       <span className="mx-i mono">{a.house ? '00' : String(i).padStart(2, '0')}</span>
       <span className="mx-bot">
         <span className="mx-face">
-          <BotMark size={26} color={a.house ? 'house' : a.color} shape={a.shape} />
+          <LiveBot size={34} color={a.house ? 'house' : a.color} eye={a.house ? '#0a0a0a' : '#fff'} shape={a.shape} habit={a.house ? 'look' : HABITS[i % HABITS.length]} delay={i * -0.6} />
         </span>
         <span>
           <b>{a.name}</b>

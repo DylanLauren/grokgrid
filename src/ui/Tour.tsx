@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { View } from '../scene/Scene'
 import { MAIN_TICKER } from '../config'
 import './tour.css'
@@ -36,6 +36,25 @@ export function Tour({ go, onDone }: { go: (tab: Tab, view: View) => void; onDon
     go('desk', 'third')
     onDone()
   }
+  // clicking anywhere off the card (not dragging the room) ends the tour
+  const end = useRef(finish)
+  useEffect(() => {
+    end.current = finish
+  })
+  useEffect(() => {
+    let down = { x: 0, y: 0 }
+    const onDown = (e: PointerEvent) => (down = { x: e.clientX, y: e.clientY })
+    const onUp = (e: PointerEvent) => {
+      if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return
+      if (!(e.target as Element).closest('.tour')) end.current()
+    }
+    addEventListener('pointerdown', onDown)
+    addEventListener('pointerup', onUp)
+    return () => {
+      removeEventListener('pointerdown', onDown)
+      removeEventListener('pointerup', onUp)
+    }
+  }, [])
   const next = () => {
     if (i === STEPS.length - 1) return finish()
     const n = STEPS[i + 1]

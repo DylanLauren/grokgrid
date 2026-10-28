@@ -3,7 +3,8 @@ import { MAIN_MINT, MAIN_NAME, MAIN_TICKER, X_HANDLE, buyUrl } from './config'
 import { stats, useFeed } from './data/useFeed'
 import type { View } from './scene/Scene'
 import { pct } from './lib/format'
-import { BotMark } from './ui/BotMark'
+import { BotMark, type Shape } from './ui/BotMark'
+import { LiveBot, type Habit } from './ui/LiveBot'
 import { CallCard } from './ui/CallCard'
 import { CallsPanel } from './ui/Panels'
 import { useAgents } from './data/useAgents'
@@ -15,6 +16,15 @@ import { MatrixPage } from './pages/MatrixPage'
 import { GridPage } from './pages/GridPage'
 import { DocsPage } from './pages/DocsPage'
 import './app.css'
+
+// his family, hanging around next to the logo
+const CREW: [string, Shape, Habit][] = [
+  ['#ff6a00', 'sphere', 'bounce'],
+  ['#13b8a6', 'squircle', 'sway'],
+  ['#9b5cff', 'tile', 'tilt'],
+  ['#ff2e9a', 'cone', 'hop'],
+  ['#1683ff', 'squircle', 'flip'],
+]
 
 const Scene = lazy(() => import('./scene/Scene').then((m) => ({ default: m.Scene })))
 
@@ -35,6 +45,27 @@ export default function App() {
   const grid = useAgents(tab === 'matrix' || tab === 'grid')
   const live = useLive(!onPage, view === 'phone', feed)
   const [touring, setTouring] = useState(() => !seenTour())
+  const tucked = useTuck()
+
+  // a plain click outside an open panel closes it and puts you back in the room
+  useEffect(() => {
+    let down: { x: number; y: number } | null = null
+    const onDown = (e: PointerEvent) => (down = { x: e.clientX, y: e.clientY })
+    const onUp = (e: PointerEvent) => {
+      if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return // a drag, not a click
+      down = null
+      const t = e.target as Element
+      if (t.closest('.bar, .mini, .tour, .panel, .views, .calls-dock, .strip, .page, .ph-wrap, .watch')) return
+      if (tab === 'calls') setTab('desk')
+      else if (view === 'phone') setView('third')
+    }
+    addEventListener('pointerdown', onDown)
+    addEventListener('pointerup', onUp)
+    return () => {
+      removeEventListener('pointerdown', onDown)
+      removeEventListener('pointerup', onUp)
+    }
+  }, [tab, view])
 
   useEffect(() => {
     history.replaceState(null, '', tab === 'desk' ? location.pathname : `#${tab}`)
@@ -62,10 +93,18 @@ export default function App() {
         </Suspense>
       </div>
 
-      <header className="bar">
+      <button className={`mini ${tucked.on ? 'on' : ''}`} onClick={tucked.open} aria-label="show menu" tabIndex={tucked.on ? 0 : -1}>
+        <BotMark size={32} />
+      </button>
+      <header className={`bar ${tucked.on ? 'tuck' : ''}`}>
         <button className="brand" onClick={() => { setTab('desk'); setView('third') }}>
           <BotMark size={30} />
           <span>GrokGrid</span>
+          <span className="crew" aria-hidden>
+            {CREW.map(([color, shape, habit], i) => (
+              <LiveBot key={color} color={color} shape={shape} habit={habit} size={24} delay={i * -0.53} />
+            ))}
+          </span>
         </button>
         <nav className="tabs">
           {TABS.map((t) => (
@@ -135,6 +174,46 @@ export default function App() {
       <footer className="fine mono">{MAIN_NAME} · ${MAIN_TICKER} · unofficial fan project, not affiliated with xAI or pump.fun</footer>
     </div>
   )
+}
+
+// Scrolling down anywhere folds the top bar into a single bot; one scroll up brings it back.
+function useTuck() {
+  const [on, setOn] = useState(false)
+  useEffect(() => {
+    const tops = new WeakMap<EventTarget, number>()
+    let touchY = 0
+    const go = (dy: number) => {
+      if (dy > 2) setOn(true)
+      else if (dy < -2) setOn(false)
+    }
+    const onWheel = (e: WheelEvent) => go(e.deltaY)
+    const onScroll = (e: Event) => {
+      const el = e.target === document ? document.documentElement : (e.target as HTMLElement)
+      if (!el || !('scrollTop' in el)) return
+      const prev = tops.get(el) ?? 0
+      tops.set(el, el.scrollTop)
+      go(el.scrollTop - prev)
+    }
+    const onTouchStart = (e: TouchEvent) => (touchY = e.touches[0].clientY)
+    const onTouchMove = (e: TouchEvent) => {
+      const y = e.touches[0].clientY
+      if (Math.abs(y - touchY) < 12) return
+      go(touchY - y)
+      touchY = y
+    }
+    const opts = { passive: true, capture: true }
+    addEventListener('wheel', onWheel, opts)
+    document.addEventListener('scroll', onScroll, opts)
+    addEventListener('touchstart', onTouchStart, opts)
+    addEventListener('touchmove', onTouchMove, opts)
+    return () => {
+      removeEventListener('wheel', onWheel, opts)
+      document.removeEventListener('scroll', onScroll, opts)
+      removeEventListener('touchstart', onTouchStart, opts)
+      removeEventListener('touchmove', onTouchMove, opts)
+    }
+  }, [])
+  return { on, open: () => setOn(false) }
 }
 
 function BuyButton() {
