@@ -1,0 +1,48 @@
+.ph {
+  width: 300px;
+  height: 640px;
+  background: #0d0f12;
+  color: #fff;
+  font-family: var(--sans);
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  user-select: none;
+  backface-visibility: hidden;
+}
+.ph-status { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--paper-70); height: 22px; }
+.ph-island { width: 86px; height: 22px; border-radius: 12px; background: #000; }
+.ph-nav { display: grid; grid-template-columns: 24px 1fr 40px; align-items: center; font-size: 14px; }
+.ph-back { font-size: 26px; line-height: 1; color: var(--paper-70); }
+.ph-brand { text-align: center; font-weight: 560; }
+.ph-demo { font-size: 10px; color: var(--paper-50); border: 1px solid var(--hair-strong); border-radius: 999px; padding: 2px 6px; text-align: center; }
+.ph-coin { display: flex; gap: 12px; align-items: center; }
+.ph-sym { font-weight: 600; font-size: 18px; }
+.ph-name { color: var(--paper-50); font-size: 13px; }
+.ph-mc { display: flex; align-items: baseline; gap: 10px; font-size: 14px; }
+.ph-mc-v { font-size: 30px; font-weight: 560; letter-spacing: -0.03em; }
+.ph-chart { width: 100%; height: 110px; background: linear-gradient(#ffffff08 1px, transparent 1px) 0 0 / 100% 22px; border-radius: 8px; }
+.ph-pos { display: grid; grid-template-columns: repeat(3, 1fr); background: #171a1f; border-radius: 14px; padding: 10px 12px; }
+.ph-pos div { display: grid; gap: 2px; }
+.ph-pos span { font-size: 11px; color: var(--paper-50); }
+.ph-pos b { font-weight: 560; font-size: 14px; }
+.ph-trade { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ph-trade button { height: 44px; border-radius: 14px; font-weight: 600; font-size: 15px; transition: transform 0.15s, filter 0.15s; }
+.ph-buy { background: #1f3a2a; color: var(--gain); }
+.ph-sell { background: #3a1f22; color: var(--loss); }
+.ph-buy.on { background: var(--gain); color: #06210f; transform: scale(0.96); }
+.ph-sell.on { background: var(--loss); color: #2a0606; transform: scale(0.96); }
+.ph-list { display: grid; gap: 8px; margin-top: 2px; }
+.ph-row { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; font-size: 13px; }
+.ph-row-s { font-weight: 560; }
+.ph-toast {
+  position: absolute; left: 16px; right: 16px; bottom: 18px;
+  background: #fff; color: #0a0a0a; border-radius: 14px; padding: 12px 14px;
+  font-weight: 560; font-size: 14px;
+  animation: ph-in 0.35s cubic-bezier(.2,.9,.3,1.2);
+}
+@keyframes ph-in { from { transform: translateY(24px); opacity: 0; } }

@@ -1,0 +1,22 @@
+.mon {
+  width: 760px;
+  height: 440px;
+  background: #0b0b0c;
+  color: #fff;
+  font-family: var(--sans);
+  padding: 22px 26px;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 8px;
+  user-select: none;
+  backface-visibility: hidden;
+}
+.mon-head { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.mon-label { text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px; }
+.mon-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gain); box-shadow: 0 0 10px var(--gain); }
+.mon-pills { margin-left: auto; display: flex; gap: 6px; }
+.mon-pills b { font-weight: 500; font-size: 12px; border: 1px solid var(--hair-strong); border-radius: 999px; padding: 3px 10px; }
+.mon-big { display: flex; align-items: baseline; gap: 10px; }
+.mon-big span:first-child { font-size: 56px; font-weight: 520; letter-spacing: -0.04em; line-height: 1; }
+.mon-chart { width: 100%; height: 100%; }
+.mon-foot { display: flex; gap: 22px; font-size: 13px; color: var(--paper-70); }

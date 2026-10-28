@@ -1,0 +1,73 @@
+import { balances, hasStore, HOUSE_WALLET, json, MAIN_MINT, markets, parse, redis, solUsd, toHash } from './_lib'
+
+// Registry entry, written once by /api/ingest when Grok Bot launches an agent's coin.
+export interface AgentRecord {
+  id: string
+  name: string
+  color: string
+  shape: string
+  strategy: string
+  launchedAt: number
+  wallet: string
+  coin: { mint: string; symbol: string; name: string; image?: string; hue: string }
+}
+
+interface CallLite { side: 'buy' | 'sell'; symbol: string; spentSol: number; pnlUsd: number; ts: number; sig?: string }
+
+// Every bot on the grid with its coin attached: registry from the store,
+// balances from the chain, market data from DexScreener.
+export async function GET() {
+  if (!hasStore()) return json({ mode: 'demo' })
+  const [reg] = await redis(['HGETALL', 'gg:agents'])
+  const records = Object.values(toHash(reg))
+    .map((v) => parse<AgentRecord>(v))
+    .filter((a): a is AgentRecord => !!a)
+  const ids = ['house', ...records.map((r) => r.id)]
+
+  const perAgent = await redis(...ids.flatMap((id) => [['HGETALL', `gg:stats:${id}`], ['LINDEX', `gg:calls:${id}`, 0]]))
+  const [bal, mkt, price] = await Promise.all([
+    balances([HOUSE_WALLET, ...records.map((r) => r.wallet)]),
+    markets([MAIN_MINT, ...records.map((r) => r.coin.mint)]),
+    solUsd(),
+  ])
+
+  const houseRecord: AgentRecord = {
+    id: 'house',
+    name: 'grok grid',
+    color: '#ffffff',
+    shape: 'sphere',
+    strategy: 'the house bot. trades on his phone at the desk, funds every bot below',
+    launchedAt: 0,
+    wallet: HOUSE_WALLET,
+    coin: { mint: MAIN_MINT, symbol: process.env.VITE_MAIN_TICKER || 'GRID', name: 'Grok Grid', image: '/favicon.svg', hue: '#f4f4f2' },
+  }
+
+  const agents = [houseRecord, ...records].map((r, i) => {
+    const st = toHash(perAgent[i * 2])
+    const last = parse<CallLite>(perAgent[i * 2 + 1])
+    const m = mkt[r.coin.mint]
+    const sells = Number(st.sells ?? 0)
+    return {
+      ...r,
+      house: r.id === 'house' || undefined,
+      launchedAt: r.launchedAt || Number(st.firstTs ?? Date.now()),
+      coin: {
+        ...r.coin,
+        image: m?.image || r.coin.image,
+        mcUsd: m?.mcUsd ?? 0,
+        vol24hUsd: m?.vol24hUsd ?? 0,
+        change24h: m?.change24h ?? 0,
+        feesSol: Number(st.feesSol ?? 0),
+      },
+      walletSol: bal[r.wallet] ?? 0,
+      pnlSol: Number(st.pnlSol ?? 0),
+      trades: Number(st.trades ?? 0),
+      winRate: sells ? (Number(st.wins ?? 0) / sells) * 100 : 0,
+      burnedMain: Number(st.burnedMain ?? 0),
+      last: last ? { side: last.side, symbol: last.symbol, spentSol: last.spentSol, pnlUsd: last.pnlUsd, ts: last.ts, sig: last.sig } : undefined,
+    }
+  })
+
+  const live = records.length > 0 || Number(toHash(perAgent[0]).trades ?? 0) > 0
+  return json({ mode: live ? 'live' : 'demo', updatedAt: Date.now(), solUsd: price, agents })
+}
