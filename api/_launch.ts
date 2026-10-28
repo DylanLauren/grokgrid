@@ -1,13 +1,13 @@
 // Launchpad rules shared by the launch routes: what a bot draft may hold, the pool of
 // trading wallets Grok Bot hands out, per-IP limits, and where pending launches live.
 // No keys here: the pool only ever holds public addresses Grok Bot posted.
-import { isAddress, redis } from './_lib.js'
+import { HOUSE_WALLET, isAddress, redis } from './_lib.js'
 
 export const SITE_URL = (process.env.SITE_URL || 'https://grokgrid-alpha.vercel.app').replace(/\/$/, '')
 export const BURN_WALLET = process.env.VITE_BURN_WALLET || ''
 export const MAX_IMAGE_BYTES = 400_000
 export const DRAFT_TTL = 86_400
-const LEASE_TTL = 900
+export const LEASE_TTL = 900
 
 // Mirrors FAMILY in src/ui/BotMark.tsx: the nine looks a bot can take.
 export const LOOKS = [
@@ -109,30 +109,40 @@ export const agentId = (ticker: string, mint: string) => `${ticker.toLowerCase()
 // it once the coin is confirmed on chain.
 
 export async function freeWallets(): Promise<number> {
-  const [n] = await redis(['SCARD', keys.pool])
-  return Number(n ?? 0)
+  const [members] = await redis(['SMEMBERS', keys.pool])
+  const wallets = ((members as string[]) ?? []).filter(isAddress)
+  if (!wallets.length) return 0
+  const busy = await redis(...wallets.map((w) => ['EXISTS', keys.lease(w)]))
+  return busy.filter((n) => Number(n) === 0).length
 }
 
 export async function leaseWallet(mint: string): Promise<string | null> {
   const [members] = await redis(['SMEMBERS', keys.pool])
   for (const w of ((members as string[]) ?? []).filter(isAddress)) {
-    const [ok] = await redis(['SET', keys.lease(w), mint, 'NX', 'EX', LEASE_TTL])
+    const [ok] = await redis(['EVAL', `if redis.call('SISMEMBER', KEYS[1], ARGV[1]) ~= 1 or redis.call('SISMEMBER', KEYS[2], ARGV[1]) == 1 then return false end return redis.call('SET', KEYS[3], ARGV[2], 'NX', 'EX', ARGV[3])`, 3, keys.pool, keys.used, keys.lease(w), w, mint, LEASE_TTL])
     if (ok === 'OK') return w
   }
   return null
 }
 
-export async function keepWallet(wallet: string) {
-  await redis(['SREM', keys.pool, wallet], ['SADD', keys.used, wallet], ['DEL', keys.lease(wallet)])
+// Compare ownership inside Redis, so an old request cannot release a newer lease.
+export async function releaseWallet(wallet: string, mint: string) {
+  await redis(['EVAL', `if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end return 0`, 1, keys.lease(wallet), mint])
 }
 
+// Before sending any signed bytes, remove expiry. Ambiguous network failures must
+// retain this wallet until chain reconciliation proves failure or success.
+export async function pinWallet(wallet: string, mint: string, expectedRecord: string, recoveryRecord: string): Promise<boolean> {
+  const [ok] = await redis(['EVAL', `if redis.call('GET', KEYS[1]) ~= ARGV[1] or redis.call('GET', KEYS[2]) ~= ARGV[2] then return 0 end redis.call('PERSIST', KEYS[1]) redis.call('SET', KEYS[2], ARGV[3]) redis.call('SADD', KEYS[3], ARGV[1]) return 1`, 3, keys.lease(wallet), keys.pending(mint), 'gg:launch:open', mint, expectedRecord, recoveryRecord])
+  return Number(ok) === 1
+}
+
+
 export async function addWallets(list: string[]) {
-  const fresh = [...new Set(list.filter(isAddress))].filter((w) => w !== BURN_WALLET)
+  const fresh = [...new Set(list.filter(isAddress))].filter((w) => w !== BURN_WALLET && w !== HOUSE_WALLET)
   if (!fresh.length) return 0
-  const used = await redis(...fresh.map((w) => ['SISMEMBER', keys.used, w]))
-  const add = fresh.filter((_, i) => Number(used[i]) !== 1)
-  if (add.length) await redis(['SADD', keys.pool, ...add])
-  return add.length
+  const [added] = await redis(['EVAL', `local count = 0 for _, w in ipairs(ARGV) do if redis.call('SISMEMBER', KEYS[2], w) == 0 then count = count + redis.call('SADD', KEYS[1], w) end end return count`, 2, keys.pool, keys.used, ...fresh])
+  return Number(added ?? 0)
 }
 
 // ---- launch status ----

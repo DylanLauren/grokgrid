@@ -3,7 +3,8 @@
 // Lighthouse safety checks), so the bytes rarely match exactly. What must not change is the
 // fee payer, the signers, and every instruction we built, in order, with the same accounts
 // and data. The only extras allowed are compute budget and Lighthouse instructions.
-import { AddressLookupTableAccount, PublicKey, VersionedMessage } from '@solana/web3.js'
+import { createPublicKey, verify } from 'node:crypto'
+import { AddressLookupTableAccount, PublicKey, VersionedMessage, VersionedTransaction } from '@solana/web3.js'
 
 const WALLET_EXTRAS = new Set(['ComputeBudget111111111111111111111111111111', 'L2TExMFKdjpN9kozasaurPtfJx5W6SrHvnmTrTxRdzh'])
 const CHANGED = "Your wallet changed the launch, so it wasn't sent. Nothing was spent."
@@ -55,3 +56,27 @@ export function matchesPrepared(signed: VersionedMessage, expected: VersionedMes
 }
 
 export const tablesFor = (m: VersionedMessage) => ('addressTableLookups' in m ? m.addressTableLookups.map((l) => l.accountKey) : []) as PublicKey[]
+
+// Verify authorization before reserving a wallet indefinitely or sending setup.
+// This never signs anything; it verifies the visitor's submitted signatures.
+export function authorizedLaunch(signedB64: string, expectedMessage: string, tables: AddressLookupTableAccount[] = []): string {
+  const raw = Buffer.from(signedB64, 'base64')
+  if (raw.length > 1232) throw Error('Transaction too large.')
+  const tx = VersionedTransaction.deserialize(raw)
+  const expected = VersionedMessage.deserialize(Buffer.from(expectedMessage, 'base64'))
+  if (!matchesPrepared(tx.message, expected, tables)) throw Error(CHANGED)
+  const got = signers(tx.message), want = signers(expected)
+  if (got.length !== 2 || got.length !== want.length || got.some((k, i) => k !== want[i])) throw Error(CHANGED)
+  const message = tx.message.serialize()
+  for (let i = 0; i < got.length; i++) {
+    const key = createPublicKey({ key: Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), tx.message.staticAccountKeys[i].toBuffer()]), format: 'der', type: 'spki' })
+    if (!verify(null, message, key, tx.signatures[i])) throw Error('The launch is missing a valid signature.')
+  }
+  // Solana transaction id is the first signature, encoded as base58.
+  const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+  const bytes = Buffer.from(tx.signatures[0])
+  let n = BigInt('0x' + bytes.toString('hex')), result = ''
+  while (n > 0n) { result = alphabet[Number(n % 58n)] + result; n /= 58n }
+  for (const b of bytes) { if (b !== 0) break; result = '1' + result }
+  return result
+}

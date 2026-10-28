@@ -70,3 +70,28 @@ Until the first real event arrives, the site plays sample data and says so in th
 ## Environment
 
 See `.env.example`. Public addresses only; no private key ever goes into this repo, Vercel or the site. Grok Bot holds its own keys.
+
+### Runtime and launch recovery
+
+`VITE_BOT_WALLET` is the house bot's public address; `VITE_BURN_WALLET` is the
+separate buy-and-burn public address. Neither belongs in the spare-wallet pool.
+Private keys stay outside this repository and outside Vercel.
+
+The phone displays only actual WHEP video or fresh captured JPEG frames. When
+capture stops, it shows **Screen offline**, not an illustrative trading screen.
+The free JPEG path uses `INGEST_TOKEN`; keep it in a protected runtime file and
+never include it in a prompt, log, repository, or public URL. A real screen feed
+is independent of whether trading has been enabled.
+
+Only add spare public wallets after a running bot can consume the launch queue
+and enforce the configured rules. Wallet inventory alone does not prove runtime
+readiness. Prepared launches reserve wallets for 15 minutes. Once an authorized
+send starts, the reservation is held until chain reconciliation completes; an
+ambiguous error must not recycle the wallet. If lookup-table setup fails before
+the launch is sent, the reservation stays held for operator review. Review the
+pending record and chain state before releasing it. Confirmation atomically
+registers and queues each mint once.
+
+Validation without a launch: `npm test`, `npm run build`, and
+`npx tsc -p api/tsconfig.json`. These do not prove a completed on-chain launch or
+an active trading worker; those require separate operational verification.
