@@ -71,17 +71,28 @@ Until the first real event arrives, the site plays sample data and says so in th
 
 See `.env.example`. Public addresses only; no private key ever goes into this repo, Vercel or the site. Grok Bot holds its own keys.
 
+### Screen-only cloud credentials
+
+For a capture worker on a shared cloud computer, keep `INGEST_TOKEN` on the
+operator's Mac. Generate an RSA-3072 key pair on the capture computer, protect its
+private key, and transfer only the public PEM to the Mac. Run
+`scripts/phone-capability.mjs --token-file <local-secret-file> --public-key <public.pem> --out <new-ciphertext-file>`.
+It writes only RSA-OAEP/SHA-256 ciphertext. Decrypt that ciphertext directly to a
+mode-600 file on the capture computer, never to terminal output or chat. The
+resulting Bearer credential permits only `type: screen` uploads to `/api/ingest`;
+it cannot read the launch queue or change wallets, trades, agents or actions.
+It expires after seven days. Renew before expiry; rotate `INGEST_TOKEN` to revoke
+all outstanding capabilities. Existing full-token ingestion still works.
+
+The phone displays fresh captured JPEGs or WHEP video and shows **Screen offline**
+when neither is available. It does not redraw an illustrative trading app. A live
+screen demonstrates capture only; it does not prove the bot is trading.
+
 ### Runtime and launch recovery
 
 `VITE_BOT_WALLET` is the house bot's public address; `VITE_BURN_WALLET` is the
 separate buy-and-burn public address. Neither belongs in the spare-wallet pool.
 Private keys stay outside this repository and outside Vercel.
-
-The phone displays only actual WHEP video or fresh captured JPEG frames. When
-capture stops, it shows **Screen offline**, not an illustrative trading screen.
-The free JPEG path uses `INGEST_TOKEN`; keep it in a protected runtime file and
-never include it in a prompt, log, repository, or public URL. A real screen feed
-is independent of whether trading has been enabled.
 
 Only add spare public wallets after a running bot can consume the launch queue
 and enforce the configured rules. Wallet inventory alone does not prove runtime
