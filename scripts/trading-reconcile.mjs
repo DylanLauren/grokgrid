@@ -9,7 +9,7 @@ const signatureValid = x => typeof x === 'string' && /^[1-9A-HJ-NP-Za-km-z]{64,8
 // finalized commitment. Balance movements prove neither strategy nor cost basis.
 export function inspectFinalizedIntentReceipt(intent, status, tx) {
   try {
-    if (!signatureValid(intent?.signature) || !publicAddress(intent.wallet) || !publicAddress(intent.mint) || intent.mint === WSOL || intent.side !== 'buy' || !integer(intent.spendLamports) || BigInt(intent.spendLamports) <= 0n || !safeNatural(intent.createdAt) || !safeNatural(intent.expiresAt) || intent.expiresAt <= intent.createdAt) return null;
+    if (!signatureValid(intent?.signature) || !publicAddress(intent.wallet) || !publicAddress(intent.mint) || intent.mint === WSOL || !['buy','sell'].includes(intent.side) || (intent.side === 'buy' ? !integer(intent.spendLamports) || BigInt(intent.spendLamports) <= 0n : !integer(intent.tokenUnits) || BigInt(intent.tokenUnits) <= 0n || !integer(intent.minimumReceiveLamports) || BigInt(intent.minimumReceiveLamports) <= 0n || !Number.isInteger(intent.tokenDecimals) || intent.tokenDecimals < 0 || intent.tokenDecimals > 18) || !safeNatural(intent.createdAt) || !safeNatural(intent.expiresAt) || intent.expiresAt <= intent.createdAt) return null;
     if (!status || status.confirmationStatus !== 'finalized' || !safeNatural(status.slot) || tx?.slot !== status.slot || !tx.meta || !safeNatural(tx.blockTime) || tx.blockTime === 0) return null;
     // Block time has second precision. Only receipts from the original intent's
     // validity interval can reconcile it; an unrelated old trade cannot be reused.
@@ -24,7 +24,7 @@ export function inspectFinalizedIntentReceipt(intent, status, tx) {
     if (!Array.isArray(pre) || !Array.isArray(post)) return null;
     if (!keys.some(k => k.pubkey === intent.mint) && ![...pre,...post].some(b => b?.mint === intent.mint && b.owner === intent.wallet)) return null;
     if (status.err === undefined || meta.err === undefined || JSON.stringify(status.err) !== JSON.stringify(meta.err)) return null;
-    const base = { signature:intent.signature, wallet:intent.wallet, mint:intent.mint, finality:'finalized' };
+    const base = { signature:intent.signature, wallet:intent.wallet, mint:intent.mint, finality:'finalized', slot:tx.slot };
     // A finalized failed transaction changed no trade balances. It may still
     // charge a network fee; this worker does not claim loss accounting is done.
     if (meta.err !== null) return {...base,outcome:'failed'};
@@ -44,10 +44,10 @@ export function inspectFinalizedIntentReceipt(intent, status, tx) {
     }
     const own = all.filter(b => b.owner === intent.wallet);
     const target = own.filter(b => b.mint === intent.mint);
-    if (!target.length || target.some(b => b.uiTokenAmount.decimals !== target[0].uiTokenAmount.decimals)) return null;
+    if (!target.length || intent.side === 'sell' && target[0].uiTokenAmount.decimals !== intent.tokenDecimals || target.some(b => b.uiTokenAmount.decimals !== target[0].uiTokenAmount.decimals)) return null;
     const sum = (rows,mint) => rows.filter(b => b.owner === intent.wallet && b.mint === mint).reduce((n,b)=>n+BigInt(b.uiTokenAmount.amount),0n);
     const received = sum(post,intent.mint)-sum(pre,intent.mint);
-    if (received <= 0n) return null;
+    if (intent.side === 'buy' ? received <= 0n : received >= 0n || -received !== BigInt(intent.tokenUnits)) return null;
     for (const mint of new Set(own.map(b=>b.mint))) if (mint !== intent.mint && mint !== WSOL && sum(post,mint) !== sum(pre,mint)) return null;
     if (!Array.isArray(meta.preBalances) || !Array.isArray(meta.postBalances) || meta.preBalances.length !== keys.length || meta.postBalances.length !== keys.length) return null;
     let net = 0n;
@@ -57,8 +57,12 @@ export function inspectFinalizedIntentReceipt(intent, status, tx) {
     }
     if (!safeNatural(meta.fee)) return null;
     if (walletIndex === 0) net += BigInt(meta.fee);
-    if (net >= 0n || -net !== BigInt(intent.spendLamports)) return null;
-    return {...base,outcome:'confirmed',spentLamports:(-net).toString(),receivedTokenUnits:received.toString()};
+    if (intent.side === 'buy') {
+      if (net >= 0n || -net !== BigInt(intent.spendLamports)) return null;
+      return {...base,outcome:'confirmed',spentLamports:(-net).toString(),receivedTokenUnits:received.toString()};
+    }
+    if (net <= 0n || net < BigInt(intent.minimumReceiveLamports)) return null;
+    return {...base,outcome:'confirmed',soldTokenUnits:(-received).toString(),receivedLamports:net.toString()};
   } catch { return null; }
 }
 

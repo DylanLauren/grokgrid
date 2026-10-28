@@ -123,3 +123,56 @@ first two pillars and is not repaired by the trade receipt checks.
 - API TypeScript check passed after receipt-handler changes.
 - Combined suite with concurrent worker/phone changes: 54 tests passed at audit.
   Parent should rerun after final integration and verify deployed behavior.
+
+## Restart and privacy follow-up
+
+A dedicated bot-only working window remains necessary. Checking the same window,
+URL and geometry before/after capture catches ordinary changes but cannot prove
+that a tab did not switch away and back entirely within that interval. The
+configuration marker `grok-bot-actual-window` is an operator assertion; actual bot
+use must be demonstrated. A window-ID capture avoids a full-desktop fallback.
+
+Abrupt process termination can leave a private screenshot temp directory or a
+capture/journal lock. Restart recovery must identify the previous process, inspect
+state, and clean only that worker's obsolete artifacts. Never automatically delete
+an ambiguous trading hold. The current offline worker performs no broadcasts, so
+recovery tests must not be described as evidence of real order recovery.
+
+Review before continuous operation: private runtime root and config inputs,
+exclusive/unique status temp files, competing invocation behavior, explicit stop
+status, and signal responsiveness. An unavailable status should not overwrite a
+healthy writer solely because a second process could not obtain its lock. These
+are operational checks that can be completed without enabling spending. The
+follow-up below records the checks since implemented.
+
+## Offline sell and position review
+
+The house worker now supports hypothetical exit proposals, still blocked from
+execution. The CLI queries both SPL token programs at finalized commitment and
+records exact raw inventory, decimals, source context slots and
+`costBasisVerified: false`. No token market price, acquisition cost, PnL or strategy
+result is inferred from balances. Failed/incomplete RPC results are unavailable,
+not zero holdings.
+
+A sell proposal requires fresh complete positions, matching mint/decimals, exact
+units, positive minimum SOL proceeds and sufficient nonreserved inventory. Pending
+same-mint exits reserve local units; ambiguous submissions keep the hold, and
+proposing an exit does not release exposure. A daily buy-loss limit does not block
+an otherwise valid risk-reducing exit. Exact finalized sell units and minimum SOL
+movement are required before reconciliation. A new position snapshot may not
+predate a confirmed intent's slot.
+
+Frozen, delegated, native and account-extension inventory is excluded from
+spendable units. Token-2022 also requires mint-extension review: an empty token
+account extension list alone does not prove absence of transfer hooks, transfer
+fees or other mint-level restrictions. The implementation now reports all Token-2022 balances with zero spendable
+units until mint-extension review is implemented; a regression test checks this.
+
+The runtime input reader now checks private owned regular files with
+`O_NOFOLLOW`, the runtime root is checked, and status outputs use unique exclusive
+temporary files and atomic rename. Signal waiting is abortable. Lock contention now uses an explicit error code and leaves another healthy
+writer's status untouched; the focused CLI test verifies that behavior.
+
+Follow-up validation: 24 focused worker, reconciler and offline-sell tests passed,
+including Token-2022 exclusion, pre-receipt snapshot rejection and lock-status
+preservation. These tests use fixtures, not live trades.

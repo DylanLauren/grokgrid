@@ -99,3 +99,45 @@ The phone pillar is not complete until Grok actually works in the selected local
 window, the publisher is exercised against production, and the real feed stays
 fresh during a sustained idle/recovery test. This code prepares that workflow;
 it does not claim that the cloud agent has been migrated or is trading.
+
+## Production verification — October 28, 2026
+
+Three read-only checks were made against `https://grokgrid-alpha.vercel.app`,
+approximately 30 seconds apart. Screen response bodies were cancelled without
+saving or displaying image content. No capture process or desktop action was
+started by these checks.
+
+| Observation (America/Los_Angeles, PDT) | `/api/live` | `screenTs` | `/api/screen` | Frame timestamp header |
+|---|---:|---:|---:|---|
+| 3:36:49 PM | 200 | 0 | 404 | absent |
+| 3:37:20 PM | 200 | 0 | 404 | absent |
+| 3:37:50 PM | 200 | 0 | 404 | absent |
+
+Both endpoints returned `Cache-Control: no-store` in every sample. The deployed
+site consistently reported an offline feed. This does **not** establish whether
+an active feed survives cloud idle: no active starting frame was observed.
+Continuous operation must be tested after establishing a real active source.
+
+## Crash cleanup review
+
+Normal capture completion and capture/conversion errors remove `frame.jpg` in a
+`finally` block. Normal process exit, including handled SIGINT/SIGTERM after the
+bounded in-flight operation finishes, removes that process's unique temporary
+directory and lock. The directory is created with `mkdtemp` under a restrictive
+umask; images are accessible only to the current user. No old frame is reused on
+startup because every process receives a new random temporary directory.
+
+A forced kill, machine crash, or failed filesystem cleanup can leave a private
+JPEG and stale lock behind. The current publisher deliberately does not sweep
+`grokgrid-phone-*` directories or delete other processes' files on startup. Its
+PID-only lock does not identify a temporary directory well enough to authorize
+automatic cleanup. No stale images or directories were deleted during this review.
+
+A possible follow-up is a private per-run manifest containing a random run ID,
+PID, process start identity, and exact temporary-directory path, written before
+capture. Recovery should require verifying the process is no longer that exact
+running instance, checking ownership and permissions with `lstat`, rejecting
+symlinks or paths outside the expected temporary parent, and deleting only the
+known `frame.jpg` and manifest before removing an empty directory. PID reuse or
+any uncertain ownership should leave files untouched for operator review. That
+recovery mechanism is a proposal, not an implemented startup behavior.

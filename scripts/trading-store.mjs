@@ -17,7 +17,7 @@ export async function withTradingStore(directory, policy, update) {
   if (!stat.isDirectory() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0) throw Error('Journal directory must be private');
   const lockPath = join(root, 'trading.lock'), file = join(root, 'trading-journal.json');
   let lock;
-  try { lock = await open(lockPath, 'wx', 0o600); } catch { throw Error('Trading journal locked; inspect the existing worker before recovery'); }
+  try { lock = await open(lockPath, 'wx', 0o600); } catch { const error=Error('Trading journal locked; inspect the existing worker before recovery'); error.code='TRADING_LOCKED'; throw error; }
   let tmp;
   try {
     await lock.writeFile(JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() })); await lock.sync();

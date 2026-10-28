@@ -52,7 +52,7 @@ test('unsubmitted expiry releases reservation but unknown external submission ne
 })
 test('unknown or mismatched reconciliation remains held; only matching finalized evidence resolves',async()=>{
  const held=holdExternalSubmission(plan(),policy,proposal.id,signature)
- const receipt={signature,wallet,mint,finality:'finalized',outcome:'confirmed',spentLamports:'100',receivedTokenUnits:'200'}
+ const receipt={signature,wallet,mint,finality:'finalized',slot:123,outcome:'confirmed',spentLamports:'100',receivedTokenUnits:'200'}
  for(const evidence of [null,{...receipt,finality:'confirmed'},{...receipt,wallet:mint},{...receipt,signature:'4'.repeat(88)},{...receipt,spentLamports:'101'},{...receipt,receivedTokenUnits:'0'}])assert.equal(await reconcileHeldIntent(held,policy,proposal.id,async()=>evidence),held)
  assert.equal(await reconcileHeldIntent(held,policy,proposal.id,async()=>{throw Error('RPC unavailable')}),held)
  const confirmed=await reconcileHeldIntent(held,policy,proposal.id,async()=>receipt)
