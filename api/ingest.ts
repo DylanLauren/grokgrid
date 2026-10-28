@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto'
+import { ingestScope } from './_ingest-auth.js'
 import type { AgentRecord } from './agents.js'
 import { HOUSE_WALLET, isAddress, isSig, json, parse, redis, signedBy } from './_lib.js'
 import { addWallets, freeWallets } from './_launch.js'
@@ -31,18 +31,14 @@ const num = (v: unknown, lo = -1e15, hi = 1e15) => (typeof v === 'number' && Num
 const isId = (v: unknown): v is string => typeof v === 'string' && /^[a-z0-9-]{2,32}$/.test(v)
 const isHex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)
 
-function authorised(req: Request) {
-  const got = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
-  if (!TOKEN || got.length !== TOKEN.length) return false
-  return timingSafeEqual(Buffer.from(got), Buffer.from(TOKEN))
-}
-
 export async function POST(req: Request) {
-  if (!authorised(req)) return json({ error: 'unauthorised' }, 401)
+  const scope = ingestScope(req.headers.get('authorization'), TOKEN)
+  if (!scope) return json({ error: 'unauthorised' }, 401)
   const raw = await req.text()
   if (raw.length > MAX_SCREEN) return json({ error: 'too large' }, 413)
   const ev = parse<Record<string, unknown>>(raw)
   if (!ev) return json({ error: 'bad json' }, 400)
+  if (scope === 'screen' && ev.type !== 'screen') return json({ error: 'screen-only credential' }, 403)
   if (ev.type !== 'screen' && raw.length > MAX_BODY) return json({ error: 'too large' }, 413)
 
   const minute = Math.floor(Date.now() / 60_000)
@@ -197,7 +193,7 @@ async function wallets(ev: Record<string, unknown>) {
 
 // What Grok Bot polls: spare wallets left, and launches it should start trading.
 export async function GET(req: Request) {
-  if (!authorised(req)) return json({ error: 'unauthorised' }, 401)
+  if (ingestScope(req.headers.get('authorization'), TOKEN) !== 'full') return json({ error: 'unauthorised' }, 401)
   const [list] = await redis(['LRANGE', 'gg:launches', 0, 49])
   const launches = ((list as string[]) ?? []).map((l) => parse(l)).filter(Boolean)
   return new Response(JSON.stringify({ free: await freeWallets(), launches }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
