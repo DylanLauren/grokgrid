@@ -29,7 +29,7 @@ export async function GET() {
   const mints = [...new Set([...(await boosted()), ...STEADY])].slice(0, 30)
   const m = await markets(mints)
   const coins = Object.entries(m)
-    .filter(([, c]) => c.image && c.symbol && c.mcUsd > 0)
+    .filter(([, c]) => c.image && c.symbol && c.mcUsd >= 50_000 && c.change24h > -80)
     .map(([mint, c]) => ({ mint, ...c }))
     .sort((a, b) => b.vol24hUsd - a.vol24hUsd)
     .slice(0, 12)
