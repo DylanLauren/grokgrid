@@ -160,3 +160,44 @@ use unique exclusive temporary files and atomic rename. A competing journal writ
 leaves the prior status untouched rather than replacing a healthy worker status
 with a lock-contention failure. SIGINT/SIGTERM interrupt the polling delay; an
 in-progress read-only RPC remains bounded by its request timeout.
+
+## Periodic inventory and readiness
+
+The ordinary worker now refreshes finalized token positions automatically, without
+needing `--refresh-positions`. Successful refreshes are scheduled about every 60
+seconds; the 30-second observer tick performs a refresh when due. The protected
+`trading-position-refresh.json` persists attempts across `--once` launches and
+restarts. Provider failures back off for 60, 120, 240, then at most 300 seconds.
+The attempt is saved before the request, preventing an interrupted process from
+immediately hammering the provider after restart. RPC and attempt/cache updates
+run under the journal's exclusive writer lock. Explicit refreshes and sell
+proposals request fresh data immediately.
+
+A failed refresh records unavailable inventory, never a zero balance. Readiness
+uses a 90-second freshness bound. `inventoryMintCount` is `null` when missing,
+stale, or invalid, and `0` only for a fresh complete empty finalized snapshot.
+`trading-status.json` lists concrete blockers: unavailable wallet observation or
+inventory, insufficient spendable SOL, an empty mint allowlist, unresolved
+submissions, launch-identity conflicts, and the always-applicable absence of live
+execution, signer, validated strategy and verified accounting. It always reports
+`readyForLiveTrading: false`, `costBasisVerified: false`, and
+`riskAccountingVerified: false`. Healthy observation is not trading readiness.
+
+## Durable local launch observations
+
+The house observer's queue entries currently contain only `{id,mint,wallet,ts}`.
+The trading worker records valid entries from a fresh observer in its protected
+journal as `launchesObserved`. Repeated entries are idempotent. A changed wallet,
+mint, or queue timestamp for an existing ID permanently marks that original
+record as `identity-conflict`; it never silently reassigns the identity. Reuse of
+a wallet or mint by a different ID marks both records conflicted. House-wallet
+assignment also conflicts. Invalid and future-dated records are rejected.
+
+Every record remains `acknowledged: false`, `executionEnabled: false`, and
+`rules: "not-fetched"`. This is local observation only: no external queue item is
+consumed or acknowledged, no key is assigned, no bot is started, and no trading
+rule is inferred. The upstream endpoint exposes only the latest 50 entries, so
+this is not complete or durable external delivery. The local journal retains at
+most 1,000 observed identities and reports capacity/truncation instead of silently
+claiming full intake. A separate verified launch-delivery and per-agent execution
+integration is still required.

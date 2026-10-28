@@ -38,6 +38,14 @@ export function validateTradingState(s, p) {
     }
     ids.add(i.id);
   }
+  if (s.launchesObserved !== undefined) {
+    if (!Array.isArray(s.launchesObserved) || s.launchesObserved.length > 1000) throw Error('Invalid observed launch journal');
+    const launches=new Set();
+    for (const launch of s.launchesObserved) {
+      if (!id(launch.id) || launches.has(launch.id) || launch.id===p.agentId || !publicAddress(launch.wallet) || !publicAddress(launch.mint) || !timestamp(launch.queuedAt) || !timestamp(launch.firstObservedAt) || launch.firstObservedAt<launch.queuedAt || !['observed-blocked','identity-conflict'].includes(launch.state) || launch.rules!=='not-fetched' || launch.acknowledged!==false || launch.executionEnabled!==false) throw Error('Invalid observed launch identity');
+      launches.add(launch.id);
+    }
+  }
   return s;
 }
 function updated(s, intents) { return { ...s, revision: s.revision + 1, intents }; }

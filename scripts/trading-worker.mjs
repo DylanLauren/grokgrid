@@ -9,6 +9,7 @@ import { homedir } from 'node:os';
 import { validateTradingPolicy, expireIntents, planIntent, reconcileHeldIntent } from './trading-policy.mjs';
 import { createFinalizedReceiptVerifier } from './trading-reconcile.mjs';
 import { collectFinalizedPositions } from './trading-positions.mjs';
+import { observerIsFresh, positionRefreshPlan, tradingReadiness, observeLaunchQueue } from './trading-readiness.mjs';
 import { withTradingStore } from './trading-store.mjs';
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
 const args = process.argv.slice(2), proposalAt=args.indexOf('--proposal');
@@ -42,13 +43,23 @@ async function tick() {
   let connection;
   async function rpcUrl() {if(!connection){connection=await json(join(root,'observer-config.json'));if(connection.houseWallet!==policy.wallet)throw Error('RPC wallet mismatch');}return connection.rpcUrl;}
   const proposal=proposalAt>=0?await json(resolve(args[proposalAt+1])):null;
-  let positions=null;
-  if(args.includes('--refresh-positions')||proposal?.side==='sell') {
-    positions=await collectFinalizedPositions(await rpcUrl(),policy.wallet);
-    await savePrivate('trading-positions.json',positions??{observedAt:Date.now(),wallet:policy.wallet,complete:false,status:'unavailable',costBasisVerified:false});
-  }
+  let positions=null,attempt=null,positionsRefreshed=false;
+  let launchIntake={rejectedCount:0,queueUnavailable:true,truncated:false,capacityReached:false};
   const state=await withTradingStore(join(root,'trading'),policy,async s=>{
+    try{positions=await json(join(root,'trading-positions.json'));}catch{}
+    try{attempt=await json(join(root,'trading-position-refresh.json'));}catch{}
+    const refresh=positionRefreshPlan(policy,attempt,positions,Date.now(),args.includes('--refresh-positions')||proposal?.side==='sell');
+    if(refresh.refresh) {
+      const lastAttemptAt=Date.now(),failures=attempt?.wallet===policy.wallet&&Number.isSafeInteger(attempt.failures)?Math.max(0,Math.min(attempt.failures,10)):0;
+      await savePrivate('trading-position-refresh.json',{wallet:policy.wallet,lastAttemptAt,failures,outcome:'started'});
+      try{positions=await collectFinalizedPositions(await rpcUrl(),policy.wallet);}catch{positions=null;}
+      positionsRefreshed=positions?.complete===true;
+      await savePrivate('trading-positions.json',positions??{observedAt:Date.now(),wallet:policy.wallet,complete:false,status:'unavailable',costBasisVerified:false});
+      attempt={wallet:policy.wallet,lastAttemptAt,failures:positionsRefreshed?0:failures+1,outcome:positionsRefreshed?'success':'unavailable'};
+      await savePrivate('trading-position-refresh.json',attempt);
+    }
     s=expireIntents(s,Date.now());
+    if(observerIsFresh(policy,observation,Date.now())){const intake=observeLaunchQueue(s,policy,observation.pendingLaunches,Date.now());s=intake.state;const {state:ignored,...diagnostics}=intake;launchIntake=diagnostics;}
     if(args.includes('--reconcile')&&s.intents.some(i=>i.state==='held-ambiguous')) {
       const verify=createFinalizedReceiptVerifier(await rpcUrl());
       for(const intent of s.intents.filter(i=>i.state==='held-ambiguous'))s=await reconcileHeldIntent(s,policy,intent.id,verify);
@@ -57,8 +68,9 @@ async function tick() {
     return s;
   });
   const now=Date.now(), age=observation?now-Date.parse(observation.observedAt):NaN;
-  const observerFresh=observation?.status==='observing'&&observation.mode==='observe-only'&&observation.house?.wallet===policy.wallet&&observation.executionEnabled===false&&observation.signingEnabled===false&&Number.isFinite(age)&&age>=0&&age<=90000;
-  const status={observedAt:new Date(now).toISOString(),mode:'observe-only',executionEnabled:false,signingEnabled:false,status:observerFresh?'observing-execution-disabled':'observer-unavailable',agentId:policy.agentId,wallet:policy.wallet,observerFresh,observerAgeMs:Number.isFinite(age)?age:null,journalRevision:state.revision,intents:state.intents.map(i=>({id:i.id,mint:i.mint,side:i.side,state:i.state})),pendingLaunchesObserved:observerFresh&&Array.isArray(observation.pendingLaunches)?observation.pendingLaunches.length:null,strategy:'unvalidated-no-orders',automaticLaunchesEnabled:false,reconciliationEnabled:args.includes('--reconcile'),positionsRefreshed:positions?.complete===true};
+  const readiness=tradingReadiness(policy,observation,positions,state,now),observerFresh=readiness.observerFresh;
+  const nextRefresh=positionRefreshPlan(policy,attempt,positions,now);
+  const status={observedAt:new Date(now).toISOString(),mode:'observe-only',executionEnabled:false,signingEnabled:false,status:observerFresh?'observing-execution-disabled':'observer-unavailable',agentId:policy.agentId,wallet:policy.wallet,observerFresh,observerAgeMs:Number.isFinite(age)?age:null,journalRevision:state.revision,intents:state.intents.map(i=>({id:i.id,mint:i.mint,side:i.side,state:i.state})),pendingLaunchesObserved:observerFresh&&Array.isArray(observation.pendingLaunches)?observation.pendingLaunches.length:null,strategy:'unvalidated-no-orders',automaticLaunchesEnabled:false,reconciliationEnabled:args.includes('--reconcile'),positionsRefreshed,readiness,positionRefresh:{outcome:attempt?.outcome??'unavailable',nextAttemptAt:nextRefresh.nextAttemptAt},launchIntake:{...launchIntake,observedCount:(state.launchesObserved??[]).length,acknowledged:false,executionEnabled:false}};
   await savePrivate('trading-status.json',status);console.log(JSON.stringify({status:status.status,revision:state.revision,intents:state.intents.length,executionEnabled:false}));
 }
 do {

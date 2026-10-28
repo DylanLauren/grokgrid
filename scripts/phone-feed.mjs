@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Capture only an explicitly pinned bot-owned macOS window. --check never captures/uploads.
 import { execFile } from 'node:child_process'
-import { readFile, writeFile, mkdir, mkdtemp, rm, stat, open, rename } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, mkdtemp, rm, lstat, open, rename } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,9 +17,12 @@ let stop = false
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stop = true })
 const sleep = ms => new Promise(resolve => { const start = Date.now(); const timer = setInterval(() => { if (stop || Date.now() - start >= ms) { clearInterval(timer); resolve() } }, 100) })
 async function privateFile(path) {
-  const s = await stat(path)
-  if (!s.isFile() || (s.mode & 0o077) || (process.getuid && s.uid !== process.getuid())) throw Error('private-file-required')
-  return readFile(path, 'utf8')
+  const h = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
+  try {
+    const s = await h.stat()
+    if (!s.isFile() || s.nlink !== 1 || s.size > 65536 || (s.mode & 0o077) || (process.getuid && s.uid !== process.getuid())) throw Error('private-file-required')
+    return await h.readFile('utf8')
+  } finally { await h.close() }
 }
 async function main() {
   if (process.platform !== 'darwin') throw Error('macos-required')
@@ -26,8 +30,8 @@ async function main() {
   if (ix < 0 || !args[ix + 1]?.startsWith('/') || args.some((v, i) => !['--config', '--once', '--check'].includes(v) && i !== ix + 1)) throw Error('configuration-required')
   if (args.includes('--once') && args.includes('--check')) throw Error('choose-check-or-once')
   const config = validateConfig(JSON.parse(await privateFile(args[ix + 1])))
-  const token = (await privateFile(config.tokenFile)).trim()
-  const expiresAt = capabilityExpiry(token)
+  let token = (await privateFile(config.tokenFile)).trim()
+  let expiresAt = null
   const swift = fileURLToPath(new URL('./phone-window.swift', import.meta.url))
   async function inspect() {
     try {
@@ -43,21 +47,25 @@ async function main() {
     } catch { throw Error('capture-unavailable') }
   }
   if (args.includes('--check')) {
+    expiresAt = capabilityExpiry(token)
     verifyWindow(await inspect(), config)
     console.log(JSON.stringify({ state: 'window-check-passed', publishing: false, credentialExpiresAt: new Date(expiresAt).toISOString() }))
     return
   }
   const folder = dirname(config.statusFile)
   await mkdir(folder, { recursive: true, mode: 0o700 })
-  const folderInfo = await stat(folder)
-  if ((folderInfo.mode & 0o077) || (process.getuid && folderInfo.uid !== process.getuid())) throw Error('private-status-directory-required')
+  const folderInfo = await lstat(folder)
+  if (!folderInfo.isDirectory() || folderInfo.isSymbolicLink() || (folderInfo.mode & 0o077) || (process.getuid && folderInfo.uid !== process.getuid())) throw Error('private-status-directory-required')
   const lock = config.statusFile + '.lock'
   const handle = await open(lock, 'wx', 0o600)
   await handle.writeFile(String(process.pid)); await handle.close()
+  const parentPid = process.ppid
+  const parentWatch = parentPid > 1 ? setInterval(() => { if (process.ppid !== parentPid) stop = true }, 1000) : null
+  parentWatch?.unref()
   let temp, failures = 0, lastSentAt = null
   const status = async (state, extra = {}) => {
     const dest = config.statusFile + '.tmp'
-    await writeFile(dest, JSON.stringify({ version: 1, state, observedAt: new Date().toISOString(), lastSentAt, windowId: config.windowId, credentialExpiresAt: new Date(expiresAt).toISOString(), failures, ...extra }) + '\n', { mode: 0o600 })
+    await writeFile(dest, JSON.stringify({ version: 1, state, observedAt: new Date().toISOString(), lastSentAt, windowId: config.windowId, credentialExpiresAt: expiresAt === null ? null : new Date(expiresAt).toISOString(), failures, ...extra }) + '\n', { mode: 0o600 })
     await rename(dest, config.statusFile)
   }
   try {
@@ -86,6 +94,10 @@ async function main() {
     while (!stop) {
       const started = Date.now()
       try {
+        // The separate issuer replaces this limited capability atomically. Never
+        // read the full ingest credential, and never retain an expired token.
+        token = (await privateFile(config.tokenFile)).trim()
+        expiresAt = capabilityExpiry(token)
         await captureAndSend(config, { token, now: Date.now, inspect, capture, send })
         lastSentAt = new Date().toISOString(); failures = 0
         await status(args.includes('--once') ? 'sent-once' : 'sending')
@@ -102,6 +114,7 @@ async function main() {
     }
     if (stop) await status('stopped')
   } finally {
+    if (parentWatch) clearInterval(parentWatch)
     if (temp) await rm(temp, { recursive: true, force: true })
     await rm(lock, { force: true })
   }

@@ -158,3 +158,94 @@ the interactive capture test. The initial local screen-only capability lasts
 24 hours; publication stops at expiry unless separately renewed. The publisher
 is pinned to one exact URL/title/window and stops or pauses after source changes.
 Stop it before wallet setup or other sensitive browsing.
+
+## Local screen capability renewal
+
+Run the issuer separately from the publisher. The issuer alone reads the full
+local ingest credential; the publisher configuration points only at the resulting
+screen-only capability. Neither the credential nor capability is printed.
+
+Create a mode-600 renewal config in a mode-700 private directory, owned by the
+current user, containing only these path fields:
+
+```json
+{
+  "sourceTokenFile": "/absolute/private/ingest-token-production",
+  "destinationTokenFile": "/absolute/private/local-phone-capability"
+}
+```
+
+```sh
+node scripts/phone-renew.mjs --config /absolute/private/renewal-config.json
+```
+
+The command creates a missing capability with a 24-hour lifetime. An existing
+valid capability is left byte-for-byte unchanged until it has six hours or less
+remaining; it then receives a new nonce, signature and 24-hour lifetime. An
+expired capability may also be renewed if its signature still matches the local
+ingest secret. A malformed capability, an unexpected full-scope token, or one
+signed by a different secret fails closed without being overwritten. After an
+intentional ingest-secret rotation, the operator must explicitly reconcile that
+mismatch; it is not silently treated as normal expiry.
+
+Files and their immediate parent directories must be private and user-owned.
+Symlinks in any path component, hardlinked credential files, shared file modes,
+relative paths, and aliases between config/source/destination are rejected. An
+exclusive per-destination issuer lock prevents simultaneous writers. The new
+capability is written to a unique mode-600 file, fsynced, atomically renamed over
+the previous capability, then the destination directory is fsynced. Existing
+readers keep a complete old file; new readers see the complete replacement.
+
+The publisher must re-read its screen-only file before each capture cycle to use
+renewal without restarting. It must retain expiry validation and reject invalid
+replacements. Schedule the separate issuer often enough to run within the
+six-hour renewal window (for example, hourly). Installing a schedule is a
+separate integration step; running the command once does not schedule renewal.
+CLI output contains only `state`, `expiresAt`, and `renewAfter`, or a generic
+failure message. No full credential is put in publisher config or environment.
+
+A forced kill can leave an issuer `.renew.lock` or a private temporary file.
+A well-formed private issuer lock may be recovered only when two process probes
+return `ESRCH` for its recorded PID. Successful probes, `EPERM`, malformed metadata,
+nonprivate files, hardlinks, symlinks, or a reused/alive PID all hold the lock.
+Immediately before removal, the issuer re-reads and compares device, inode and
+complete lock contents. A changed lock is never removed.
+
+A separate exclusive recovery guard serializes this check-and-remove sequence,
+so two reclaimers cannot unlink each other's newly acquired issuer locks. A
+crashed or uncertain recovery guard is held for operator review rather than
+recursively reclaimed. A new issuer that wins the exclusive lock creation is
+left alone; the losing issuer fails and can be retried later. Private temporary
+files are not swept. Normally exiting issuers clean up only their own temporary
+files and locks using recorded inode ownership; the destination capability stays.
+Renewal tests use only temporary fixture credentials, including dead/live/PID-reuse
+and replacement-lock scenarios. No production credential is accessed by tests.
+
+## Native permission owner and restart supervision
+
+`scripts/install-phone-app.py` builds `~/Applications/GrokGrid Phone.app` from
+`scripts/phone-app.swift`. It starts no capture and grants no permission. Open
+the app and grant macOS Screen Recording permission directly. Rebuilding its
+ad-hoc signed binary may require a new OS grant. The menu-bar **GG** menu can
+pause or resume publishing. After pausing, let the publisher stop before Resume.
+Quit leaves a pause marker so login startup cannot undo an intentional stop.
+
+The app runs `phone-supervisor.mjs --config` with the protected publisher config.
+The supervisor restarts transient publisher failures with bounded delays, recovers
+only verified dead-process locks, waits for a changed capability after expiry,
+and stops for authorization rejection or prolonged source mismatch. It never
+chooses a different window. Parent-process checks shut down descendants if the
+app or supervisor disappears; a surviving/uncertain owner is never killed or
+adopted merely to clear a lock. An unresolved recovery guard requires review.
+
+Local login registration uses `fun.grokgrid.phone-app` to open the app at login
+and check for its presence every60seconds. `fun.grokgrid.phone-renewal` runs the
+separate issuer at login and every30minutes. These LaunchAgents work only in the
+logged-in user's session. They do not capture at the lock screen, prevent manual
+sleep, or make Grok act between prompts. A recreated Chrome window needs a fresh
+explicit pin; changing tabs is not authorization to broadcast the new page.
+
+The helper's `phone-app-status.json` reports OS capture permission and supervisor
+process state. `local-phone-supervisor-status.json` reports restart/hold state.
+Neither proves live pictures: `local-phone-status.json` lastSentAt and production
+frame timestamps remain the checks for current capture.
