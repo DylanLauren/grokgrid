@@ -3,6 +3,7 @@ import { stats } from '../data/useFeed'
 import type { Call, Feed, Live } from '../data/types'
 import { BOT_WALLET } from '../config'
 import { mc, pct, short } from '../lib/format'
+import { CoinChip } from './CoinChip'
 import { BotMark } from './BotMark'
 import './monitor.css'
 
@@ -48,12 +49,13 @@ export function MonitorScreen({ feed, live }: { feed: Feed; live: Live }) {
           {call && (
             <>
               <div className="wc-head">
-                <span className="wc-chip" style={{ background: call.hue }}>{call.symbol[0]}</span>
+                <CoinChip call={call} size={24} />
                 <b>{call.name}</b>
                 <span className="mono">{mc(call.nowMc)}</span>
                 <span className={`mono ${call.nowMc >= call.entryMc ? 'gain' : 'loss'}`}>{pct(((call.nowMc - call.entryMc) / call.entryMc) * 100)}</span>
                 <span className="wc-tf mono"><i>1m</i><i className="on">5m</i><i>1h</i></span>
               </div>
+              <span className="mono dim">illustrative chart{feed.mode === 'demo' ? ' · sample trades' : ''}</span>
               <Candles call={call} />
             </>
           )}

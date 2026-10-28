@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { demoAgents, driftAgents, withRealCoins } from './demoAgents'
-import type { AgentsFeed, RealCoin } from './types'
+import { realCoins, coinUpdatedAt } from './realCoins'
+import type { AgentsFeed } from './types'
 
 const POLL_MS = 10_000
 const DEMO_TICK_MS = 4_000
@@ -34,10 +35,8 @@ export function useAgents(active: boolean): AgentsFeed {
     const coins = async () => {
       if (mode.current !== 'demo') return
       try {
-        const res = await fetch('/api/coins')
-        if (!res.ok) return
-        const { coins } = (await res.json()) as { coins: RealCoin[] }
-        if (alive && mode.current === 'demo') setFeed((f) => withRealCoins(f, coins))
+        const coins = await realCoins()
+        if (alive && mode.current === 'demo') setFeed((f) => ({ ...withRealCoins(f, coins), marketUpdatedAt: coinUpdatedAt() }))
       } catch {
         /* local dev without functions: keep the sample coins */
       }

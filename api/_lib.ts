@@ -84,7 +84,7 @@ export async function markets(mints: string[]): Promise<Record<string, Market>> 
   const list = [...new Set(mints.filter(isAddress))]
   for (let i = 0; i < list.length; i += 30) {
     try {
-      const res = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${list.slice(i, i + 30).join(',')}`)
+      const res = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${list.slice(i, i + 30).join(',')}`, { signal: AbortSignal.timeout(8000) })
       if (!res.ok) continue
       const pairs = (await res.json()) as {
         baseToken: { address: string; symbol?: string; name?: string }

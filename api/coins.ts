@@ -14,7 +14,7 @@ async function boosted(): Promise<string[]> {
   const out: string[] = []
   for (const url of ['https://api.dexscreener.com/token-boosts/top/v1', 'https://api.dexscreener.com/token-boosts/latest/v1']) {
     try {
-      const res = await fetch(url)
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) })
       if (!res.ok) continue
       const list = (await res.json()) as { chainId: string; tokenAddress: string }[]
       for (const t of list) if (t.chainId === 'solana' && t.tokenAddress.endsWith('pump')) out.push(t.tokenAddress)
@@ -26,12 +26,12 @@ async function boosted(): Promise<string[]> {
 }
 
 export async function GET() {
-  const mints = [...new Set([...(await boosted()), ...STEADY])].slice(0, 30)
+  const mints = [...new Set([...STEADY, ...(await boosted())])].slice(0, 30)
   const m = await markets(mints)
   const coins = Object.entries(m)
     .filter(([, c]) => c.image && c.symbol && c.mcUsd >= 50_000 && c.change24h > -80)
     .map(([mint, c]) => ({ mint, ...c }))
-    .sort((a, b) => b.vol24hUsd - a.vol24hUsd)
+    .sort((a, b) => Number(STEADY.includes(b.mint)) - Number(STEADY.includes(a.mint)) || b.vol24hUsd - a.vol24hUsd)
     .slice(0, 12)
-  return json({ coins }, 200, 60)
+  return json({ coins, updatedAt: Date.now(), source: 'dexscreener' }, coins.length ? 200 : 503, 60)
 }

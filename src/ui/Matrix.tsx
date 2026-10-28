@@ -42,7 +42,7 @@ function houseRow(feed: Feed): Agent {
     trades: s.trades,
     winRate: s.winRate,
     burnedMain: feed.burnedMain,
-    last: last && { side: last.side, symbol: last.symbol, spentSol: last.spentSol, pnlUsd: last.pnlUsd, ts: last.ts, sig: last.sig },
+    last: last && { side: last.side, symbol: last.symbol, spentSol: last.spentSol, pnlUsd: last.pnlUsd, ts: last.ts, sig: last.sig, mint: last.mint, image: last.image, hue: last.hue },
   }
 }
 
@@ -100,7 +100,7 @@ export function MatrixPanel({ grid, feed }: { grid: AgentsFeed; feed: Feed }) {
           <Row key={a.id} a={a} i={i} solUsd={grid.solUsd} now={now} />
         ))}
       </div>
-      {grid.mode === 'demo' && <p className="mx-fine">sample bots on real pump.fun coins: the coins, logos and market numbers are live, the bots are samples. real bots replace them the moment they launch.</p>}
+      {grid.mode === 'demo' && <p className="mx-fine">sample bots on real pump.fun coins: real coin identities and pictures; market snapshots refresh every minute. bot trades, wallets, fees and performance are simulated. market snapshot: {grid.marketUpdatedAt ? new Date(grid.marketUpdatedAt).toLocaleString() : 'unavailable'}. real bots replace them when they launch.</p>}
     </div>
   )
 }
@@ -143,6 +143,7 @@ function Row({ a, i, solUsd, now }: { a: Agent; i: number; solUsd: number; now: 
       <span className="mx-last mono" data-label="last trade">
         {a.last ? (
           <>
+            {a.last.image && <CoinChip call={{ image: a.last.image, symbol: a.last.symbol, hue: a.last.hue ?? a.color }} size={20} />}
             <em className={a.last.side}>{a.last.side}</em> {a.last.symbol}{' '}
             {a.last.side === 'sell' ? <span className={a.last.pnlUsd >= 0 ? 'gain' : 'loss'}>{signedUsd(a.last.pnlUsd)}</span> : `${a.last.spentSol} SOL`}
             <small> {ago(a.last.ts, now)}</small>

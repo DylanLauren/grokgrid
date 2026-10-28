@@ -1,13 +1,17 @@
+import { useState } from 'react'
 import type { Call } from '../data/types'
 
 export function CoinChip({ call, size }: { call: Pick<Call, 'hue' | 'image' | 'symbol'>; size: number }) {
+  const [failed, setFailed] = useState<string | undefined>()
+  const image = call.image && failed !== call.image ? call.image : undefined
   return (
     <span
       style={{
         width: size,
         height: size,
         borderRadius: size * 0.28,
-        background: call.image ? `center / cover url(${call.image})` : call.hue,
+        background: call.hue,
+        overflow: 'hidden',
         display: 'inline-grid',
         placeItems: 'center',
         flex: 'none',
@@ -18,7 +22,7 @@ export function CoinChip({ call, size }: { call: Pick<Call, 'hue' | 'image' | 's
         boxShadow: 'inset 0 0 0 1px #ffffff24', // keeps dark coins visible on the dark page
       }}
     >
-      {call.image ? '' : call.symbol.slice(0, 1)}
+      {image ? <img src={image} alt={`${call.symbol} token`} width={size} height={size} decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : call.symbol.slice(0, 1)}
     </span>
   )
 }

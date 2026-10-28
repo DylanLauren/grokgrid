@@ -16,7 +16,7 @@ export function MatrixPage({ grid, feed }: { grid: AgentsFeed; feed: Feed }) {
       n={4}
       label="matrix"
       title="The matrix"
-      sub="every bot on the grid and the coin it trades for. read from the chain and refreshed every 10 seconds."
+      sub={grid.mode === 'demo' ? 'sample bots paired with real memecoins and their token pictures. market snapshots refresh every minute; bot performance is simulated.' : 'every bot on the grid and the coin it trades for. read from the chain and refreshed every 10 seconds.'}
       side={grid.mode === 'live' && <span className="live-pill"><i />live · {ago(grid.updatedAt, now)}</span>}
     >
       <MatrixPanel grid={grid} feed={feed} />
