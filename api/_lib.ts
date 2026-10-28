@@ -41,6 +41,9 @@ export const json = (body: unknown, status = 200, maxAge = 5) =>
     },
   })
 
+// Browsers always re-ask; Vercel's CDN shares one answer per second across all viewers.
+export const EDGE_1S = 'public, max-age=0, s-maxage=1'
+
 export const isAddress = (s: unknown): s is string => typeof s === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s)
 export const isSig = (s: unknown): s is string => typeof s === 'string' && /^[1-9A-HJ-NP-Za-km-z]{64,90}$/.test(s)
 

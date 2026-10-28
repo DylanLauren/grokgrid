@@ -275,3 +275,18 @@ native-helper feed recovery, stop the old cloud publisher, establish one exclusi
 actual source window, and repeat the controlled crash/recovery test. Merely seeing
 HTTP 200 or an advancing global frame timestamp is insufficient to identify which
 publisher produced the image.
+
+## Current response caching and source retirement
+
+PR16 introduced one-second edge caching for successful live metadata and screen
+responses (`public, max-age=0, s-maxage=1`); errors remain uncached. Earlier dated
+`no-store` observations above describe the earlier deployment. Origin checks
+still reject missing, future or12-second-old frames; the edge may retain a valid
+response for another second. Browser rendering independently checks frame age.
+
+After the source conflict was identified, Grok verified and terminated the old
+cloud `cloud-capture.py` process and removed its publishing-enable marker.
+Production then returned404 while the local guarded publisher was stopped.
+The local near-expiry credential was renewed successfully through the configured
+issuer. An exclusive-source live recovery repeat remains required after other
+desktop automation stops changing the dedicated browser window.
