@@ -6,7 +6,8 @@ import { HOUSE_WALLET, isAddress, redis } from './_lib.js'
 export const SITE_URL = (process.env.SITE_URL || 'https://grokgrid-alpha.vercel.app').replace(/\/$/, '')
 export const BURN_WALLET = process.env.VITE_BURN_WALLET || ''
 export const MAX_IMAGE_BYTES = 400_000
-export const DRAFT_TTL = 86_400
+// A picture and its metadata wait this long for their coin; sending a launch keeps them for good.
+export const DRAFT_TTL = 7_200
 export const LEASE_TTL = 900
 
 // Mirrors FAMILY in src/ui/BotMark.tsx: the nine looks a bot can take.
@@ -20,6 +21,7 @@ export const keys = {
   meta: (m: string) => `gg:meta:${m}`,
   pending: (m: string) => `gg:launch:${m}`,
   lease: (w: string) => `gg:lease:${w}`,
+  launcher: (w: string) => `gg:launcher:${w}`,
   pool: 'gg:pool',
   used: 'gg:pool:used',
 }

@@ -23,6 +23,8 @@ export async function POST(req: Request) {
     signature = authorizedLaunch(b.tx, pending.message, await validationTables(pending.message, pending.setup))
     const recovery = JSON.stringify({ ...pending, signature: null, sending: true })
     if (!(await pinWallet(pending.bot, b.mint, raw as string, recovery))) return noStore({ error: 'This launch expired. Try again.' }, 410)
+    // The coin may land at any moment now, so its picture and metadata must not expire.
+    await redis(['PERSIST', keys.image(b.mint)], ['PERSIST', keys.meta(b.mint)])
     // The site's first launch also opens its lookup table, in the same approval.
     if (pending.setup && !(await tableReady(pending.setup.table, pending.setup.expected))) {
       if (!Array.isArray(b.setup) || !b.setup.every((s) => typeof s === 'string')) return noStore({ error: 'This launch expired. Try again.' }, 410)
