@@ -17,9 +17,9 @@ button.cc:hover .cc-ago::after { opacity: 1; }
 @keyframes cc-focus { 0% { box-shadow: 0 0 0 0 #ffffff60; transform: scale(1.02); } 100% { box-shadow: 0 0 0 14px #ffffff00; transform: none; } }
 .cc-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .cc-who { font-weight: 560; }
-.cc-side { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--hair-strong); color: var(--paper-70); }
-.cc-side.buy { color: var(--gain); border-color: rgba(74, 222, 128, 0.35); }
-.cc-side.sell { color: var(--paper-70); }
+.cc-side { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 6px; font-size: 10px; font-weight: 500; line-height: 1; text-transform: uppercase; letter-spacing: 0.08em; color: var(--paper-70); background: #ffffff0f; }
+.cc-side.is-buy { color: var(--gain); background: #4ade801f; box-shadow: inset 0 0 0 1px #4ade8033; }
+.cc-side.is-sell { color: var(--loss); background: #f871711f; box-shadow: inset 0 0 0 1px #f8717133; }
 .cc-ago { margin-left: auto; color: var(--paper-50); font-size: 11.5px; }
 .cc-note { margin: 8px 0 10px; font-size: 14px; line-height: 1.4; color: var(--paper); }
 .cc-pos {
