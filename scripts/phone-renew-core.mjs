@@ -123,6 +123,9 @@ export async function acquireIssuerLock(path, { probeProcess = pid => process.ki
     if (!await definitelyDead(pid, probeProcess)) fail()
     const latest = await readPrivate(path)
     if (original.info.dev !== latest.info.dev || original.info.ino !== latest.info.ino || original.contents !== latest.contents) fail()
+    const finalPath = await lstat(path)
+    ownerMode(finalPath)
+    if (finalPath.isSymbolicLink() || finalPath.dev !== original.info.dev || finalPath.ino !== original.info.ino) fail()
     await unlink(path)
     // A regular new issuer may win this exclusive create. In that case we fail
     // without deleting its lock, and the scheduler can try again later.
