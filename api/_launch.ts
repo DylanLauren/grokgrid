@@ -147,12 +147,17 @@ export async function addWallets(list: string[]) {
 
 // ---- launch status ----
 export async function launchStatus(): Promise<{ open: boolean; reason: string | null; free: number }> {
+  // Wallet inventory alone cannot promise an operating agent. The executor is
+  // still observe-only; activation must add a verified worker readiness check.
+  if (!executorReady()) return { open: false, reason: 'Agent trading is not ready yet. Coin launches are paused.', free: 0 }
   if (!isAddress(BURN_WALLET)) return { open: false, reason: 'Launching opens once the burn wallet is set.', free: 0 }
   const free = await freeWallets().catch(() => -1)
   if (free < 0) return { open: false, reason: 'The launchpad is offline for a moment, try again soon.', free: 0 }
-  if (free === 0) return { open: false, reason: 'Grok Bot is making new trading wallets. Launching reopens in a few minutes.', free: 0 }
+  if (free === 0) return { open: false, reason: 'No trading wallets are available. Coin launches are paused.', free: 0 }
   return { open: true, reason: null, free }
 }
+
+export const executorReady = (): boolean => false
 
 // ---- per-IP limits ----
 // Fixed one-minute windows in Redis. If Redis is down the request goes through.

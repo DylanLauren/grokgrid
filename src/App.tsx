@@ -160,7 +160,7 @@ export default function App() {
         <div><dt>wallet</dt><dd>{s.solNow.toFixed(2)} SOL</dd></div>
         <div><dt>24h</dt><dd className={s.pnl24h >= 0 ? 'gain' : 'loss'}>{pct(s.pnl24h)}</dd></div>
         <div><dt>trades</dt><dd>{s.trades}</dd></div>
-        <div><dt>win</dt><dd>{s.winRate.toFixed(0)}%</dd></div>
+        <div><dt>win</dt><dd>{(s.winRate === null ? '–' : s.winRate.toFixed(0))}%</dd></div>
       </dl>
 
       <aside className="panel" aria-hidden={tab !== 'calls'}>

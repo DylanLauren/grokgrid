@@ -3,6 +3,7 @@ import type { Feed, Live } from '../data/types'
 import { FRESH_MS } from '../data/useLive'
 import { PHONE_STREAM } from '../config'
 import { useWhep } from './useWhep'
+import { fetchPhoneFrame } from './phoneFrame'
 import './phone.css'
 
 // Show only actual broadcast frames. An offline feed must never impersonate a live screen.
@@ -33,13 +34,44 @@ function Stream({ ts, now }: { ts: number; now: number }) {
   const [frame, setFrame] = useState<{ ts: number; src: string } | null>(null)
   useEffect(() => {
     let active = true
+    let pendingSrc: string | null = null
+    let committed = false
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 8000)
     const img = new Image()
-    const src = `/api/screen?t=${ts}`
-    img.onload = () => { if (active) setFrame({ ts, src }) }
-    img.src = src
-    return () => { active = false; img.onload = null }
+    const load = async () => {
+      try {
+        const next = await fetchPhoneFrame(controller.signal)
+        if (!active) return
+        const src = URL.createObjectURL(next.blob)
+        pendingSrc = src
+        img.onload = () => {
+          if (active && Date.now() >= next.ts && Date.now() - next.ts < FRESH_MS) {
+            committed = true
+            setFrame({ ts: next.ts, src })
+          } else {
+            URL.revokeObjectURL(src)
+            pendingSrc = null
+          }
+        }
+        img.onerror = () => { URL.revokeObjectURL(src); pendingSrc = null }
+        img.src = src
+      } catch {
+        // Keep only the previous successfully decoded frame until its own expiry.
+      } finally { window.clearTimeout(timeout) }
+    }
+    void load()
+    return () => {
+      active = false
+      controller.abort()
+      window.clearTimeout(timeout)
+      img.onload = null
+      img.onerror = null
+      if (pendingSrc && !committed) URL.revokeObjectURL(pendingSrc)
+    }
   }, [ts])
-  if (!frame || now - frame.ts >= FRESH_MS) return <Offline />
+  useEffect(() => () => { if (frame) URL.revokeObjectURL(frame.src) }, [frame])
+  if (!frame || now < frame.ts || now - frame.ts >= FRESH_MS) return <Offline />
   return (
     <div className="ph ph-stream">
       <img src={frame.src} alt="Grok Bot's captured screen" />

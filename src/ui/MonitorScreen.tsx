@@ -52,11 +52,11 @@ export function MonitorScreen({ feed, live }: { feed: Feed; live: Live }) {
                 <CoinChip call={call} size={24} />
                 <b>{call.name}</b>
                 <span className="mono">{mc(call.nowMc)}</span>
-                <span className={`mono ${call.nowMc >= call.entryMc ? 'gain' : 'loss'}`}>{pct(((call.nowMc - call.entryMc) / call.entryMc) * 100)}</span>
+                <span className="mono">{call.nowMc !== null && call.entryMc !== null && call.entryMc > 0 ? pct(((call.nowMc - call.entryMc) / call.entryMc) * 100) : '–'}</span>
                 <span className="wc-tf mono"><i>1m</i><i className="on">5m</i><i>1h</i></span>
               </div>
               <span className="mono dim">illustrative chart{feed.mode === 'demo' ? ' · sample trades' : ''}</span>
-              <Candles call={call} />
+              {call.entryMc !== null && call.nowMc !== null ? <Candles call={{ ...call, entryMc: call.entryMc, nowMc: call.nowMc }} /> : <p className="dim">Historical chart data unavailable.</p>}
             </>
           )}
         </section>
@@ -110,7 +110,7 @@ function WinBar({ title }: { title: string }) {
 
 // Candles that start at his entry and walk to where the coin is now. Seeded by the
 // trade so the chart holds still between renders.
-function Candles({ call }: { call: Call }) {
+function Candles({ call }: { call: Call & { entryMc: number; nowMc: number } }) {
   const bars = useMemo(() => {
     let seed = 0
     for (const ch of call.id) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0

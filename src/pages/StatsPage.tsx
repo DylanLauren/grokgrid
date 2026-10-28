@@ -11,7 +11,7 @@ export function StatsPage({ feed }: { feed: Feed }) {
   const s = stats(feed)
   const tiles: [string, string, string?, string?][] = [
     ['trades', `${s.trades}`, `${feed.calls.filter((c) => c.side === 'sell').length} closed`],
-    ['win rate', `${s.winRate.toFixed(0)}%`, 'of closed trades'],
+    ['win rate', `${(s.winRate === null ? '–' : s.winRate.toFixed(0))}%`, 'of closed trades'],
     ['best trade', s.best ? signedUsd(s.best.pnlUsd) : '–', s.best?.symbol, 'gain'],
     ['worst trade', s.worst ? signedUsd(s.worst.pnlUsd) : '–', s.worst?.symbol, 'loss'],
     ['fees in', `${feed.feesSol.toFixed(2)}`, 'SOL from creator fees'],
@@ -77,7 +77,7 @@ export function StatsPage({ feed }: { feed: Feed }) {
               <em className={`mono ${c.side}`}>{c.side}</em>
               <span className="r mono">{c.spentSol} SOL</span>
               <span className="r mono">{mc(c.nowMc)}</span>
-              <span className={`r mono ${c.side === 'buy' ? 'dim' : c.pnlUsd >= 0 ? 'gain' : 'loss'}`}>{c.side === 'buy' ? '–' : signedUsd(c.pnlUsd)}</span>
+              <span className={`r mono ${c.side === 'buy' ? 'dim' : c.pnlUsd === null ? 'dim' : c.pnlUsd >= 0 ? 'gain' : 'loss'}`}>{c.side === 'buy' ? '–' : signedUsd(c.pnlUsd)}</span>
               <span className="r mono dim">{ago(c.ts)}</span>
               {c.sig ? (
                 <a href={solscan('tx', c.sig)} target="_blank" rel="noreferrer" title="transaction on Solscan">↗</a>

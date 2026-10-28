@@ -1,6 +1,7 @@
 import { ingestScope } from './_ingest-auth.js'
 import type { AgentRecord } from './agents.js'
-import { HOUSE_WALLET, isAddress, isSig, json, parse, redis, signedBy } from './_lib.js'
+import { HOUSE_WALLET, isAddress, isSig, json, parse, redis } from './_lib.js'
+import { verifyTradeReceipt } from './_trade-receipt.js'
 import { addWallets, freeWallets } from './_launch.js'
 
 // Grok Bot posts what it just did here, one event per request, with
@@ -75,53 +76,45 @@ async function trade(ev: Record<string, unknown>) {
   const id = ev.agent
   if (!isId(id)) return json({ error: 'agent' }, 400)
   const side = ev.side === 'buy' || ev.side === 'sell' ? ev.side : null
-  const spentSol = num(ev.spentSol, 0, 1e4)
-  const positionUsd = num(ev.positionUsd, 0)
-  const pnlUsd = num(ev.pnlUsd)
-  if (!side || !isAddress(ev.mint) || spentSol === null || positionUsd === null || pnlUsd === null) return json({ error: 'fields' }, 400)
-  const sig = isSig(ev.sig) ? ev.sig : undefined
+  if (!side || !isAddress(ev.mint) || !isSig(ev.sig)) return json({ error: 'A trade requires a mint, side and finalized signature.' }, 400)
   const owner = await walletOf(id)
   if (!owner) return json({ error: 'unknown agent' }, 404)
-  const verified = sig ? await signedBy(sig, owner) : false
-
-  const ts = Date.now()
+  const receipt = await verifyTradeReceipt(ev.sig, owner, ev.mint, side)
+  if (!receipt.ok) return json({ error: receipt.reason }, receipt.unavailable ? 503 : 422)
+  const ts = receipt.blockTime * 1000
   const call = {
-    id: sig || `${id}-${ts}`,
-    ts,
-    side,
-    mint: ev.mint,
-    symbol: text(ev.symbol, 16) || '???',
-    name: text(ev.name, 48),
+    id: `${ev.sig}:${ev.mint}`, ts, side, mint: ev.mint,
+    symbol: text(ev.symbol, 16) || '???', name: text(ev.name, 48),
     hue: isHex(ev.hue) ? ev.hue : '#4ade80',
     image: typeof ev.image === 'string' && IMAGE_HOSTS.test(ev.image) ? ev.image : undefined,
-    note: text(ev.note, 280),
-    sizeTokens: num(ev.sizeTokens, 0) ?? 0,
-    spentSol,
-    positionUsd,
-    pnlUsd,
-    entryMc: num(ev.entryMc, 0) ?? 0,
-    nowMc: num(ev.nowMc, 0) ?? 0,
-    sig,
-    verified,
+    note: text(ev.note, 280), sizeTokens: receipt.sizeTokens,
+    // This is the checked SOL balance movement, not an independently decoded price.
+    spentSol: receipt.solFlow, tokenAmountRaw: receipt.tokenAmountRaw,
+    tokenDecimals: receipt.tokenDecimals, solFlowLamports: receipt.solFlowLamports,
+    positionUsd: null, pnlUsd: null, entryMc: null, nowMc: null,
+    sig: ev.sig, verified: true, verification: receipt.verification, accountingVerified: false,
   }
-  // realised p&l in SOL: what it spent times the return on the position
-  const cost = positionUsd - pnlUsd
-  const pnlSol = side === 'sell' && cost > 0 ? spentSol * (pnlUsd / cost) : 0
-
-  await redis(
-    ['LPUSH', `gg:calls:${id}`, JSON.stringify(call)],
-    ['LTRIM', `gg:calls:${id}`, 0, 199],
-    ['HINCRBY', `gg:stats:${id}`, 'trades', 1],
-    ['HSETNX', `gg:stats:${id}`, 'firstTs', ts],
-    ...(side === 'sell'
-      ? [
-          ['HINCRBY', `gg:stats:${id}`, 'sells', 1],
-          ['HINCRBY', `gg:stats:${id}`, 'wins', pnlUsd > 0 ? 1 : 0],
-          ['HINCRBYFLOAT', `gg:stats:${id}`, 'pnlSol', pnlSol],
-        ]
-      : []),
-  )
-  return json({ ok: true, verified })
+  // Deduplicate one wallet/mint movement per signature, atomically with the feed.
+  // No caller-reported USD amount can change realized PnL or wins.
+  const [saved] = await redis(['EVAL', `
+    local expected = {'set', 'list', 'hash'}
+    for i = 1, 3 do
+      local kind = redis.call('TYPE', KEYS[i]).ok
+      if kind ~= 'none' and kind ~= expected[i] then return -1 end
+    end
+    local trades = redis.call('HGET', KEYS[3], 'trades')
+    if trades and ((trades ~= '0' and not string.match(trades, '^[1-9]%d*$')) or string.len(trades) > 15) then return -1 end
+    if redis.call('SISMEMBER', KEYS[1], ARGV[1]) == 1 then return 0 end
+    redis.call('SADD', KEYS[1], ARGV[1])
+    redis.call('LPUSH', KEYS[2], ARGV[2])
+    redis.call('LTRIM', KEYS[2], 0, 199)
+    redis.call('HINCRBY', KEYS[3], 'trades', 1)
+    redis.call('HSETNX', KEYS[3], 'firstTs', ARGV[3])
+    return 1
+  `, 3, 'gg:trade:receipts', `gg:calls:${id}`, `gg:stats:${id}`,
+  `${owner}:${ev.sig}:${ev.mint}`, JSON.stringify(call), ts])
+  if (saved !== 0 && saved !== 1) return json({ error: 'Trade store unavailable; retry the same receipt.' }, 503)
+  return new Response(JSON.stringify({ ok: true, duplicate: saved === 0, verified: true, verification: receipt.verification, accountingVerified: false }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
 }
 
 async function agent(a: Record<string, unknown> | undefined) {
@@ -179,7 +172,8 @@ async function screen(ev: Record<string, unknown>) {
   const jpeg = typeof ev.jpeg === 'string' ? ev.jpeg.replace(/^data:image\/jpeg;base64,/, '') : ''
   if (!jpeg.startsWith('/9j/') || !/^[A-Za-z0-9+/=]+$/.test(jpeg)) return json({ error: 'jpeg' }, 400)
   const ts = Date.now()
-  await redis(['SET', 'gg:screen', jpeg, 'EX', 60], ['SET', 'gg:screen:ts', ts, 'EX', 60])
+  const [saved] = await redis(['EVAL', `redis.call('SET', KEYS[1], ARGV[1], 'EX', 60); redis.call('SET', KEYS[2], ARGV[2], 'EX', 60); return 1`, 2, 'gg:screen', 'gg:screen:ts', jpeg, ts])
+  if (saved !== 1) return json({ error: 'Screen store unavailable.' }, 503)
   return json({ ok: true, ts })
 }
 

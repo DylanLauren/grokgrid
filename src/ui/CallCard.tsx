@@ -53,10 +53,10 @@ function Body({ call, compact }: { call: Call; compact?: boolean }) {
           <div className="cc-nums">
             <span><i>Size</i>{tokens(call.sizeTokens)} {call.symbol}</span>
             <span><i>Position</i>{usd(call.positionUsd)}</span>
-            <span><i>Profit</i><em className={call.pnlUsd >= 0 ? 'gain' : 'loss'}>{signedUsd(call.pnlUsd)}</em></span>
+            <span><i>Profit</i><em className={call.pnlUsd === null ? 'dim' : call.pnlUsd >= 0 ? 'gain' : 'loss'}>{signedUsd(call.pnlUsd)}</em></span>
           </div>
           <div className="cc-foot">
-            <span><i>Spent</i>{call.spentSol} SOL</span>
+            <span><i>{call.side === 'sell' ? 'SOL in' : 'SOL out'}</i>{call.spentSol} SOL</span>
             <span><i>Avg entry</i>{mc(call.entryMc)} → {mc(call.nowMc)} MC</span>
           </div>
         </div>
@@ -65,7 +65,7 @@ function Body({ call, compact }: { call: Call; compact?: boolean }) {
             <Icon d={SHARE} />
             <Icon d={TARGET} />
             {call.sample && <span className="cc-tag">sample trade</span>}
-            {call.verified && <span className="cc-tag ok" title="signature found on chain, signed by his wallet">on chain ✓</span>}
+            {call.verified && call.verification === 'wallet-balance-movements' && <span className="cc-tag ok" title="Finalized wallet token and SOL movements checked; profit is not verified">wallet flows checked</span>}
           </div>
         )}
       </div>

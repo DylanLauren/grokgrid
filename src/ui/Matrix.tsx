@@ -19,7 +19,7 @@ const by: Record<Sort, (a: Agent) => number> = {
   mc: (a) => a.coin.mcUsd,
   volume: (a) => a.coin.vol24hUsd,
   change: (a) => a.coin.change24h,
-  pnl: (a) => a.pnlSol,
+  pnl: (a) => a.pnlSol ?? -Infinity,
   newest: (a) => a.launchedAt,
 }
 
@@ -38,7 +38,7 @@ function houseRow(feed: Feed): Agent {
     wallet: BOT_WALLET,
     coin: { mint: MAIN_MINT, symbol: MAIN_TICKER, name: MAIN_NAME, image: '/favicon.svg', hue: '#f4f4f2', mcUsd: 0, vol24hUsd: 0, change24h: 0, feesSol: feed.feesSol },
     walletSol: s.solNow,
-    pnlSol: s.solNow - (feed.curve[0]?.sol ?? s.solNow),
+    pnlSol: feed.mode === 'demo' ? s.solNow - (feed.curve[0]?.sol ?? s.solNow) : null,
     trades: s.trades,
     winRate: s.winRate,
     burnedMain: feed.burnedMain,
@@ -133,19 +133,19 @@ function Row({ a, i, solUsd, now }: { a: Agent; i: number; solUsd: number; now: 
       <Num className={`r ${a.coin.change24h >= 0 ? 'gain' : 'loss'}`} v={a.coin.change24h} label="24h">{a.coin.mcUsd ? pct(a.coin.change24h) : '–'}</Num>
       <Num className="r" v={a.coin.feesSol} label="fees"><Sol n={a.coin.feesSol} /></Num>
       <Num className="r" v={a.walletSol} label="wallet"><Sol n={a.walletSol} /></Num>
-      <Num className={`r ${a.pnlSol >= 0 ? 'gain' : 'loss'}`} v={a.pnlSol} label="p&l" title={usd(a.pnlSol * solUsd)}>
-        {a.pnlSol >= 0 ? '+' : ''}{a.pnlSol.toFixed(2)}
+      <Num className={`r ${a.pnlSol === null ? 'dim' : a.pnlSol >= 0 ? 'gain' : 'loss'}`} v={a.pnlSol ?? 0} label="p&l" title={a.pnlSol === null ? 'Cost basis not verified' : usd(a.pnlSol * solUsd)}>
+        {a.pnlSol === null ? '–' : `${a.pnlSol >= 0 ? '+' : ''}${a.pnlSol.toFixed(2)}`}
       </Num>
       <span className="r mono" data-label="trades">
         {a.trades}
-        <small> · {a.winRate.toFixed(0)}%</small>
+        <small> · {(a.winRate === null ? '–' : a.winRate.toFixed(0))}%</small>
       </span>
       <span className="mx-last mono" data-label="last trade">
         {a.last ? (
           <>
             {a.last.image && <CoinChip call={{ image: a.last.image, symbol: a.last.symbol, hue: a.last.hue ?? a.color }} size={20} />}
             <em className={a.last.side}>{a.last.side}</em> {a.last.symbol}{' '}
-            {a.last.side === 'sell' ? <span className={a.last.pnlUsd >= 0 ? 'gain' : 'loss'}>{signedUsd(a.last.pnlUsd)}</span> : `${a.last.spentSol} SOL`}
+            {a.last.side === 'sell' ? <span className={a.last.pnlUsd === null ? 'dim' : a.last.pnlUsd >= 0 ? 'gain' : 'loss'}>{signedUsd(a.last.pnlUsd)}</span> : `${a.last.spentSol} SOL`}
             <small> {ago(a.last.ts, now)}</small>
           </>
         ) : (
