@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { BOT_WALLET, BURN_WALLET, MAIN_MINT, MAIN_TICKER, solscan } from '../config'
 import type { Feed } from '../data/types'
 import { short } from '../lib/format'
@@ -9,8 +10,10 @@ export function CallsPanel({ feed, focus }: { feed: Feed; focus?: string }) {
     <>
       <PanelHead title="Calls" sub={`every trade he makes, called out as it happens. ${feed.mode === 'demo' ? 'sample calls until his wallet goes live.' : 'each one links to its transaction.'}`} />
       <div className="pn-list">
-        {feed.calls.slice(0, 40).map((c) => (
-          <CallCard key={c.id} call={c} focus={c.id === focus} />
+        {feed.calls.slice(0, 40).map((c, i) => (
+          <div key={c.id} className="pn-item" style={{ '--i': Math.min(i, 12) } as CSSProperties}>
+            <CallCard call={c} focus={c.id === focus} />
+          </div>
         ))}
       </div>
     </>

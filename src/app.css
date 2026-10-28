@@ -77,7 +77,8 @@
 .calls-dock { left: var(--edge); width: clamp(300px, 27vw, 400px); display: grid; gap: 8px; }
 .dock-card { animation: dock-in 0.45s cubic-bezier(.2,.9,.3,1.1); }
 .dock-card .cc { background: var(--glass); backdrop-filter: blur(14px); }
-.dock-card.older { opacity: 0.5; transform: scale(0.96); transform-origin: bottom left; order: -1; }
+.dock-card.older { opacity: 0.5; transform: scale(0.96); transform-origin: bottom left; order: -1; transition: opacity 0.3s, transform 0.4s cubic-bezier(.3,1.4,.5,1); }
+.dock-card.older:hover { opacity: 1; transform: none; }
 .dock-card.older .cc-pos, .dock-card.older .cc-note { display: none; }
 @keyframes dock-in { from { transform: translateY(16px); opacity: 0; } }
 

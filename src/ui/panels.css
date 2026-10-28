@@ -61,3 +61,13 @@
 .pn-cost-row + .pn-cost-row { border-top: 1px solid var(--hair); }
 .pn-cost-th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--paper-50); }
 .pn-cost-th span:first-child { color: var(--paper-50); }
+
+/* the calls panel: cards cascade in as it slides open, hovered card stays in front,
+   its neighbours step back, and the list fades at the edges as it scrolls */
+.has-panel .pn-item { animation: pn-in 0.5s cubic-bezier(.2,.9,.3,1.05) both; animation-delay: calc(var(--i) * 45ms + 120ms); }
+@keyframes pn-in { from { opacity: 0; transform: translateX(24px) scale(0.98); } }
+.pn-list:has(.pn-item:hover) .pn-item:not(:hover) { opacity: 0.55; filter: saturate(0.6); }
+.pn-item { transition: opacity 0.3s, filter 0.3s; }
+.pn-list { padding-bottom: 6px; }
+@media (hover: none) { .pn-list:has(.pn-item:hover) .pn-item:not(:hover) { opacity: 1; filter: none; } }
+@media (prefers-reduced-motion: reduce) { .pn-item { animation: none; } }

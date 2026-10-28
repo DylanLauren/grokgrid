@@ -5,10 +5,8 @@
   border-radius: var(--r-card);
   padding: 12px 14px 12px;
 }
-a.cc:hover { border-color: var(--hair-strong); }
 /* the dock's cards open the calls panel */
-button.cc { width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; transition: border-color 0.2s, transform 0.3s cubic-bezier(.3,1.4,.5,1), box-shadow 0.3s; }
-button.cc:hover { border-color: var(--paper-50); transform: translateY(-3px); box-shadow: 0 12px 30px #0007; }
+button.cc { width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
 button.cc:active { transform: scale(0.98); }
 button.cc .cc-ago::after { content: ' ↗'; opacity: 0; transition: opacity 0.2s; }
 button.cc:hover .cc-ago::after { opacity: 1; }
@@ -63,3 +61,44 @@ button.cc:hover .cc-ago::after { opacity: 1; }
   .cc-nums { justify-content: space-between; text-align: left; }
 }
 
+
+/* ---- hover: a soft light in the trade's colour follows the pointer, the card lifts,
+   the position box catches a sheen and the coin tips toward you ---- */
+.cc { --tone: 74 222 128; position: relative; isolation: isolate; overflow: hidden; transition: border-color 0.25s, transform 0.35s cubic-bezier(.3,1.4,.5,1), box-shadow 0.35s; }
+.cc-sell { --tone: 248 113 113; }
+.cc::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0; transition: opacity 0.3s;
+  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 0%), rgb(var(--tone) / 0.13), transparent 70%);
+}
+.cc::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 0.3s;
+  padding: 1px; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  background: radial-gradient(180px circle at var(--mx, 50%) var(--my, 0%), rgb(var(--tone) / 0.75), transparent 70%);
+}
+.cc:hover::before, .cc:hover::after, .cc:focus-visible::before, .cc:focus-visible::after { opacity: 1; }
+:is(a, button).cc:hover { transform: translateY(-3px); border-color: #3a3a3e; box-shadow: 0 14px 34px #0008, 0 0 0 1px rgb(var(--tone) / 0.08); }
+.cc-pos { position: relative; overflow: hidden; transition: background 0.3s; }
+.cc-pos::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; transform: translateX(-120%);
+  background: linear-gradient(105deg, transparent 35%, #ffffff12 50%, transparent 65%);
+}
+.cc:hover .cc-pos { background: #1d1d20; }
+.cc:hover .cc-pos::after { transform: translateX(120%); transition: transform 0.9s cubic-bezier(.3,.6,.3,1); }
+.cc-pos > :first-child { transition: transform 0.4s cubic-bezier(.3,1.5,.5,1); }
+.cc:hover .cc-pos > :first-child { transform: scale(1.08) rotate(-4deg); }
+.cc-side { transition: box-shadow 0.3s, transform 0.3s; }
+.cc:hover .cc-side { transform: translateY(-1px); box-shadow: 0 0 0 3px rgb(var(--tone) / 0.18), 0 0 14px rgb(var(--tone) / 0.45); }
+.cc-av { transition: transform 0.4s cubic-bezier(.3,1.5,.5,1); }
+.cc:hover .cc-av { transform: translateY(-2px) rotate(-6deg); }
+.cc-ic { transition: color 0.2s, transform 0.25s; }
+.cc:hover .cc-ic { color: #c8c8cc; }
+.cc-ic:hover { transform: scale(1.15); }
+.cc-nums em { transition: text-shadow 0.3s; }
+.cc:hover .cc-nums em.gain { text-shadow: 0 0 12px #4ade8080; }
+.cc:hover .cc-nums em.loss { text-shadow: 0 0 12px #f8717180; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cc, .cc *, .cc::before, .cc::after, .cc-pos::after { transition: none !important; }
+  :is(a, button).cc:hover, .cc:hover .cc-pos > :first-child, .cc:hover .cc-av, .cc:hover .cc-side { transform: none; }
+  .cc:hover .cc-pos::after { transform: translateX(-120%); }
+}
