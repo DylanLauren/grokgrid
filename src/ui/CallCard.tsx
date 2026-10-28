@@ -1,4 +1,4 @@
-import { useEffect, useRef, type Ref } from 'react'
+import { useEffect, useRef, type PointerEvent, type Ref } from 'react'
 import type { Call } from '../data/types'
 import { solscan } from '../config'
 import { ago, mc, signedUsd, tokens, usd } from '../lib/format'
@@ -14,19 +14,26 @@ export function CallCard({ call, compact, onOpen, focus }: { call: Call; compact
   useEffect(() => {
     if (focus) ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [focus])
-  const cls = `cc ${compact ? 'cc-compact' : ''} ${onOpen ? 'cc-open' : ''} ${focus ? 'cc-focus' : ''}`
+  const cls = `cc cc-${call.side} ${compact ? 'cc-compact' : ''} ${onOpen ? 'cc-open' : ''} ${focus ? 'cc-focus' : ''}`
   if (onOpen)
     return (
-      <button ref={ref as Ref<HTMLButtonElement>} type="button" className={cls} onClick={onOpen} aria-label={`open call: ${call.side} ${call.symbol}`}>
+      <button ref={ref as Ref<HTMLButtonElement>} type="button" className={cls} onClick={onOpen} onPointerMove={spotlight} aria-label={`open call: ${call.side} ${call.symbol}`}>
         <Body call={call} compact={compact} />
       </button>
     )
   const Wrap = call.sig ? 'a' : 'div'
   return (
-    <Wrap ref={ref as never} className={cls} {...(call.sig ? { href: solscan('tx', call.sig), target: '_blank', rel: 'noreferrer' } : {})}>
+    <Wrap ref={ref as never} className={cls} onPointerMove={spotlight} {...(call.sig ? { href: solscan('tx', call.sig), target: '_blank', rel: 'noreferrer' } : {})}>
       <Body call={call} compact={compact} />
     </Wrap>
   )
+}
+
+// Hover glow follows the pointer: the card's CSS reads these two variables.
+function spotlight(e: PointerEvent<HTMLElement>) {
+  const r = e.currentTarget.getBoundingClientRect()
+  e.currentTarget.style.setProperty('--mx', `${e.clientX - r.left}px`)
+  e.currentTarget.style.setProperty('--my', `${e.clientY - r.top}px`)
 }
 
 // Same layout as a pump.fun callout: avatar column, name and time, the note, the position
