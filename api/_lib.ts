@@ -4,7 +4,7 @@
 const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || ''
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || ''
 const HELIUS = process.env.HELIUS_API_KEY || ''
-export const RPC = HELIUS ? `https://mainnet.helius-rpc.com/?api-key=${HELIUS}` : process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com'
+export const RPC = HELIUS ? `https://mainnet.helius-rpc.com/?api-key=${HELIUS}` : process.env.SOLANA_RPC_URL || 'https://solana-rpc.publicnode.com'
 export const HOUSE_WALLET = process.env.VITE_BOT_WALLET || ''
 export const MAIN_MINT = process.env.VITE_MAIN_MINT || ''
 const SOL_MINT = 'So11111111111111111111111111111111111111112'

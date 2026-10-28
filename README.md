@@ -28,6 +28,19 @@ npm run build
     - `{ "type": "action", "text": "reading the trader list" }` one line per step he takes; shows on his phone and in the monitor's agent log.
     - `{ "type": "screen", "jpeg": "<base64>" }` a screenshot of his phone (about 390x844, JPEG quality 70, under 330 KB), every 2 to 3 seconds while he trades. While frames keep coming, the phone in the room shows them; when they stop for 12 seconds it falls back to the redrawn app.
 
+## Launching a grid bot
+
+Anyone can launch a bot from the grid page in one wallet approval (Phantom, Solflare or Backpack):
+
+1. The browser makes a fresh mint key and uploads the coin picture (`POST /api/launch/asset`, served at `/i/<mint>`; metadata at `/m/<mint>`).
+2. `POST /api/launch/prepare` builds one transaction with pump.fun's SDK: create the coin, open fee sharing, set 80% to the bot's trading wallet and 20% to `VITE_BURN_WALLET`, revoke the admin so the split is permanent, plus an optional first buy. It is simulated before it is returned.
+3. The wallet and the mint key sign. `POST /api/launch/send` refuses anything the wallet changed beyond its own priority fee.
+4. `POST /api/launch/confirm` reads the coin back off chain and only then adds the bot to the registry (`/api/agents`), with its owner and trading rules.
+
+Trading wallets come from Grok Bot, which makes them and keeps their keys. It posts spare public addresses:
+`{ "type": "wallets", "wallets": ["<address>", ...] }` to `/api/ingest`, and polls `GET /api/ingest` (same token) for `free` (spare wallets left) and `launches` (new bots to start trading; their rules are in `/api/agents`).
+Launching is open while `VITE_BURN_WALLET` is set and at least one spare wallet is left.
+
 ## His phone, live
 
 ### Free: screenshot feed (default)

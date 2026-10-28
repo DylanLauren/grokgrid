@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { MAIN_TICKER } from '../config'
+import { STEPS, launchBot, svgToImage, toImage } from '../data/launch'
+import { connectWallet, isMobile, provider, rejected, walletLinks } from '../data/wallet'
 import type { AgentsFeed } from '../data/types'
-import { BODY, EYES, FAMILY } from '../ui/BotMark'
+import { BODY, EYES, FAMILY, type Shape } from '../ui/BotMark'
 import { LiveBot, type Habit } from '../ui/LiveBot'
 import { Roll } from '../ui/Roll'
 import { Page, Section } from './Page'
@@ -57,7 +59,7 @@ function check(d: Draft) {
   if (n(d.maxSol, 0.01, 10)) e.maxSol = '0.01 to 10 SOL'
   if (n(d.takeProfit, 5, 10000)) e.takeProfit = '5% to 10,000%'
   if (n(d.stopLoss, 1, 95)) e.stopLoss = '1% to 95%'
-  if (n(d.firstBuy, 0, 50)) e.firstBuy = '0 to 50 SOL'
+  if (d.firstBuy && !(Number(d.firstBuy) === 0 || (Number(d.firstBuy) >= 0.001 && Number(d.firstBuy) <= 10))) e.firstBuy = '0, or 0.001 to 10 SOL'
   return e
 }
 
@@ -77,6 +79,11 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
     }
   }, [d])
   const [image, setImage] = useState<{ url: string; name: string } | null>(null)
+  const status = useLaunchStatus()
+  const [me, setMe] = useState('')
+  const [step, setStep] = useState<number | null>(null)
+  const [fail, setFail] = useState('')
+  const [made, setMade] = useState<{ mint: string; name: string } | null>(null)
   const [imgErr, setImgErr] = useState('')
   const [touched, setTouched] = useState<Partial<Record<keyof Draft, boolean>>>({})
   const [cheer, setCheer] = useState(0)
@@ -87,9 +94,42 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
   const errs = check(d)
   const botPic = useMemo(() => botImage(d.look), [d.look])
   const pic = image?.url ?? botPic
-  const ready = false // the launch flow opens after the main coin is live
-  const userBots = grid.mode === 'live' ? grid.agents.filter((a) => !a.house).length : 0
+  const ready = !!status?.open && Object.keys(errs).length === 0 && step === null
+  const mine = grid.mode === 'live' ? grid.agents.filter((a) => !a.house && a.coin.real !== false) : []
+  const userBots = mine.length
   const err = (k: keyof Draft) => (touched[k] ? errs[k] : undefined)
+
+  const noWallet = typeof window !== 'undefined' && !provider() && isMobile()
+
+  async function launch(e: FormEvent) {
+    e.preventDefault()
+    setTouched(Object.fromEntries(Object.keys(EMPTY).map((k) => [k, true])))
+    if (!ready) return
+    setFail('')
+    setMade(null)
+    const w = provider()
+    if (!w) return setFail('no Solana wallet found. install Phantom, Solflare or Backpack, then reload.')
+    try {
+      const addr = me || (await connectWallet(w))
+      setMe(addr)
+      const picture = image?.url ?? (await svgToImage(botPic))
+      const r = await launchBot({
+        wallet: w,
+        launcher: addr,
+        image: picture,
+        onStep: setStep,
+        draft: { ...d, maxSol: Number(d.maxSol || 0.25), takeProfit: Number(d.takeProfit || 100), stopLoss: Number(d.stopLoss || 30) },
+      })
+      setMade({ mint: r.mint, name: d.name })
+      setD(EMPTY)
+      setImage(null)
+      setTouched({})
+    } catch (err) {
+      setFail(rejected(err) ? 'you cancelled in the wallet. nothing was spent.' : (err as Error).message)
+    } finally {
+      setStep(null)
+    }
+  }
 
   return (
     <Page say="make me a sibling" n={5} label="the grid" title="Launch a bot" sub={`every bot is its own coin on pump.fun. 80% of its fees fund its trades, 20% buy and burn $${MAIN_TICKER}. pick one of the family to start.`}>
@@ -138,7 +178,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
           </div>
         </div>
 
-        <form className="card gd-form" onSubmit={(e) => e.preventDefault()} noValidate>
+        <form className="card gd-form" onSubmit={launch} noValidate>
           <Group n="01" title="the coin">
             <div className="gd-img">
               <img src={pic} alt="coin image" />
@@ -150,11 +190,11 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
                     accept="image/png,image/jpeg,image/gif,image/webp"
                     onChange={(e) => {
                       const f = e.target.files?.[0]
+                      e.target.value = ''
                       if (!f) return
                       if (f.size > IMAGE_MAX) return setImgErr('4 MB at most')
                       setImgErr('')
-                      if (image) URL.revokeObjectURL(image.url)
-                      setImage({ url: URL.createObjectURL(f), name: f.name })
+                      toImage(f).then((url) => setImage({ url, name: f.name }), (err: Error) => setImgErr(err.message))
                     }}
                   />
                 </label>
@@ -234,23 +274,66 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
               </div>
             </div>
             <p className="gd-note mono">paired with SOL on pump.fun · fee split locked at creation · you pay network fees and pump.fun rent only</p>
-            <button className="btn" disabled={!ready}>
-              <Roll>Launch bot</Roll>
-            </button>
-            <p className="gd-note">
-              {ready
-                ? 'one wallet approval. the coin, the bot and the fee split go live together.'
-                : `launching opens once $${MAIN_TICKER} is live. your draft stays saved in this tab, except the image.`}
+            {noWallet ? (
+              <div className="gd-wallets">
+                {walletLinks().map((w) => (
+                  <a key={w.name} className="btn" href={w.href}>
+                    <Roll>{`Open in ${w.name}`}</Roll>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <button type="submit" className="btn" disabled={!ready}>
+                <Roll>{step !== null ? STEPS[step] : me ? 'Launch bot' : 'Connect wallet and launch'}</Roll>
+              </button>
+            )}
+            {step !== null && (
+              <ol className="gd-steps mono" aria-live="polite">
+                {STEPS.map((t, i) => (
+                  <li key={t} className={i < step ? 'done' : i === step ? 'on' : ''}>{t}</li>
+                ))}
+              </ol>
+            )}
+            {made && (
+              <p className="gd-made">
+                {made.name} is live. <a href={`https://pump.fun/coin/${made.mint}`} target="_blank" rel="noreferrer">see it on pump.fun</a>. it shows up in the matrix within a minute, and Grok Bot starts trading it with its own wallet.
+              </p>
+            )}
+            <p className={`gd-note ${fail ? 'bad' : ''}`}>
+              {fail ||
+                (made
+                  ? 'launch another one any time.'
+                  : status === null
+                  ? 'checking the launchpad'
+                  : !status.open
+                    ? `${status.reason ?? 'launching is closed right now.'} your draft stays saved in this tab, except the picture.`
+                    : noWallet
+                      ? 'open this page in your wallet app to launch from a phone.'
+                      : Object.keys(errs).length
+                        ? 'fill in the fields marked above to launch.'
+                        : 'one wallet approval. the coin, the bot and the fee split go live together.')}
             </p>
           </Group>
         </form>
       </div>
 
       <Section title="On the grid" note={`${userBots} launched`}>
-        <div className="card gd-empty">
-          <LiveBot color="#0b0b0b" shape="sphere" habit="doze" size={44} />
-          <span>no user bots yet. the first ones line up in the matrix, ranked by profit.</span>
-        </div>
+        {mine.length ? (
+          <div className="gd-list">
+            {mine.map((a) => (
+              <a key={a.id} className="card gd-bot" href={`https://pump.fun/coin/${a.coin.mint}`} target="_blank" rel="noreferrer">
+                <LiveBot color={a.color} shape={a.shape as Shape} habit="float" size={40} />
+                <b>{a.name}</b>
+                <span className="mono">${a.coin.symbol}</span>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <div className="card gd-empty">
+            <LiveBot color="#0b0b0b" shape="sphere" habit="doze" size={44} />
+            <span>no user bots yet. the first ones line up in the matrix, ranked by profit.</span>
+          </div>
+        )}
       </Section>
     </Page>
   )
@@ -292,4 +375,26 @@ function botImage(look: number) {
   const eyes = EYES.map(([cx, cy]) => `<rect x="${cx - 5.5}" y="${cy - 12.5}" width="11" height="25" rx="5.5" fill="#fff" transform="rotate(-27 ${cx} ${cy})"/>`).join('')
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-14 -14 128 128"><rect x="-14" y="-14" width="128" height="128" fill="#f2f3f5"/><path d="${BODY[f.shape]}" fill="${f.color}"/>${eyes}</svg>`
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
+type Status = { open: boolean; reason: string | null; free: number }
+
+// Whether launching is open right now. Checked on load and every 20 seconds.
+function useLaunchStatus() {
+  const [s, setS] = useState<Status | null>(null)
+  useEffect(() => {
+    let live = true
+    const load = () =>
+      fetch('/api/launch/status')
+        .then((r) => r.json() as Promise<Status>)
+        .then((j) => live && setS(j))
+        .catch(() => live && setS({ open: false, reason: 'the launchpad is offline for a moment.', free: 0 }))
+    load()
+    const t = setInterval(load, 20_000)
+    return () => {
+      live = false
+      clearInterval(t)
+    }
+  }, [])
+  return s
 }
