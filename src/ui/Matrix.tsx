@@ -64,17 +64,6 @@ export function MatrixPanel({ grid, feed }: { grid: AgentsFeed; feed: Feed }) {
 
   return (
     <div className="mx">
-      <header className="mx-head">
-        <div>
-          <h2>Matrix</h2>
-          <p>every bot on the grid and the coin it trades for. read from the chain and refreshed every 10 seconds.</p>
-        </div>
-        <span className={`mx-live mono ${grid.mode}`}>
-          <i />
-          {grid.mode === 'live' ? `live · ${ago(grid.updatedAt, now)}` : 'demo grid'}
-        </span>
-      </header>
-
       <dl className="mx-totals">
         {totals.map(([k, v]) => (
           <div key={k}>

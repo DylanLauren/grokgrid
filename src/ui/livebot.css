@@ -1,0 +1,65 @@
+.lb { position: relative; display: grid; place-items: center; --ex: 0px; --ey: 0px; }
+.lb svg { width: 100%; height: 100%; overflow: visible; display: block; }
+.lb-body { width: 82%; height: 82%; transform-origin: 50% 100%; }
+.lb-habit { width: 100%; height: 100%; transform-origin: 50% 100%; }
+.lb-shadow { position: absolute; bottom: 2%; left: 22%; right: 22%; height: 7%; border-radius: 50%; background: #000; opacity: 0.18; filter: blur(3px); transition: transform 0.3s; }
+
+/* eyes follow the pointer, blink on their own clock */
+.lb-eyes { transform: translate(var(--ex), var(--ey)); transition: transform 0.18s ease-out; }
+.lb-blink { transform-box: fill-box; transform-origin: center; animation: lb-blink 4.6s infinite; animation-delay: var(--d); }
+@keyframes lb-blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(0.1); } }
+
+/* idle habits, one per bot */
+.lb-look .lb-habit { animation: lb-breathe 3.2s ease-in-out infinite var(--d); }
+.lb-look .lb-blink { animation-name: lb-blink, lb-glance; animation-duration: 4.6s, 7s; }
+@keyframes lb-glance { 0%, 30%, 100% { translate: 0 0; } 40%, 55% { translate: -6px 1px; } 65%, 80% { translate: 6px -1px; } }
+.lb-bounce .lb-habit { animation: lb-bounce 1.6s cubic-bezier(.3,0,.4,1) infinite var(--d); }
+.lb-float .lb-habit { animation: lb-float 4.4s ease-in-out infinite var(--d); }
+.lb-sway .lb-habit { animation: lb-sway 2.8s ease-in-out infinite var(--d); }
+.lb-tilt .lb-habit { animation: lb-tilt 5s ease-in-out infinite var(--d); }
+.lb-flip .lb-habit { animation: lb-flip 6s cubic-bezier(.5,0,.2,1) infinite var(--d); transform-origin: 50% 55%; }
+.lb-hop .lb-habit { animation: lb-hop 2.4s cubic-bezier(.3,0,.4,1) infinite var(--d); }
+.lb-squish .lb-habit { animation: lb-squish 2.2s ease-in-out infinite var(--d); }
+.lb-doze .lb-habit { animation: lb-breathe 4.5s ease-in-out infinite var(--d); }
+.lb-doze .lb-blink { animation: none; transform: scaleY(0.22); transition: transform 0.25s; }
+
+@keyframes lb-breathe { 50% { transform: scale(1.03, 0.97); } }
+@keyframes lb-bounce { 0%, 100% { transform: translateY(0) scale(1.06, 0.94); } 15% { transform: translateY(0) scale(0.96, 1.05); } 45% { transform: translateY(-14%) scale(1); } 75% { transform: translateY(0) scale(1.04, 0.96); } }
+@keyframes lb-float { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-9%) rotate(3deg); } }
+@keyframes lb-sway { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+@keyframes lb-tilt { 0%, 40%, 100% { transform: rotate(0); } 50%, 70% { transform: rotate(-14deg) translateX(-3%); } }
+@keyframes lb-flip { 0%, 70% { transform: rotate(0); } 78% { transform: translateY(-16%) rotate(180deg); } 86%, 100% { transform: translateY(0) rotate(360deg); } }
+@keyframes lb-hop { 0%, 55%, 100% { transform: translateY(0) scale(1); } 60% { transform: scale(1.08, 0.9); } 72% { transform: translateY(-20%) scale(0.95, 1.06); } 86% { transform: translateY(0) scale(1.06, 0.94); } }
+@keyframes lb-squish { 0%, 100% { transform: scale(1, 1); } 30% { transform: scale(1.1, 0.88); } 60% { transform: scale(0.94, 1.08); } }
+
+.lb-z { position: absolute; top: 0; right: 6%; font-size: 13px; color: var(--paper-50); animation: lb-z 2.6s ease-out infinite; }
+@keyframes lb-z { from { transform: translate(0, 10px) scale(0.6); opacity: 0; } 30% { opacity: 1; } to { transform: translate(10px, -18px) scale(1.2); opacity: 0; } }
+
+/* hover: it notices you. a jump, a squash on landing, the dozer wakes up */
+.lb:hover .lb-body { animation: lb-jump 0.65s cubic-bezier(.3,0,.3,1); }
+.lb:hover .lb-shadow { transform: scale(0.7); }
+.lb-doze:hover .lb-blink { transform: scaleY(1); }
+.lb-doze:hover .lb-z { display: none; }
+@keyframes lb-jump {
+  0% { transform: scale(1); }
+  18% { transform: scale(1.12, 0.86); }
+  45% { transform: translateY(-22%) scale(0.92, 1.1); }
+  75% { transform: translateY(0) scale(1.1, 0.9); }
+  100% { transform: scale(1); }
+}
+.lb.sel .lb-body { animation: lb-happy 0.7s cubic-bezier(.3,0,.3,1); }
+@keyframes lb-happy { 40% { transform: translateY(-18%) rotate(-12deg) scale(1.08); } 70% { transform: rotate(8deg); } }
+
+.lb-say {
+  position: absolute; bottom: 100%; left: 50%; translate: -50% 4px;
+  white-space: nowrap; font-size: 12.5px; font-weight: 500;
+  background: var(--paper); color: var(--ink); padding: 6px 10px; border-radius: 12px 12px 12px 3px;
+  opacity: 0; pointer-events: none; scale: 0.8; transform-origin: 30% 100%;
+  transition: opacity 0.2s, scale 0.35s cubic-bezier(.3,1.5,.5,1), translate 0.35s cubic-bezier(.3,1.5,.5,1);
+  z-index: 2;
+}
+.lb:hover .lb-say, .lb.shout .lb-say { opacity: 1; scale: 1; translate: -50% -4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lb .lb-habit, .lb .lb-body { animation: none !important; }
+}

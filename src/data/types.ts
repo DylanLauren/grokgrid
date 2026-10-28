@@ -70,3 +70,11 @@ export interface AgentsFeed {
   solUsd: number
   agents: Agent[]
 }
+
+// What he is doing this second, for the phone view. screenTs is the time of his
+// latest phone frame (0 when he is not streaming one).
+export interface Live {
+  mode: 'live' | 'demo'
+  actions: { ts: number; text: string }[] // newest first
+  screenTs: number
+}

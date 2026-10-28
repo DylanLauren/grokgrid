@@ -1,6 +1,7 @@
 import { RoundedBox, useGLTF } from '@react-three/drei'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
+import { Sky } from './Sky'
 import { cityTexture, familyPoster, stickyNote } from './textures'
 
 const DESK_Y = 0.75
@@ -18,7 +19,7 @@ const mat = {
 }
 
 // The room modelled and lit in Blender (blender/room.py), lighting baked into its textures.
-export function RoomBaked() {
+export function RoomBaked({ onReady }: { onReady?: (colliders: THREE.Object3D[]) => void }) {
   const { scene } = useGLTF('/room.glb')
   const room = useMemo(() => {
     scene.traverse((o) => {
@@ -30,11 +31,14 @@ export function RoomBaked() {
     })
     return scene
   }, [scene])
+  useEffect(() => {
+    // the floor and desk sit under the camera's reach anyway, the rest can block the view
+    onReady?.(['room', 'chair', 'shelf', 'desk'].map((n) => room.getObjectByName(n)).filter((o): o is THREE.Object3D => !!o))
+  }, [room, onReady])
   return <primitive object={room} />
 }
 
-// What stays live on top of either room: the city, the poster print, the sticky note
-// and the two small family bots.
+// What stays live on top of either room: the city, the poster print and the sticky note.
 export function RoomLive() {
   const city = useMemo(() => cityTexture(), [])
   const poster = useMemo(() => familyPoster(), [])
@@ -45,6 +49,7 @@ export function RoomLive() {
         <planeGeometry args={[0.95, 1.05]} />
         <meshBasicMaterial map={city} toneMapped={false} />
       </mesh>
+      <Sky position={[-0.98, 1.5, -0.894]} size={[0.95, 1.05]} />
       <mesh position={[0.98, 1.58, -0.874]}>
         <planeGeometry args={[0.74, 0.52]} />
         <meshBasicMaterial map={poster} toneMapped={false} color="#8a8a8a" />
@@ -55,8 +60,6 @@ export function RoomLive() {
           <meshBasicMaterial map={note} toneMapped={false} color="#9a9a9a" />
         </mesh>
       </group>
-      <MiniBot position={[-0.36, DESK_Y, -0.3]} color="#ff6a00" />
-      <MiniBot position={[-0.25, DESK_Y, -0.36]} color="#13b8a6" squircle />
     </group>
   )
 }
@@ -158,28 +161,6 @@ export function Room() {
           </mesh>
         ))}
       </group>
-    </group>
-  )
-}
-
-function MiniBot({ position, color, squircle }: { position: [number, number, number]; color: string; squircle?: boolean }) {
-  const m = useMemo(() => new THREE.MeshPhysicalMaterial({ color, roughness: 0.35, clearcoat: 0.8 }), [color])
-  const eye = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ffffff' }), [])
-  const s = 0.055
-  return (
-    <group position={[position[0], position[1] + s, position[2]]} rotation-y={0.4}>
-      {squircle ? (
-        <RoundedBox args={[s * 1.9, s * 1.8, s * 1.7]} radius={s * 0.6} smoothness={6} material={m} castShadow />
-      ) : (
-        <mesh material={m} castShadow>
-          <sphereGeometry args={[s, 40, 30]} />
-        </mesh>
-      )}
-      {[-1, 1].map((k) => (
-        <mesh key={k} position={[k * s * 0.33, s * 0.15, s * (squircle ? 0.86 : 0.93)]} rotation-z={-0.2} material={eye}>
-          <capsuleGeometry args={[s * 0.1, s * 0.28, 4, 12]} />
-        </mesh>
-      ))}
     </group>
   )
 }

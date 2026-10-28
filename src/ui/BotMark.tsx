@@ -13,7 +13,7 @@ export const FAMILY: { color: string; shape: Shape; name: string }[] = [
   { color: '#9a6a3f', shape: 'sphere', name: 'brown' },
 ]
 
-const BODY: Record<Shape, string> = {
+export const BODY: Record<Shape, string> = {
   sphere: 'M50 6a44 44 0 1 1 0 88a44 44 0 1 1 0-88z',
   squircle: 'M30 8h40c16 0 24 8 24 24v36c0 16-8 24-24 24H30C14 92 6 84 6 68V32C6 16 14 8 30 8z',
   tile: 'M28 12l46-4c12-1 20 6 20 18l-2 40c-1 14-9 22-22 24l-40 4C18 95 8 88 8 74V34c0-12 8-21 20-22z',
@@ -23,8 +23,8 @@ const BODY: Record<Shape, string> = {
 }
 
 // eye centres. The house bot glances up and to the right, as on xAI's Grok Bot mark.
-const HOUSE_EYES = [[53, 37], [73, 28]]
-const EYES = [[38, 44], [60, 40]]
+export const HOUSE_EYES = [[53, 37], [73, 28]]
+export const EYES = [[38, 44], [60, 40]]
 
 export function BotMark({ size = 28, color = 'house', shape = 'sphere' }: { size?: number; color?: string; shape?: Shape }) {
   const house = color === 'house'

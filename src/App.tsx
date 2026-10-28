@@ -5,16 +5,23 @@ import type { View } from './scene/Scene'
 import { pct } from './lib/format'
 import { BotMark } from './ui/BotMark'
 import { CallCard } from './ui/CallCard'
-import { CallsPanel, DocsPanel, GridPanel, StatsPanel } from './ui/Panels'
-import { MatrixPanel } from './ui/Matrix'
+import { CallsPanel } from './ui/Panels'
 import { useAgents } from './data/useAgents'
+import { useLive } from './data/useLive'
 import { seenTour, Tour } from './ui/Tour'
+import { Roll } from './ui/Roll'
+import { StatsPage } from './pages/StatsPage'
+import { MatrixPage } from './pages/MatrixPage'
+import { GridPage } from './pages/GridPage'
+import { DocsPage } from './pages/DocsPage'
 import './app.css'
 
 const Scene = lazy(() => import('./scene/Scene').then((m) => ({ default: m.Scene })))
 
 type Tab = 'desk' | 'calls' | 'stats' | 'matrix' | 'grid' | 'docs'
 const TABS: Tab[] = ['desk', 'calls', 'stats', 'matrix', 'grid', 'docs']
+// desk and calls live in the room; the rest are pages of their own
+const ROOM: Tab[] = ['desk', 'calls']
 
 export default function App() {
   const feed = useFeed()
@@ -24,7 +31,9 @@ export default function App() {
     return TABS.includes(h) ? h : 'desk'
   })
   const s = stats(feed)
-  const grid = useAgents(tab === 'matrix')
+  const onPage = !ROOM.includes(tab)
+  const grid = useAgents(tab === 'matrix' || tab === 'grid')
+  const live = useLive(!onPage, view === 'phone', feed)
   const [touring, setTouring] = useState(() => !seenTour())
 
   useEffect(() => {
@@ -46,10 +55,10 @@ export default function App() {
   }, [])
 
   return (
-    <div className={`app ${tab !== 'desk' ? 'has-panel' : ''}`}>
-      <div className="stage">
+    <div className={`app ${tab === 'calls' ? 'has-panel' : ''} ${onPage ? 'on-page' : ''} view-${view}`}>
+      <div className="stage" aria-hidden={onPage}>
         <Suspense fallback={<Boot />}>
-          <Scene feed={feed} view={view} />
+          <Scene feed={feed} live={live} view={view} paused={onPage} onPhone={() => setView('phone')} />
         </Suspense>
       </div>
 
@@ -60,16 +69,18 @@ export default function App() {
         </button>
         <nav className="tabs">
           {TABS.map((t) => (
-            <button key={t} className={t === tab ? 'on' : ''} onClick={() => setTab(t)}>
-              {t}
+            <button key={t} className={`${t === tab ? 'on' : ''} ${t === 'stats' ? 'split' : ''}`} onClick={() => setTab(t)}>
+              <Roll>{t}</Roll>
             </button>
           ))}
         </nav>
         <div className="bar-right">
-          <span className={`status mono ${feed.mode}`}>
-            <i />
-            {feed.mode === 'live' ? 'live' : 'demo'}
-          </span>
+          {feed.mode === 'live' && (
+            <span className="status mono live">
+              <i />
+              live
+            </span>
+          )}
           {X_HANDLE && (
             <a className="chip mono" href={`https://x.com/${X_HANDLE}`} target="_blank" rel="noreferrer">@{X_HANDLE}</a>
           )}
@@ -87,10 +98,10 @@ export default function App() {
 
       <div className="views" role="tablist" aria-label="camera">
         <button role="tab" aria-selected={view === 'third'} className={view === 'third' ? 'on' : ''} onClick={() => setView('third')}>
-          third person <kbd>1</kbd>
+          <Roll>his room</Roll> <kbd>1</kbd>
         </button>
         <button role="tab" aria-selected={view === 'phone'} className={view === 'phone' ? 'on' : ''} onClick={() => setView('phone')}>
-          his phone <kbd>2</kbd>
+          <Roll>his phone</Roll> <kbd>2</kbd>
         </button>
       </div>
 
@@ -101,14 +112,15 @@ export default function App() {
         <div><dt>win</dt><dd>{s.winRate.toFixed(0)}%</dd></div>
       </dl>
 
-      <aside className={`panel ${tab === 'matrix' ? 'wide' : ''}`} aria-hidden={tab === 'desk'}>
+      <aside className="panel" aria-hidden={tab !== 'calls'}>
         <button className="panel-x" onClick={() => setTab('desk')} aria-label="close">×</button>
-        {tab === 'calls' && <CallsPanel feed={feed} />}
-        {tab === 'stats' && <StatsPanel feed={feed} />}
-        {tab === 'matrix' && <MatrixPanel grid={grid} feed={feed} />}
-        {tab === 'grid' && <GridPanel />}
-        {tab === 'docs' && <DocsPanel onTour={() => setTouring(true)} />}
+        <CallsPanel feed={feed} />
       </aside>
+
+      {tab === 'stats' && <StatsPage feed={feed} />}
+      {tab === 'matrix' && <MatrixPage grid={grid} feed={feed} />}
+      {tab === 'grid' && <GridPage grid={grid} />}
+      {tab === 'docs' && <DocsPage onTour={() => setTouring(true)} />}
 
       {touring && (
         <Tour
@@ -144,7 +156,7 @@ function BuyButton() {
       >
         {copied ? 'copied' : `${MAIN_MINT.slice(0, 4)}…${MAIN_MINT.slice(-4)}`}
       </button>
-      <a className="buy" href={buyUrl()} target="_blank" rel="noreferrer">Buy ${MAIN_TICKER}</a>
+      <a className="buy" href={buyUrl()} target="_blank" rel="noreferrer"><Roll>{`Buy $${MAIN_TICKER}`}</Roll></a>
     </span>
   )
 }

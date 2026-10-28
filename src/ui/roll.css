@@ -1,0 +1,9 @@
+.roll { display: inline-flex; overflow: hidden; line-height: 1.2; height: 1.2em; vertical-align: bottom; }
+.roll-c {
+  display: inline-block;
+  text-shadow: 0 1.2em 0 currentColor;
+  transition: transform 0.5s cubic-bezier(0.7, 0, 0.2, 1);
+  transition-delay: calc(var(--i) * 16ms);
+}
+:is(a, button, .rolls):hover .roll-c,
+:is(a, button, .rolls):focus-visible .roll-c { transform: translateY(-1.2em); }

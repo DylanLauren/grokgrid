@@ -15,16 +15,20 @@ npm run build
 
 ## Pieces
 
-- `src/scene` the room (three.js + react-three-fiber). The bot, his phone, the monitor and the small family bots are live; the room itself is `public/room.glb`.
+- `src/scene` the room (three.js + react-three-fiber). The bot, his clickable phone, the monitor, the twinkling sky, steam, lava lamp, clock and the small family bots are live; the room itself is `public/room.glb`. The camera is pushed in front of anything that would block the view.
 - `blender/room.py` builds the room in Blender, bakes its lighting and exports `public/room.glb`:
   `python blender/room.py --bake --soften --export --samples 128` (needs the `bpy` package) and `--preview out.png` for a quick render.
-- `src/ui` panels: calls, stats, matrix, grid, docs.
+- `src/ui` the room overlay (calls dock and panel, phone and monitor screens). `src/pages` the full pages: stats, matrix, grid, docs.
 - `api/` Vercel functions:
   - `GET /api/feed` the house bot's calls and wallet curve.
   - `GET /api/agents` every bot on the grid with its coin (DexScreener), balances (chain), stats.
-  - `POST /api/ingest` where Grok Bot posts what it just did (`Authorization: Bearer $INGEST_TOKEN`). Trade signatures are checked on chain.
+  - `GET /api/live` his latest actions and the time of his latest phone frame (polled every 2.5s while someone watches his phone).
+  - `GET /api/screen?t=<ts>` his latest phone frame as a JPEG.
+  - `POST /api/ingest` where Grok Bot posts what it just did (`Authorization: Bearer $INGEST_TOKEN`). Trade signatures are checked on chain. Event types: `trade`, `agent`, `fees`, `wallet`, plus
+    - `{ "type": "action", "text": "reading the trader list" }` one line per step he takes; shows on his phone and in the monitor's agent log.
+    - `{ "type": "screen", "jpeg": "<base64>" }` a screenshot of his phone (about 390x844, JPEG quality 70, under 330 KB), every 2 to 3 seconds while he trades. While frames keep coming, the phone in the room shows them; when they stop for 12 seconds it falls back to the redrawn app.
 
-Every screen shows a labelled demo until the first real event arrives.
+Until the first real event arrives, the site plays sample data and says so in the page subtitles.
 
 ## Environment
 

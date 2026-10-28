@@ -13,9 +13,12 @@ import { HOUSE_WALLET, isAddress, isSig, json, parse, redis, signedBy } from './
 //     "coin": { "mint", "symbol", "name", "image" } } }
 //   { "type": "fees",   "agent": "house", "feesSol": 1.2, "burnedMain": 350000 }   (running totals)
 //   { "type": "wallet", "agent": "house", "sol": 2.31 }
+//   { "type": "action", "text": "reading the trader list" }           (what he is doing right now)
+//   { "type": "screen", "jpeg": "<base64 jpeg of his phone screen>" }  (live view, about one every 2s)
 
 const TOKEN = process.env.INGEST_TOKEN || ''
 const MAX_BODY = 8_000
+const MAX_SCREEN = 450_000 // a 390x844 jpeg at quality 70 is about 60 KB, base64 adds a third
 const PER_MINUTE = 120
 const SHAPES = ['sphere', 'squircle', 'tile', 'cloud', 'cone', 'drop']
 const IMAGE_HOSTS = /^https:\/\/([a-z0-9-]+\.)*(ipfs\.io|pump\.fun|mypinata\.cloud|dexscreener\.com|arweave\.net|nftstorage\.link|irys\.xyz)\//i
@@ -34,9 +37,10 @@ function authorised(req: Request) {
 export async function POST(req: Request) {
   if (!authorised(req)) return json({ error: 'unauthorised' }, 401)
   const raw = await req.text()
-  if (raw.length > MAX_BODY) return json({ error: 'too large' }, 413)
+  if (raw.length > MAX_SCREEN) return json({ error: 'too large' }, 413)
   const ev = parse<Record<string, unknown>>(raw)
   if (!ev) return json({ error: 'bad json' }, 400)
+  if (ev.type !== 'screen' && raw.length > MAX_BODY) return json({ error: 'too large' }, 413)
 
   const minute = Math.floor(Date.now() / 60_000)
   const [count] = await redis(['INCR', `gg:rate:${minute}`], ['EXPIRE', `gg:rate:${minute}`, 120])
@@ -51,6 +55,10 @@ export async function POST(req: Request) {
       return fees(ev)
     case 'wallet':
       return wallet(ev)
+    case 'action':
+      return action(ev)
+    case 'screen':
+      return screen(ev)
     default:
       return json({ error: 'unknown type' }, 400)
   }
@@ -156,4 +164,20 @@ async function wallet(ev: Record<string, unknown>) {
   if (!isId(ev.agent) || sol === null) return json({ error: 'fields' }, 400)
   await redis(['RPUSH', `gg:curve:${ev.agent}`, JSON.stringify({ ts: Date.now(), sol })], ['LTRIM', `gg:curve:${ev.agent}`, -500, -1])
   return json({ ok: true })
+}
+
+async function action(ev: Record<string, unknown>) {
+  const t = text(ev.text, 120)
+  if (!t) return json({ error: 'fields' }, 400)
+  await redis(['LPUSH', 'gg:actions', JSON.stringify({ ts: Date.now(), text: t })], ['LTRIM', 'gg:actions', 0, 29])
+  return json({ ok: true })
+}
+
+// Only the latest frame is kept, and it expires a minute after he stops sending.
+async function screen(ev: Record<string, unknown>) {
+  const jpeg = typeof ev.jpeg === 'string' ? ev.jpeg.replace(/^data:image\/jpeg;base64,/, '') : ''
+  if (!jpeg.startsWith('/9j/') || !/^[A-Za-z0-9+/=]+$/.test(jpeg)) return json({ error: 'jpeg' }, 400)
+  const ts = Date.now()
+  await redis(['SET', 'gg:screen', jpeg, 'EX', 60], ['SET', 'gg:screen:ts', ts, 'EX', 60])
+  return json({ ok: true, ts })
 }

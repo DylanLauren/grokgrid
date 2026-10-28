@@ -14,12 +14,30 @@
   user-select: none;
   backface-visibility: hidden;
 }
-.ph-status { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--paper-70); height: 22px; }
-.ph-island { width: 86px; height: 22px; border-radius: 12px; background: #000; }
+.ph-status { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--paper-70); height: 22px; padding: 0 6px; }
+.ph-bars { display: flex; align-items: flex-end; gap: 2px; height: 10px; }
+.ph-bars i { width: 3px; background: var(--paper-70); border-radius: 1px; }
+.ph-bars i:nth-child(1) { height: 4px; } .ph-bars i:nth-child(2) { height: 6px; } .ph-bars i:nth-child(3) { height: 8px; } .ph-bars i:nth-child(4) { height: 10px; }
+.ph-bars b { width: 20px; height: 10px; margin-left: 6px; border: 1.5px solid var(--paper-70); border-radius: 3px; background: linear-gradient(90deg, var(--paper-70) 72%, transparent 72%) 1px 1px / calc(100% - 2px) calc(100% - 2px) no-repeat; }
+.ph-island { position: absolute; top: 12px; left: 50%; margin-left: -46px; width: 92px; height: 26px; border-radius: 14px; background: #000; }
+/* what he is doing right now, as Grok Bot reports it */
+.ph-agent { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-radius: 12px; background: #fff; color: #0a0a0a; font-size: 12.5px; font-weight: 520; overflow: hidden; }
+.ph-agent img { flex: none; }
+.ph-agent > i { flex: none; margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: #16a34a; animation: pulse 1.2s infinite; }
+.ph-doing { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: ph-doing 0.4s ease-out; }
+@keyframes ph-doing { from { opacity: 0; transform: translateY(8px); filter: blur(3px); } }
+.ph-brand img { vertical-align: -3px; margin-right: 6px; }
+.ph-trade button { position: relative; overflow: hidden; }
+.ph-tap { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px; border-radius: 50%; background: #ffffffaa; animation: ph-tap 0.7s ease-out 2; }
+@keyframes ph-tap { from { transform: scale(0.2); opacity: 1; } to { transform: scale(3); opacity: 0; } }
+.ph-stream { padding: 0; background: #000; }
+.ph-stream img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ph-stream .ph-next { opacity: 0; }
+.ph-live { position: absolute; top: 14px; right: 16px; display: flex; gap: 6px; align-items: center; font-size: 11px; background: #000a; color: #fff; padding: 3px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.06em; }
+.ph-live i { width: 6px; height: 6px; border-radius: 50%; background: var(--loss); animation: pulse 1.2s infinite; }
 .ph-nav { display: grid; grid-template-columns: 24px 1fr 40px; align-items: center; font-size: 14px; }
 .ph-back { font-size: 26px; line-height: 1; color: var(--paper-70); }
 .ph-brand { text-align: center; font-weight: 560; }
-.ph-demo { font-size: 10px; color: var(--paper-50); border: 1px solid var(--hair-strong); border-radius: 999px; padding: 2px 6px; text-align: center; }
 .ph-coin { display: flex; gap: 12px; align-items: center; }
 .ph-sym { font-weight: 600; font-size: 18px; }
 .ph-name { color: var(--paper-50); font-size: 13px; }

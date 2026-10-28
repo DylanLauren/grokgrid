@@ -2,10 +2,11 @@ import { CameraControls, ContactShadows, Environment, Html, Lightformer, Rounded
 import { Canvas } from '@react-three/fiber'
 import { Component, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
-import type { Feed } from '../data/types'
+import type { Feed, Live } from '../data/types'
 import { PhoneScreen } from '../ui/PhoneScreen'
 import { Bot, type Mood } from './Bot'
 import { MON, Room, RoomBaked, RoomLive } from './Room'
+import { Props } from './Props'
 import { MonitorScreen } from '../ui/MonitorScreen'
 
 export type View = 'third' | 'phone'
@@ -60,14 +61,22 @@ function Later({ children }: { children: ReactNode }) {
   return ready ? <>{children}</> : null
 }
 
-function Rig({ view }: { view: View }) {
+// Anything in the room between the camera and him pushes the camera in front of it,
+// so looking around never ends behind a chair, a shelf or a wall.
+function Rig({ view, colliders }: { view: View; colliders: THREE.Object3D[] }) {
   const ref = useRef<CameraControls>(null)
+  useEffect(() => {
+    const c = ref.current
+    if (!c) return
+    c.colliderMeshes = colliders
+  }, [colliders])
   useEffect(() => {
     const c = ref.current
     if (!c) return
     const [px, py, pz, tx, ty, tz] = VIEWS[view]
     c.setLookAt(px, py, pz, tx, ty, tz, !reduced)
-    c.zoomTo(view === 'phone' ? 1.3 : 1, !reduced)
+    // a phone held up close fills a narrow screen sooner
+    c.zoomTo(view === 'phone' ? (innerWidth < 700 ? 0.85 : 1.3) : 1, !reduced)
     c.enabled = view === 'third'
   }, [view])
   return (
@@ -86,12 +95,26 @@ function Rig({ view }: { view: View }) {
   )
 }
 
-export function Scene({ feed, view }: { feed: Feed; view: View }) {
+interface SceneProps {
+  feed: Feed
+  live: Live
+  view: View
+  paused: boolean // a page is open over the room, so it stops drawing
+  onPhone: () => void
+}
+
+export function Scene({ feed, live, view, paused, onPhone }: SceneProps) {
   const mood = useMood(feed)
   const bot = useRef<THREE.Group>(null!)
+  const [colliders, setColliders] = useState<THREE.Object3D[]>([])
+  const [hover, setHover] = useState(false)
+  useEffect(() => {
+    document.body.style.cursor = hover && view === 'third' ? 'pointer' : ''
+  }, [hover, view])
 
   return (
     <Canvas
+      frameloop={paused ? 'never' : 'always'}
       shadows
       dpr={[1, 2]}
       camera={{ position: VIEWS.third.slice(0, 3) as [number, number, number], fov: 38, near: 0.02, far: 30 }}
@@ -132,10 +155,11 @@ export function Scene({ feed, view }: { feed: Feed; view: View }) {
 
       <KeepFallback fallback={<Room />}>
         <Suspense fallback={<Room />}>
-          <RoomBaked />
+          <RoomBaked onReady={setColliders} />
         </Suspense>
       </KeepFallback>
       <RoomLive />
+      <Props />
       <group position={[MON.x, 0, MON.z]} rotation-y={MON.yaw}>
         <Later>
           <Html
@@ -146,13 +170,22 @@ export function Scene({ feed, view }: { feed: Feed; view: View }) {
             zIndexRange={[10, 0]}
             pointerEvents="none"
           >
-            <MonitorScreen feed={feed} />
+            <MonitorScreen feed={feed} live={live} />
           </Html>
         </Later>
       </group>
 
       <Bot ref={bot} mood={mood} position={BOT_POS} yaw={BOT_YAW}>
-        <group position={PHONE.pos} rotation-x={PHONE.tilt}>
+        <group
+          position={PHONE.pos}
+          rotation-x={PHONE.tilt}
+          onClick={(e) => {
+            e.stopPropagation()
+            onPhone()
+          }}
+          onPointerOver={() => setHover(true)}
+          onPointerOut={() => setHover(false)}
+        >
           <RoundedBox args={[PHONE.w + 0.006, PHONE.h + 0.006, 0.009]} radius={0.009} smoothness={6} castShadow>
             <meshStandardMaterial color="#1b1c1f" roughness={0.3} metalness={0.5} />
           </RoundedBox>
@@ -165,15 +198,23 @@ export function Scene({ feed, view }: { feed: Feed; view: View }) {
             zIndexRange={[20, 10]}
             pointerEvents="none"
           >
-            <PhoneScreen feed={feed} />
+            <PhoneScreen feed={feed} live={live} />
           </Html>
           </Later>
           <pointLight position={[0, 0, 0.05]} intensity={0.25} distance={0.45} color="#c9ffe0" />
         </group>
+        <Later>
+          <Html position={[-0.06, 0.03, -0.42]} center zIndexRange={[30, 20]}>
+            <button className={`watch ${hover ? 'hot' : ''} ${view === 'third' && !paused ? '' : 'gone'}`} onClick={onPhone} tabIndex={view === 'third' ? 0 : -1}>
+              <span className="watch-line" />
+              <span className="watch-pill">Watch me trade!</span>
+            </button>
+          </Html>
+        </Later>
       </Bot>
 
       <ContactShadows position={[0, 0.001, 0.3]} opacity={0.55} scale={4} blur={2.6} far={1.2} />
-      <Rig view={view} />
+      <Rig view={view} colliders={colliders} />
     </Canvas>
   )
 }

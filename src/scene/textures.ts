@@ -26,10 +26,7 @@ export function cityTexture() {
     sky.addColorStop(1, '#1a1a24')
     g.fillStyle = sky
     g.fillRect(0, 0, 1024, 1024)
-    for (let i = 0; i < 120; i++) {
-      g.fillStyle = `rgba(255,255,255,${0.2 + r() * 0.5})`
-      g.fillRect(r() * 1024, r() * 420, 1.5, 1.5)
-    }
+    // stars are drawn live on top (Sky.tsx) so they can twinkle
     // moon
     g.fillStyle = '#e9ecf2'
     g.beginPath()
