@@ -163,7 +163,9 @@ export default function App() {
       </dl>
 
       <aside className="panel" aria-hidden={tab !== 'calls'}>
-        <button className="panel-x" onClick={() => setTab('desk')} aria-label="close">×</button>
+        <button className="panel-x" onClick={() => setTab('desk')} aria-label="close">
+          <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+        </button>
         <CallsPanel feed={feed} focus={tab === 'calls' ? focusCall : undefined} />
       </aside>
 
