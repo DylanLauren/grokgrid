@@ -15,40 +15,51 @@ button.cc:hover .cc-ago::after { opacity: 1; }
 /* the call you opened, lit up in the panel */
 .cc-focus { border-color: var(--paper-70); animation: cc-focus 1.6s ease-out; }
 @keyframes cc-focus { 0% { box-shadow: 0 0 0 0 #ffffff60; transform: scale(1.02); } 100% { box-shadow: 0 0 0 14px #ffffff00; transform: none; } }
-.cc-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-.cc-who { font-weight: 560; }
-.cc-side { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 6px; font-size: 10px; font-weight: 500; line-height: 1; text-transform: uppercase; letter-spacing: 0.08em; color: var(--paper-70); background: #ffffff0f; }
-.cc-side.is-buy { color: var(--gain); background: #4ade801f; box-shadow: inset 0 0 0 1px #4ade8033; }
-.cc-side.is-sell { color: var(--loss); background: #f871711f; box-shadow: inset 0 0 0 1px #f8717133; }
-.cc-ago { margin-left: auto; color: var(--paper-50); font-size: 11.5px; }
-.cc-note { margin: 8px 0 10px; font-size: 14px; line-height: 1.4; color: var(--paper); }
+.cc { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; background: #0e0e0f; border-color: #262628; border-radius: 14px; padding: 12px 14px; }
+.cc-av { width: 30px; height: 30px; display: grid; place-items: center; }
+.cc-main { min-width: 0; }
+.cc-head { display: flex; align-items: center; gap: 7px; font-size: 13.5px; line-height: 1.2; min-height: 20px; }
+.cc-who { font-weight: 600; color: var(--paper); }
+.cc-ago { color: #8a8a90; font-size: 12.5px; }
+/* pump.fun's trade tags: solid green buy, solid red sell, dark text */
+.cc-side { margin-left: auto; display: inline-flex; align-items: center; height: 19px; padding: 0 8px; border-radius: 5px; font-size: 11px; font-weight: 650; line-height: 1; color: #0a0a0a; }
+.cc-side.is-buy { background: #4ade80; }
+.cc-side.is-sell { background: #f87171; }
+.cc-note { margin: 4px 0 9px; font-size: 13.5px; line-height: 1.42; color: #e8e8ea; }
 .cc-pos {
   display: grid;
   grid-template-columns: auto 1fr auto;
   grid-template-areas: 'chip coin nums' 'foot foot foot';
   column-gap: 10px;
-  row-gap: 8px;
-  background: #101010;
-  border-radius: 12px;
+  row-gap: 7px;
+  background: #19191b;
+  border-radius: 10px;
   padding: 10px 12px;
   align-items: center;
 }
-.cc-pos > :first-child { grid-area: chip; }
-.cc-coin { grid-area: coin; display: grid; line-height: 1.2; min-width: 0; }
-.cc-coin b { font-weight: 560; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cc-coin span { font-size: 12px; color: var(--paper-50); }
-.cc-nums { grid-area: nums; display: flex; gap: 14px; text-align: right; }
-.cc-nums span, .cc-foot span { display: grid; font-size: 13px; font-weight: 520; white-space: nowrap; }
-.cc-pos i { font-style: normal; font-size: 11px; color: var(--paper-50); font-weight: 420; }
+.cc-pos > :first-child { grid-area: chip; border-radius: 8px !important; }
+.cc-coin { grid-area: coin; display: grid; line-height: 1.25; min-width: 0; }
+.cc-coin b { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-coin span { font-size: 12.5px; color: #8a8a90; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-coin { overflow: hidden; }
+.cc-nums { grid-area: nums; display: flex; gap: 10px; text-align: right; align-items: flex-start; }
+.cc-nums span, .cc-foot span { display: grid; font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.cc-pos i { font-style: normal; font-size: 11.5px; color: #8a8a90; font-weight: 400; }
 .cc-pos em { font-style: normal; }
 .cc-foot { grid-area: foot; display: flex; justify-content: space-between; gap: 12px; }
-.cc-foot span { display: flex; gap: 6px; align-items: baseline; }
+.cc-foot span { display: flex; gap: 5px; align-items: baseline; font-size: 12.5px; }
+.cc-ic { display: block; color: #8a8a90; flex: none; }
+.cc-acts { display: flex; align-items: center; gap: 16px; margin-top: 10px; }
+.cc-tag { margin-left: auto; font-size: 11.5px; color: #8a8a90; }
+.cc-tag + .cc-tag { margin-left: 0; }
+.cc-tag.ok { color: var(--gain); }
 .cc-compact { padding: 10px 12px; }
-.cc-compact .cc-note { font-size: 13px; margin: 6px 0 8px; }
+.cc-compact .cc-av { width: 26px; height: 26px; }
+.cc-compact .cc-note { font-size: 13px; margin: 3px 0 8px; }
 .cc-compact .cc-nums { gap: 10px; }
+
 @media (max-width: 520px) {
   .cc-pos { grid-template-columns: auto 1fr; grid-template-areas: 'chip coin' 'nums nums' 'foot foot'; }
   .cc-nums { justify-content: space-between; text-align: left; }
 }
 
-.cc-ok { font-size: 10.5px; color: var(--gain); letter-spacing: 0.04em; }
