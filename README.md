@@ -30,6 +30,18 @@ npm run build
 
 ## His phone, live
 
+### Free: screenshot feed (default)
+
+Grok Bot's Mac posts his real phone screen to `/api/ingest` about every 2 seconds and the phone in the room shows it. No video service needed.
+
+1. Open his phone window on the Mac: iPhone Mirroring, an Android emulator with the pump.fun app, or a phone-sized browser on pump.fun.
+2. Find its position with Cmd+Shift+4 (drag over it, read x, y, width, height), then run
+   `INGEST_TOKEN=... node scripts/phone-feed.mjs --rect x,y,w,h`
+   The first run asks for Screen Recording permission for Terminal.
+3. Open the site, click his phone: the frames show within a few seconds. Stop the script and the phone falls back to the redrawn app after 12 seconds.
+
+### Paid: real-time video
+
 The phone in the room plays his real phone screen as live video (WebRTC, under half a second behind) whenever someone opens the phone view.
 
 1. Create a live input in Cloudflare Stream. It gives two URLs:
