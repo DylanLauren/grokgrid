@@ -1,21 +1,37 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Call, Feed, Live } from '../data/types'
 import { FRESH_MS } from '../data/useLive'
+import { PHONE_STREAM } from '../config'
+import { useWhep } from './useWhep'
 import { mc, signedUsd, tokens, usd } from '../lib/format'
 import { CoinChip } from './CoinChip'
 import './phone.css'
 
-// His phone. When Grok Bot streams his screen, this is the real frame from his phone.
-// When it does not, the pump.fun app is redrawn from his real trades and the island
-// at the top narrates what he is doing. Same layout at any size; the parent scales it.
-export function PhoneScreen({ feed, live }: { feed: Feed; live: Live }) {
+// His phone. Three ways to show it, best first:
+//  1. live video of his real phone screen (WebRTC, under half a second behind), while
+//     someone is looking at the phone, so viewers only pay for minutes really watched
+//  2. screenshots he posts every couple of seconds
+//  3. the pump.fun app redrawn from his real trades, with the step he is on at the top
+// Same layout at any size; the parent scales it.
+export function PhoneScreen({ feed, live, watching }: { feed: Feed; live: Live; watching: boolean }) {
   const [now, setNow] = useState(() => Date.now())
+  const { video, playing } = useWhep(PHONE_STREAM, watching)
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
-  if (live.screenTs && now - live.screenTs < FRESH_MS) return <Stream ts={live.screenTs} />
-  return <App feed={feed} live={live} />
+  const frames = !!live.screenTs && now - live.screenTs < FRESH_MS
+  return (
+    <div className="ph-wrap">
+      {frames ? <Stream ts={live.screenTs} /> : <App feed={feed} live={live} />}
+      {PHONE_STREAM && (
+        <div className={`ph ph-stream ph-video ${playing ? 'on' : ''}`}>
+          <video ref={video} muted playsInline autoPlay />
+          <span className="ph-live mono"><i />live</span>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // Real frames from his phone. The next frame loads behind the current one, then swaps in,

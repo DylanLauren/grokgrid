@@ -198,7 +198,7 @@ export function Scene({ feed, live, view, paused, onPhone }: SceneProps) {
             zIndexRange={[20, 10]}
             pointerEvents="none"
           >
-            <PhoneScreen feed={feed} live={live} />
+            <PhoneScreen feed={feed} live={live} watching={view === 'phone' && !paused} />
           </Html>
           </Later>
           <pointLight position={[0, 0, 0.05]} intensity={0.25} distance={0.45} color="#c9ffe0" />
