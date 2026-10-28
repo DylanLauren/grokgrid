@@ -52,3 +52,12 @@
 .pn-doc p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--paper-70); }
 .pn-flow { width: 100%; height: auto; margin: 4px 0 10px; font-family: var(--sans); }
 .pn-fine { margin-top: 14px !important; font-size: 12px !important; color: var(--paper-30) !important; }
+
+.pn-tour { margin: -4px 0 14px; font-size: 13.5px; color: var(--paper); border: 1px solid var(--hair-strong); border-radius: var(--r-pill); padding: 6px 12px; }
+.pn-tour:hover { border-color: var(--paper-50); }
+.pn-cost { border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; margin: 4px 0 10px; }
+.pn-cost-row { display: grid; grid-template-columns: 1.1fr 0.8fr 1.4fr; gap: 10px; padding: 9px 12px; font-size: 13px; line-height: 1.4; color: var(--paper-70); }
+.pn-cost-row span:first-child { color: var(--paper); }
+.pn-cost-row + .pn-cost-row { border-top: 1px solid var(--hair); }
+.pn-cost-th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--paper-50); }
+.pn-cost-th span:first-child { color: var(--paper-50); }

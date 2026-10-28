@@ -8,6 +8,7 @@ import { CallCard } from './ui/CallCard'
 import { CallsPanel, DocsPanel, GridPanel, StatsPanel } from './ui/Panels'
 import { MatrixPanel } from './ui/Matrix'
 import { useAgents } from './data/useAgents'
+import { seenTour, Tour } from './ui/Tour'
 import './app.css'
 
 const Scene = lazy(() => import('./scene/Scene').then((m) => ({ default: m.Scene })))
@@ -24,6 +25,7 @@ export default function App() {
   })
   const s = stats(feed)
   const grid = useAgents(tab === 'matrix')
+  const [touring, setTouring] = useState(() => !seenTour())
 
   useEffect(() => {
     history.replaceState(null, '', tab === 'desk' ? location.pathname : `#${tab}`)
@@ -105,8 +107,18 @@ export default function App() {
         {tab === 'stats' && <StatsPanel feed={feed} />}
         {tab === 'matrix' && <MatrixPanel grid={grid} feed={feed} />}
         {tab === 'grid' && <GridPanel />}
-        {tab === 'docs' && <DocsPanel />}
+        {tab === 'docs' && <DocsPanel onTour={() => setTouring(true)} />}
       </aside>
+
+      {touring && (
+        <Tour
+          go={(t, v) => {
+            setTab(t)
+            setView(v)
+          }}
+          onDone={() => setTouring(false)}
+        />
+      )}
 
       <footer className="fine mono">{MAIN_NAME} · ${MAIN_TICKER} · unofficial fan project, not affiliated with xAI or pump.fun</footer>
     </div>

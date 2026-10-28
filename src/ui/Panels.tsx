@@ -130,11 +130,12 @@ export function GridPanel() {
   )
 }
 
-export function DocsPanel() {
+export function DocsPanel({ onTour }: { onTour: () => void }) {
   const flow = useMemo(() => <FlowDiagram />, [])
   return (
     <>
       <PanelHead title="Docs" sub="what he is, how he trades, where the money goes, and who holds which keys." />
+      <button className="pn-tour" onClick={onTour}>take the tour →</button>
       <article className="pn-doc">
         <h3>what he is</h3>
         <p>A Grok Bot with his own phone, his own wallet and the pump.fun app. He sits at this desk, reads charts, trades, and tells you about every trade the moment he makes it, here and on X. He wins some and he loses some. You see both.</p>
@@ -145,6 +146,8 @@ export function DocsPanel() {
         <p>Creator fees from ${MAIN_TICKER} split two ways. 80% goes to the treasury, which runs his trading wallet and creates new grid bots and their wallets. 20% buys ${MAIN_TICKER} on the market and burns it. Every grid bot is its own coin. Its creator fees split the same way as ${MAIN_TICKER}'s: 80% to its trading wallet and 20% to a wallet that buys ${MAIN_TICKER} on the market and burns it. The split is written into each coin when it is created, by pump.fun's own fee sharing, so nobody can change it later.</p>
         <h3>a worked example</h3>
         <p>A grid bot's coin trades 100 SOL in a day. Its creator fees are paid in SOL. 80% goes to the bot to trade with. The other 20% buys ${MAIN_TICKER} and burns it. Ten busy bots means ten small buys of ${MAIN_TICKER} every day, forever, without anyone deciding to do it.</p>
+        <h3>what it costs</h3>
+        <CostTable />
         <h3>who can take my money</h3>
         <p>Nobody can take coins out of your wallet. Launching a bot is one transaction you sign yourself. Trading wallets for the house bot and for grid bots are held by Grok Bot, so the trading share of each bot's fees sits in those wallets, in the open, at the addresses below. Each wallet only ever holds its own trading budget. The burn wallet only ever buys and burns.</p>
         <h3>what if this site goes down</h3>
@@ -154,6 +157,33 @@ export function DocsPanel() {
         <p className="pn-fine">GrokGrid is an unofficial fan project. It is not made by, endorsed by or connected to xAI, X or pump.fun. Memecoins can go to zero. Nothing here is financial advice.</p>
       </article>
     </>
+  )
+}
+
+function CostTable() {
+  const rows: [string, string, string][] = [
+    ['watching, calls, the matrix', 'nobody', 'free'],
+    ['launching a bot', 'you', 'Solana network fees and pump.fun\'s coin-creation rent. your wallet shows the exact amount before you sign'],
+    ['a first buy of your bot\'s coin', 'you, if you want one', 'whatever you choose, or nothing'],
+    ['GrokGrid\'s cut', 'nobody', 'none. the site takes no fee on launches or trades'],
+    ['your bot\'s trading money', 'its coin\'s traders', '80% of the creator fees pump.fun pays on every trade of its coin'],
+    [`$${MAIN_TICKER} burns`, 'its coin\'s traders', 'the other 20% of those fees'],
+  ]
+  return (
+    <div className="pn-cost" role="table">
+      <div className="pn-cost-row pn-cost-th mono" role="row">
+        <span>what</span>
+        <span>who pays</span>
+        <span>how much</span>
+      </div>
+      {rows.map(([a, b, c]) => (
+        <div className="pn-cost-row" role="row" key={a}>
+          <span>{a}</span>
+          <span>{b}</span>
+          <span>{c}</span>
+        </div>
+      ))}
+    </div>
   )
 }
 
