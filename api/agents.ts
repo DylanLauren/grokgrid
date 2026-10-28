@@ -9,6 +9,8 @@ export interface AgentRecord {
   strategy: string
   launchedAt: number
   wallet: string
+  owner?: string // the wallet that launched it
+  rules?: { maxSol: number; takeProfit: number; stopLoss: number } // how its owner asked it to trade
   coin: { mint: string; symbol: string; name: string; image?: string; hue: string }
 }
 

@@ -27,13 +27,14 @@ export function seenTour() {
 export function Tour({ go, onDone }: { go: (tab: Tab, view: View) => void; onDone: () => void }) {
   const [i, setI] = useState(0)
   const s = STEPS[i]
-  const finish = () => {
+  // skip and done go back to his desk; clicking off just closes it where you are
+  const finish = (home = true) => {
     try {
       localStorage.setItem(KEY, '1')
     } catch {
       /* private mode: the tour simply shows again next visit */
     }
-    go('desk', 'third')
+    if (home) go('desk', 'third')
     onDone()
   }
   // clicking anywhere off the card (not dragging the room) ends the tour
@@ -46,7 +47,7 @@ export function Tour({ go, onDone }: { go: (tab: Tab, view: View) => void; onDon
     const onDown = (e: PointerEvent) => (down = { x: e.clientX, y: e.clientY })
     const onUp = (e: PointerEvent) => {
       if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return
-      if (!(e.target as Element).closest('.tour')) end.current()
+      if (!(e.target as Element).closest('.tour')) end.current(false)
     }
     addEventListener('pointerdown', onDown)
     addEventListener('pointerup', onUp)
@@ -67,7 +68,7 @@ export function Tour({ go, onDone }: { go: (tab: Tab, view: View) => void; onDon
         <span>
           {String(i + 1).padStart(2, '0')} / {String(STEPS.length).padStart(2, '0')}
         </span>
-        <button onClick={finish}>skip</button>
+        <button onClick={() => finish()}>skip</button>
       </div>
       <b>{s.title}</b>
       <p>{s.body}</p>

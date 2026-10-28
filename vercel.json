@@ -1,5 +1,22 @@
 {
+  "rewrites": [
+    { "source": "/i/:mint", "destination": "/api/img?mint=:mint" },
+    { "source": "/m/:mint", "destination": "/api/meta?mint=:mint" }
+  ],
+  "functions": {
+    "api/launch/*.ts": { "maxDuration": 60 }
+  },
   "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains" }
+      ]
+    },
     { "source": "/room.glb", "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=604800" }] },
     { "source": "/fonts/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
     { "source": "/brands/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }] }

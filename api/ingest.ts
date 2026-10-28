@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import type { AgentRecord } from './agents.js'
 import { HOUSE_WALLET, isAddress, isSig, json, parse, redis, signedBy } from './_lib.js'
+import { addWallets, freeWallets } from './_launch.js'
 
 // Grok Bot posts what it just did here, one event per request, with
 //   Authorization: Bearer <INGEST_TOKEN>
@@ -15,6 +16,8 @@ import { HOUSE_WALLET, isAddress, isSig, json, parse, redis, signedBy } from './
 //   { "type": "wallet", "agent": "house", "sol": 2.31 }
 //   { "type": "action", "text": "reading the trader list" }           (what he is doing right now)
 //   { "type": "screen", "jpeg": "<base64 jpeg of his phone screen>" }  (live view, about one every 2s)
+//   { "type": "wallets", "wallets": ["<public address>", ...] }       (spare trading wallets for new grid bots)
+//   GET /api/ingest  (same token)  -> how many spare wallets are left and the latest launches to start trading
 
 const TOKEN = process.env.INGEST_TOKEN || ''
 const MAX_BODY = 8_000
@@ -59,6 +62,8 @@ export async function POST(req: Request) {
       return action(ev)
     case 'screen':
       return screen(ev)
+    case 'wallets':
+      return wallets(ev)
     default:
       return json({ error: 'unknown type' }, 400)
   }
@@ -180,4 +185,20 @@ async function screen(ev: Record<string, unknown>) {
   const ts = Date.now()
   await redis(['SET', 'gg:screen', jpeg, 'EX', 60], ['SET', 'gg:screen:ts', ts, 'EX', 60])
   return json({ ok: true, ts })
+}
+
+// Spare trading wallets Grok Bot made (it keeps their keys). Each new grid bot gets one.
+async function wallets(ev: Record<string, unknown>) {
+  const list = Array.isArray(ev.wallets) ? ev.wallets.slice(0, 50) : []
+  if (!list.length) return json({ error: 'fields' }, 400)
+  const added = await addWallets(list.filter((w) => w !== HOUSE_WALLET))
+  return json({ ok: true, added, free: await freeWallets() })
+}
+
+// What Grok Bot polls: spare wallets left, and launches it should start trading.
+export async function GET(req: Request) {
+  if (!authorised(req)) return json({ error: 'unauthorised' }, 401)
+  const [list] = await redis(['LRANGE', 'gg:launches', 0, 49])
+  const launches = ((list as string[]) ?? []).map((l) => parse(l)).filter(Boolean)
+  return new Response(JSON.stringify({ free: await freeWallets(), launches }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
 }

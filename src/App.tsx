@@ -44,7 +44,8 @@ export default function App() {
   const onPage = !ROOM.includes(tab)
   const grid = useAgents(tab === 'matrix' || tab === 'grid')
   const live = useLive(!onPage, view === 'phone', feed)
-  const [touring, setTouring] = useState(() => !seenTour())
+  // the first-visit tour only starts on his desk, never over a page someone linked to
+  const [touring, setTouring] = useState(() => !seenTour() && !location.hash.slice(1))
   const tucked = useTuck()
   const [focusCall, setFocusCall] = useState<string>()
 
