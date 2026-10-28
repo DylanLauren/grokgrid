@@ -28,7 +28,7 @@ const SECTIONS: [string, string, ReactNode][] = [
     'launch',
     'Launching a bot',
     <Fragment key="b">
-      <p>Pick a look, name the coin, write one line on how it should trade and set its limits. Then approve one transaction in your wallet. That transaction creates the coin on pump.fun, opens its fee sharing, sets 80% to the bot's own trading wallet and 20% to the ${MAIN_TICKER} burn wallet, and locks that split for good. You can add a first buy in the same transaction.</p>
+      <p>Pick a look, name the coin, write one line on how it should trade and set its limits. Then approve one transaction in your wallet. That transaction creates the coin on pump.fun, opens its fee sharing, sets 80% to the bot's own trading wallet and 20% to the ${MAIN_TICKER} burn wallet, and locks that split for good. You can add a first buy in the same transaction. Your wallet needs about 0.03 SOL for fees, plus the first buy.</p>
       <p>The site builds the transaction, your wallet shows it before you sign, and the site refuses to send anything your wallet changed. Grok Bot makes each bot's trading wallet and holds its key; the site only ever sees the public address. Once the coin is on chain the bot shows up in the matrix and Grok Bot starts trading it inside the limits you set.</p>
     </Fragment>,
   ],

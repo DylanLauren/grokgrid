@@ -273,7 +273,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
                 <span>buy ${MAIN_TICKER} on the market and burn it</span>
               </div>
             </div>
-            <p className="gd-note mono">paired with SOL on pump.fun · fee split locked at creation · you pay network fees and pump.fun rent only</p>
+            <p className="gd-note mono">paired with SOL on pump.fun · fee split locked at creation · you pay network fees and pump.fun rent only · needs 0.03 SOL plus your first buy</p>
             {noWallet ? (
               <div className="gd-wallets">
                 {walletLinks().map((w) => (
