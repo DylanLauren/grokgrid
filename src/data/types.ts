@@ -18,6 +18,7 @@ export interface Call {
   pnlUsd: number
   entryMc: number
   nowMc: number
+  sample?: boolean
   sig?: string // transaction signature, links to solscan
   verified?: boolean // the signature was found on chain, signed by the bot's wallet
 }
@@ -26,6 +27,7 @@ export interface WalletPoint { ts: number; sol: number }
 
 export interface Feed {
   mode: 'live' | 'demo'
+  marketUpdatedAt?: number
   wallet: string | null
   solUsd: number
   calls: Call[] // newest first
@@ -62,11 +64,12 @@ export interface Agent {
   trades: number
   winRate: number // percent of closed trades in profit
   burnedMain: number // $GRID bought and burned from this coin's 20%
-  last?: Pick<Call, 'side' | 'symbol' | 'spentSol' | 'pnlUsd' | 'ts' | 'sig'>
+  last?: Pick<Call, 'side' | 'symbol' | 'spentSol' | 'pnlUsd' | 'ts' | 'sig'> & Partial<Pick<Call, 'mint' | 'image' | 'hue'>>
 }
 
 export interface AgentsFeed {
   mode: 'live' | 'demo'
+  marketUpdatedAt?: number
   updatedAt: number
   solUsd: number
   agents: Agent[]

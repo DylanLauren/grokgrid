@@ -1,7 +1,8 @@
+import snapshot from './tokenSnapshot.json'
 import type { Agent, AgentsFeed, RealCoin } from './types'
 
 // Demo grid, shown only until the first real agent launches. Labelled "demo"
-// everywhere it appears; none of these bots or coins exist.
+// everywhere it appears; the bots and their performance are simulated; token identities are real.
 const BOTS: [string, string, Agent['shape'], string, string][] = [
   ['dip goblin', '#0b0b0b', 'sphere', 'buys the first red candle after a fresh ATH, sells the bounce', 'GOBL'],
   ['tangerine', '#ff6a00', 'sphere', 'only trades coins under 30K with a real X account', 'TNGR'],
@@ -31,8 +32,9 @@ const addr = (r: () => number, end = '') => {
 
 export function demoAgents(now = Date.now()): AgentsFeed {
   const r = rng(20261028)
-  const agents: Agent[] = BOTS.map(([name, color, shape, strategy, symbol], i) => {
-    const mcUsd = 9000 + r() ** 2 * 900000
+  const agents: Agent[] = BOTS.map(([name, color, shape, strategy], i) => {
+    const coin = snapshot.coins[i % snapshot.coins.length]
+    const mcUsd = coin.mcUsd
     const trades = 4 + Math.floor(r() * 160)
     return {
       id: `demo-${i}`,
@@ -43,13 +45,12 @@ export function demoAgents(now = Date.now()): AgentsFeed {
       launchedAt: now - (1 + r() * 9) * 8.64e7,
       wallet: addr(r),
       coin: {
-        mint: addr(r, 'pump'),
-        symbol,
-        name,
+        ...coin,
+        real: true,
         hue: color,
         mcUsd,
-        vol24hUsd: mcUsd * (0.3 + r() * 2.5),
-        change24h: (r() - 0.45) * 120,
+        vol24hUsd: coin.vol24hUsd,
+        change24h: coin.change24h,
         feesSol: (mcUsd / 1e5) * (0.4 + r()),
       },
       walletSol: 0.2 + r() * 6,
@@ -59,14 +60,14 @@ export function demoAgents(now = Date.now()): AgentsFeed {
       burnedMain: Math.round(r() * 3e6),
       last: {
         side: r() < 0.5 ? 'buy' : 'sell',
-        symbol: ['MOTH', 'GLUE', 'FERN', 'HONK', 'ZAPP', 'SOUP'][Math.floor(r() * 6)],
+        symbol: coin.symbol, mint: coin.mint, image: coin.image, hue: color,
         spentSol: +(0.05 + r() * 0.5).toFixed(2),
         pnlUsd: (r() - 0.45) * 60,
         ts: now - r() * 40 * 60e3,
       },
     }
   })
-  return { mode: 'demo', updatedAt: now, solUsd: 182, agents }
+  return withRealCoins({ mode: 'demo', marketUpdatedAt: snapshot.updatedAt, updatedAt: now, solUsd: 182, agents }, snapshot.coins)
 }
 
 // Sample bots trading real coins: each sample bot takes one real pump.fun coin, with its
@@ -76,11 +77,12 @@ export function withRealCoins(feed: AgentsFeed, coins: RealCoin[]): AgentsFeed {
   return {
     ...feed,
     agents: feed.agents.map((a, i) => {
-      const c = coins[i % coins.length]
+      const c = coins.find((c) => c.mint === a.coin.mint) ?? coins[i % coins.length]
+      const lastCoin = coins.find((c) => c.mint === a.last?.mint) ?? coins[(i * 3 + 1) % coins.length]
       return {
         ...a,
         coin: { ...a.coin, mint: c.mint, symbol: c.symbol, name: c.name, image: c.image, mcUsd: c.mcUsd, vol24hUsd: c.vol24hUsd, change24h: c.change24h, real: true },
-        last: a.last && { ...a.last, symbol: coins[(i * 3 + 1) % coins.length].symbol },
+        last: a.last && { ...a.last, symbol: lastCoin.symbol, mint: lastCoin.mint, image: lastCoin.image, hue: a.color },
       }
     }),
   }
@@ -102,7 +104,7 @@ export function driftAgents(feed: AgentsFeed, now = Date.now()): AgentsFeed {
           : { ...a.coin, mcUsd: a.coin.mcUsd * k, vol24hUsd: a.coin.vol24hUsd + a.coin.mcUsd * r() * 0.004, change24h: a.coin.change24h + (k - 1) * 100, feesSol: a.coin.feesSol + r() * 0.002 },
         trades: a.trades + (traded ? 1 : 0),
         walletSol: Math.max(0.05, a.walletSol + (traded ? (r() - 0.48) * 0.1 : 0)),
-        last: traded ? { side: r() < 0.5 ? 'buy' : 'sell', symbol: a.last?.symbol ?? 'MOTH', spentSol: +(0.05 + r() * 0.4).toFixed(2), pnlUsd: (r() - 0.45) * 40, ts: now } : a.last,
+        last: traded ? { ...a.last, side: r() < 0.5 ? 'buy' : 'sell', symbol: a.last?.symbol ?? 'MOTH', spentSol: +(0.05 + r() * 0.4).toFixed(2), pnlUsd: (r() - 0.45) * 40, ts: now } : a.last,
       }
     }),
   }

@@ -28,3 +28,7 @@ dist-ssr
 !.env.example
 *.blend
 *.blend1
+
+.playwright-cli/
+output/playwright/
+.vercel/

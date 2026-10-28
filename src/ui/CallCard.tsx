@@ -14,6 +14,7 @@ export function CallCard({ call, compact }: { call: Call; compact?: boolean }) {
         <BotMark size={22} />
         <span className="cc-who">grokgrid</span>
         <span className={`cc-side mono ${call.side}`}>{call.side}</span>
+        {call.sample && <span className="cc-ok mono">sample trade</span>}
         {call.verified && <span className="cc-ok mono" title="signature found on chain, signed by his wallet">on chain ✓</span>}
         <span className="cc-ago mono">{ago(call.ts)}</span>
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { cachedCoins, realCoins, coinUpdatedAt } from './realCoins'
 import { demoFeed, makeCall } from './demo'
 import type { Feed } from './types'
 
@@ -29,6 +30,16 @@ export function useFeed(): Feed {
         /* offline or local dev without functions: stay on demo */
       }
     }
+    const coins = async () => {
+      const tokens = await realCoins()
+      if (!alive || mode.current !== 'demo') return
+      setFeed((f) => ({ ...f, marketUpdatedAt: coinUpdatedAt(), calls: f.calls.map((call) => {
+        const coin = tokens.find((c) => c.mint === call.mint)
+        return coin ? { ...call, symbol: coin.symbol, name: coin.name, image: coin.image, nowMc: coin.mcUsd } : call
+      }) }))
+    }
+    coins()
+    const coinPoll = setInterval(coins, 60_000)
     pull()
     const poll = setInterval(pull, POLL_MS)
 
@@ -37,7 +48,7 @@ export function useFeed(): Feed {
       if (mode.current !== 'demo') return
       setFeed((f) => {
         const r = Math.random
-        const call = makeCall(r, Date.now(), n++, f.solUsd)
+        const call = makeCall(r, Date.now(), n++, f.solUsd, cachedCoins())
         const last = f.curve[f.curve.length - 1]
         const sol = Math.max(0.2, last.sol + call.pnlUsd / f.solUsd)
         return {
@@ -51,6 +62,7 @@ export function useFeed(): Feed {
     return () => {
       alive = false
       ctrl?.abort()
+      clearInterval(coinPoll)
       clearInterval(poll)
       clearInterval(demo)
     }

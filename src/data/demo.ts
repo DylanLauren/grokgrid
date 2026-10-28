@@ -1,18 +1,10 @@
 import type { Call, Feed, WalletPoint } from './types'
 
-// Demo mode runs only while no worker is posting real trades. Every screen that shows
-// these numbers carries a "demo" label, and none of these coins exist.
-const COINS = [
-  { symbol: 'MOTH', name: 'moth to a chart', hue: '#ff9a00' },
-  { symbol: 'GLUE', name: 'glue hands', hue: '#13b8a6' },
-  { symbol: 'PEBL', name: 'pebble', hue: '#7a7a7a' },
-  { symbol: 'DRIP', name: 'drip check', hue: '#1683ff' },
-  { symbol: 'FERN', name: 'fern', hue: '#4ade80' },
-  { symbol: 'HONK', name: 'honk', hue: '#ff6a00' },
-  { symbol: 'ZAPP', name: 'zapp', hue: '#9b5cff' },
-  { symbol: 'SOUP', name: 'soup season', hue: '#ff2e9a' },
-  { symbol: 'LOAF', name: 'loaf', hue: '#9a6a3f' },
-]
+import snapshot from './tokenSnapshot.json'
+import type { RealCoin } from './types'
+
+// Real token identities and market snapshots; positions and trades are simulations.
+const COINS: RealCoin[] = snapshot.coins
 
 const BUY_NOTES = [
   'small entry on {S} around {M} mc. holders look spread out, dev sold nothing yet.',
@@ -43,13 +35,14 @@ function rng(seed: number) {
 const fmtMc = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : `${Math.round(n / 1e3)}K`)
 const fill = (t: string, s: string, m: number, p: string) => t.replace('{S}', s).replace('{M}', fmtMc(m)).replace('{P}', p)
 
-export function makeCall(r: () => number, ts: number, i: number, solUsd: number): Call {
-  const c = COINS[Math.floor(r() * COINS.length)]
+export function makeCall(r: () => number, ts: number, i: number, solUsd: number, coins: RealCoin[] = COINS): Call {
+  const c = coins[Math.floor(r() * coins.length)]
   const side = r() < 0.55 ? 'buy' : 'sell'
   const spentSol = +(0.1 + r() * 0.4).toFixed(2)
-  const entryMc = 18000 + r() * 90000
+  const marketMc = c.mcUsd
   const move = side === 'buy' ? (r() - 0.5) * 0.08 : (r() - 0.56) * 0.9
-  const nowMc = entryMc * (1 + move)
+  const entryMc = marketMc / (1 + move)
+  const nowMc = marketMc
   const positionUsd = spentSol * solUsd * (1 + move)
   const pnlUsd = positionUsd - spentSol * solUsd
   const pct = `${Math.abs(move * 100).toFixed(0)}%`
@@ -58,10 +51,12 @@ export function makeCall(r: () => number, ts: number, i: number, solUsd: number)
     id: `demo-${ts}-${i}`,
     ts,
     side,
-    mint: `DEMO${c.symbol}pump`,
+    mint: c.mint,
+    image: c.image,
+    sample: true,
     symbol: c.symbol,
     name: c.name,
-    hue: c.hue,
+    hue: '#1683ff',
     note: fill(pool[Math.floor(r() * pool.length)], c.symbol, entryMc, pct),
     sizeTokens: Math.round((spentSol * solUsd / entryMc) * 1e9),
     spentSol,
@@ -72,14 +67,14 @@ export function makeCall(r: () => number, ts: number, i: number, solUsd: number)
   }
 }
 
-export function demoFeed(now = Date.now()): Feed {
+export function demoFeed(now = Date.now(), coins: RealCoin[] = COINS): Feed {
   const solUsd = 182
   const r = rng(Math.floor(now / 3.6e6)) // same story for everyone within the hour
   const calls: Call[] = []
   let ts = now - 6 * 3.6e6
   let i = 0
   while (ts < now - 20000) {
-    calls.push(makeCall(r, ts, i++, solUsd))
+    calls.push(makeCall(r, ts, i++, solUsd, coins))
     ts += 6 * 60e3 + r() * 14 * 60e3
   }
   calls.reverse()
@@ -89,5 +84,5 @@ export function demoFeed(now = Date.now()): Feed {
     sol = Math.max(0.2, sol * (1 + (r() - 0.53) * 0.04))
     curve.push({ ts: t, sol })
   }
-  return { mode: 'demo', wallet: null, solUsd, calls, curve, burnedMain: 0, feesSol: 0 }
+  return { mode: 'demo', marketUpdatedAt: snapshot.updatedAt, wallet: null, solUsd, calls, curve, burnedMain: 0, feesSol: 0 }
 }

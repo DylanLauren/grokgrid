@@ -101,6 +101,7 @@ function App({ feed, live }: { feed: Feed; live: Live }) {
         <span className="ph-mc-v">{mc(call.nowMc)}</span>
         <span className={change >= 0 ? 'gain' : 'loss'}>{change >= 0 ? '+' : ''}{change.toFixed(1)}%</span>
       </div>
+      <div className="mono dim" style={{ fontSize: 9, padding: '0 12px' }}>illustrative chart{feed.mode === 'demo' ? ' · sample trades' : ''}</div>
       <MiniChart call={call} />
 
       <div className="ph-pos">
