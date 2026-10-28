@@ -1,0 +1,63 @@
+.mon {
+  position: relative;
+  width: 760px;
+  height: 440px;
+  overflow: hidden;
+  color: #fff;
+  font-family: var(--sans);
+  user-select: none;
+  backface-visibility: hidden;
+  /* a dark wallpaper with a soft light falling in from the top left */
+  background:
+    radial-gradient(120% 90% at 18% 0%, #1d2433 0%, transparent 60%),
+    radial-gradient(90% 80% at 100% 100%, #1a1325 0%, transparent 55%),
+    #08090c;
+  display: grid;
+  grid-template-rows: 22px 1fr 34px;
+}
+.mon-menu { display: flex; align-items: center; gap: 14px; padding: 0 12px; font-size: 11px; background: #0008; backdrop-filter: blur(8px); color: #ffffffcc; }
+.mon-menu b { font-weight: 600; font-family: var(--sans); }
+.mon-menu-r { margin-left: auto; color: #ffffff80; }
+
+.mon-desk { position: relative; display: grid; grid-template-columns: 1.55fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px; padding: 12px 14px 4px; min-height: 0; }
+.win { background: #101216f2; border: 1px solid #ffffff14; border-radius: 9px; box-shadow: 0 14px 30px #0009, inset 0 1px 0 #ffffff0d; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+.win-bar { display: flex; align-items: center; gap: 10px; height: 22px; flex: none; padding: 0 9px; font-size: 10px; color: #ffffff80; border-bottom: 1px solid #ffffff0d; background: #ffffff05; }
+.win-dots { display: flex; gap: 5px; }
+.win-dots i { width: 8px; height: 8px; border-radius: 50%; background: #ffffff26; }
+.win-dots i:first-child { background: #ff5f57; } .win-dots i:nth-child(2) { background: #febc2e; } .win-dots i:nth-child(3) { background: #28c840; }
+
+.win-chart { grid-row: 1 / 3; }
+.wc-head { display: flex; align-items: center; gap: 9px; padding: 9px 12px 2px; font-size: 13px; }
+.wc-head b { font-weight: 560; }
+.wc-chip { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; font: 600 10px var(--mono); color: #0a0a0a; }
+.wc-tf { margin-left: auto; display: flex; gap: 4px; font-size: 10px; }
+.wc-tf i { font-style: normal; padding: 2px 6px; border-radius: 5px; color: #ffffff80; }
+.wc-tf i.on { background: #ffffff1a; color: #fff; }
+.wc-svg { flex: 1; width: 100%; min-height: 0; padding: 4px 6px 6px 10px; }
+
+.ww-big { padding: 8px 12px 0; font-size: 30px; font-weight: 520; letter-spacing: -0.04em; line-height: 1; }
+.ww-big small { font-size: 11px; margin-left: 6px; letter-spacing: 0; color: #ffffff80; }
+.ww-pills { display: flex; gap: 8px; padding: 5px 12px 0; font-size: 10.5px; }
+.ww-line { flex: 1; width: 100%; min-height: 0; padding: 4px 12px 10px; }
+
+.wl { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 3px; padding: 8px 10px; font-size: 10.5px; line-height: 1.35; color: #ffffffb3; overflow: hidden; }
+.wl div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wl .now { color: #fff; animation: wl-in 0.4s ease-out; }
+.wl-cursor { color: var(--gain); animation: wl-blink 1s steps(1) infinite; }
+@keyframes wl-in { from { opacity: 0; transform: translateY(6px); } }
+@keyframes wl-blink { 50% { opacity: 0; } }
+
+.mon-dock { justify-self: center; align-self: center; display: flex; gap: 8px; padding: 5px 10px; border-radius: 11px; background: #ffffff10; border: 1px solid #ffffff12; }
+.mon-dock i { position: relative; width: 18px; height: 18px; border-radius: 5px; opacity: 0.9; }
+.mon-dock i.on::after { content: ''; position: absolute; left: 50%; bottom: -5px; width: 3px; height: 3px; margin-left: -1.5px; border-radius: 50%; background: #fff; }
+
+/* the panel itself: glare from the lamp, a fine pixel grid, darker edges */
+.mon-glass {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(115deg, #ffffff12 0%, #ffffff05 28%, transparent 42%),
+    radial-gradient(130% 120% at 50% 50%, transparent 60%, #0000008c 100%),
+    repeating-linear-gradient(90deg, #ff000006 0 1px, #00ff0006 1px 2px, #0000ff06 2px 3px),
+    repeating-linear-gradient(0deg, #0000001a 0 1px, transparent 1px 3px);
+  box-shadow: inset 0 0 0 1px #000, inset 0 0 30px #0007;
+}

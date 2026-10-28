@@ -1,0 +1,71 @@
+.ph {
+  width: 300px;
+  height: 640px;
+  background: #0d0f12;
+  color: #fff;
+  font-family: var(--sans);
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  user-select: none;
+  backface-visibility: hidden;
+}
+.ph-status { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--paper-70); height: 22px; padding: 0 6px; }
+.ph-bars { display: flex; align-items: flex-end; gap: 2px; height: 10px; }
+.ph-bars i { width: 3px; background: var(--paper-70); border-radius: 1px; }
+.ph-bars i:nth-child(1) { height: 4px; } .ph-bars i:nth-child(2) { height: 6px; } .ph-bars i:nth-child(3) { height: 8px; } .ph-bars i:nth-child(4) { height: 10px; }
+.ph-bars b { width: 20px; height: 10px; margin-left: 6px; border: 1.5px solid var(--paper-70); border-radius: 3px; background: linear-gradient(90deg, var(--paper-70) 72%, transparent 72%) 1px 1px / calc(100% - 2px) calc(100% - 2px) no-repeat; }
+.ph-island { position: absolute; top: 12px; left: 50%; margin-left: -46px; width: 92px; height: 26px; border-radius: 14px; background: #000; }
+/* what he is doing right now, as Grok Bot reports it */
+.ph-agent { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-radius: 12px; background: #fff; color: #0a0a0a; font-size: 12.5px; font-weight: 520; overflow: hidden; }
+.ph-agent img { flex: none; }
+.ph-agent > i { flex: none; margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: #16a34a; animation: pulse 1.2s infinite; }
+.ph-doing { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: ph-doing 0.4s ease-out; }
+@keyframes ph-doing { from { opacity: 0; transform: translateY(8px); filter: blur(3px); } }
+.ph-brand img { vertical-align: -3px; margin-right: 6px; }
+.ph-trade button { position: relative; overflow: hidden; }
+.ph-tap { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px; border-radius: 50%; background: #ffffffaa; animation: ph-tap 0.7s ease-out 2; }
+@keyframes ph-tap { from { transform: scale(0.2); opacity: 1; } to { transform: scale(3); opacity: 0; } }
+.ph-stream { padding: 0; background: #000; }
+.ph-stream img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ph-stream .ph-next { opacity: 0; }
+.ph-live { position: absolute; top: 14px; right: 16px; display: flex; gap: 6px; align-items: center; font-size: 11px; background: #000a; color: #fff; padding: 3px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.06em; }
+.ph-live i { width: 6px; height: 6px; border-radius: 50%; background: var(--loss); animation: pulse 1.2s infinite; }
+.ph-nav { display: grid; grid-template-columns: 24px 1fr 40px; align-items: center; font-size: 14px; }
+.ph-back { font-size: 26px; line-height: 1; color: var(--paper-70); }
+.ph-brand { text-align: center; font-weight: 560; }
+.ph-coin { display: flex; gap: 12px; align-items: center; }
+.ph-sym { font-weight: 600; font-size: 18px; }
+.ph-name { color: var(--paper-50); font-size: 13px; }
+.ph-mc { display: flex; align-items: baseline; gap: 10px; font-size: 14px; }
+.ph-mc-v { font-size: 30px; font-weight: 560; letter-spacing: -0.03em; }
+.ph-chart { width: 100%; height: 110px; background: linear-gradient(#ffffff08 1px, transparent 1px) 0 0 / 100% 22px; border-radius: 8px; }
+.ph-pos { display: grid; grid-template-columns: repeat(3, 1fr); background: #171a1f; border-radius: 14px; padding: 10px 12px; }
+.ph-pos div { display: grid; gap: 2px; }
+.ph-pos span { font-size: 11px; color: var(--paper-50); }
+.ph-pos b { font-weight: 560; font-size: 14px; }
+.ph-trade { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ph-trade button { height: 44px; border-radius: 14px; font-weight: 600; font-size: 15px; transition: transform 0.15s, filter 0.15s; }
+.ph-buy { background: #1f3a2a; color: var(--gain); }
+.ph-sell { background: #3a1f22; color: var(--loss); }
+.ph-buy.on { background: var(--gain); color: #06210f; transform: scale(0.96); }
+.ph-sell.on { background: var(--loss); color: #2a0606; transform: scale(0.96); }
+.ph-list { display: grid; gap: 8px; margin-top: 2px; }
+.ph-row { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; font-size: 13px; }
+.ph-row-s { font-weight: 560; }
+.ph-toast {
+  position: absolute; left: 16px; right: 16px; bottom: 18px;
+  background: #fff; color: #0a0a0a; border-radius: 14px; padding: 12px 14px;
+  font-weight: 560; font-size: 14px;
+  animation: ph-in 0.35s cubic-bezier(.2,.9,.3,1.2);
+}
+@keyframes ph-in { from { transform: translateY(24px); opacity: 0; } }
+
+.ph-wrap { position: relative; width: 300px; height: 640px; }
+.ph-video { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity 0.4s; }
+.ph-video.on { opacity: 1; }
+.ph-video video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

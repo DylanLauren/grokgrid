@@ -1,0 +1,73 @@
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMono-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  /* the desk at night: near black, white, white at fixed steps. green and red only mean money. */
+  --ink: #0a0a0a;
+  --ink-raised: #141414;
+  --ink-card: #1a1a1a;
+  --paper: #ffffff;
+  --paper-70: rgba(255, 255, 255, 0.7);
+  --paper-50: rgba(255, 255, 255, 0.5);
+  --paper-30: rgba(255, 255, 255, 0.3);
+  --hair: rgba(255, 255, 255, 0.1);
+  --hair-strong: rgba(255, 255, 255, 0.2);
+  --veil: rgba(10, 10, 10, 0.72);
+  --gain: #4ade80;
+  --loss: #f87171;
+
+  /* the bot family, taken from the @bot banner */
+  --bot-black: #0b0b0b;
+  --bot-orange: #ff6a00;
+  --bot-amber: #ff9a00;
+  --bot-teal: #13b8a6;
+  --bot-violet: #9b5cff;
+  --bot-blue: #1683ff;
+  --bot-pink: #ff2e9a;
+  --bot-grey: #7a7a7a;
+  --bot-brown: #9a6a3f;
+
+  --sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --pad: clamp(10px, 1.6vw, 20px);
+  --gutter: clamp(16px, 4vw, 40px);
+  --bar: clamp(48px, 5.2vw, 60px);
+  --r-card: 18px;
+  --r-pill: 999px;
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--sans);
+  font-weight: 420;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+a { color: inherit; text-decoration: none; }
+.mono { font-family: var(--mono); letter-spacing: 0; }
+.gain { color: var(--gain); }
+.loss { color: var(--loss); }
+.dim { color: var(--paper-50); }
+@keyframes pulse { 50% { opacity: 0.35; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}

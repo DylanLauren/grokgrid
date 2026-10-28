@@ -1,0 +1,45 @@
+.cc {
+  display: block;
+  background: var(--ink-raised);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-card);
+  padding: 12px 14px 12px;
+}
+a.cc:hover { border-color: var(--hair-strong); }
+.cc-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.cc-who { font-weight: 560; }
+.cc-side { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--hair-strong); color: var(--paper-70); }
+.cc-side.buy { color: var(--gain); border-color: rgba(74, 222, 128, 0.35); }
+.cc-side.sell { color: var(--paper-70); }
+.cc-ago { margin-left: auto; color: var(--paper-50); font-size: 11.5px; }
+.cc-note { margin: 8px 0 10px; font-size: 14px; line-height: 1.4; color: var(--paper); }
+.cc-pos {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: 'chip coin nums' 'foot foot foot';
+  column-gap: 10px;
+  row-gap: 8px;
+  background: #101010;
+  border-radius: 12px;
+  padding: 10px 12px;
+  align-items: center;
+}
+.cc-pos > :first-child { grid-area: chip; }
+.cc-coin { grid-area: coin; display: grid; line-height: 1.2; min-width: 0; }
+.cc-coin b { font-weight: 560; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-coin span { font-size: 12px; color: var(--paper-50); }
+.cc-nums { grid-area: nums; display: flex; gap: 14px; text-align: right; }
+.cc-nums span, .cc-foot span { display: grid; font-size: 13px; font-weight: 520; white-space: nowrap; }
+.cc-pos i { font-style: normal; font-size: 11px; color: var(--paper-50); font-weight: 420; }
+.cc-pos em { font-style: normal; }
+.cc-foot { grid-area: foot; display: flex; justify-content: space-between; gap: 12px; }
+.cc-foot span { display: flex; gap: 6px; align-items: baseline; }
+.cc-compact { padding: 10px 12px; }
+.cc-compact .cc-note { font-size: 13px; margin: 6px 0 8px; }
+.cc-compact .cc-nums { gap: 10px; }
+@media (max-width: 520px) {
+  .cc-pos { grid-template-columns: auto 1fr; grid-template-areas: 'chip coin' 'nums nums' 'foot foot'; }
+  .cc-nums { justify-content: space-between; text-align: left; }
+}
+
+.cc-ok { font-size: 10.5px; color: var(--gain); letter-spacing: 0.04em; }
