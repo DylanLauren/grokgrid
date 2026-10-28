@@ -1,12 +1,18 @@
 // Stores a coin's picture before launch, under the mint address the browser just made.
 // First upload wins, so nobody can swap a picture once it is in. Served from /i/<mint>.
 import { hasStore, isAddress, redis } from '../_lib.js'
-import { DRAFT_TTL, MAX_IMAGE_BYTES, SITE_URL, keys, limited, noStore, readJson } from '../_launch.js'
+import { DRAFT_TTL, MAX_IMAGE_BYTES, SITE_URL, keys, launchStatus, limited, noStore, readJson } from '../_launch.js'
+
+// Pictures sit in Redis for a day before their coin launches, so uploads are capped
+// site-wide too: one person rotating IPs cannot fill the store and take the site down.
+const PER_DAY = 150
 
 export async function POST(req: Request) {
   if (!hasStore()) return noStore({ error: 'The launchpad is offline for a moment, try again soon.' }, 503)
-  const slow = await limited(req, 'asset', 20)
+  const slow = await limited(req, 'asset', 5)
   if (slow) return slow
+  const status = await launchStatus()
+  if (!status.open) return noStore({ error: status.reason ?? 'Launching is paused right now.' }, 503)
   const b = await readJson<{ mint?: unknown; image?: unknown }>(req, 600_000)
   if (!b) return noStore({ error: 'Image must be 400 KB or smaller.' }, 413)
   if (!isAddress(b.mint) || typeof b.image !== 'string') return noStore({ error: 'bad request' }, 400)
@@ -18,6 +24,9 @@ export async function POST(req: Request) {
   const magic = data.subarray(0, 12).toString('hex')
   const kind = magic.startsWith('89504e47') ? 'image/png' : magic.startsWith('ffd8ff') ? 'image/jpeg' : magic.startsWith('47494638') ? 'image/gif' : magic.startsWith('52494646') && magic.slice(16, 24) === '57454250' ? 'image/webp' : null
   if (!kind) return noStore({ error: "That file isn't an image." }, 400)
+  const day = `gg:lim:asset-day:${Math.floor(Date.now() / 86_400_000)}`
+  const [count] = await redis(['INCR', day], ['EXPIRE', day, 172_800])
+  if (Number(count) > PER_DAY) return noStore({ error: 'Too many launches today. Try again tomorrow.' }, 429)
   const [ok] = await redis(['SET', keys.image(b.mint), JSON.stringify({ type: kind, b64: m[2] }), 'NX', 'EX', DRAFT_TTL])
   if (ok !== 'OK') return noStore({ error: 'That coin address is taken. Try again for a fresh one.' }, 409)
   return noStore({ image: `${SITE_URL}/i/${b.mint}` })
