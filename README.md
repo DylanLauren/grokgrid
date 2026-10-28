@@ -87,3 +87,22 @@ all outstanding capabilities. Existing full-token ingestion still works.
 The phone displays fresh captured JPEGs or WHEP video and shows **Screen offline**
 when neither is available. It does not redraw an illustrative trading app. A live
 screen demonstrates capture only; it does not prove the bot is trading.
+
+### Runtime and launch recovery
+
+`VITE_BOT_WALLET` is the house bot's public address; `VITE_BURN_WALLET` is the
+separate buy-and-burn public address. Neither belongs in the spare-wallet pool.
+Private keys stay outside this repository and outside Vercel.
+
+Only add spare public wallets after a running bot can consume the launch queue
+and enforce the configured rules. Wallet inventory alone does not prove runtime
+readiness. Prepared launches reserve wallets for 15 minutes. Once an authorized
+send starts, the reservation is held until chain reconciliation completes; an
+ambiguous error must not recycle the wallet. If lookup-table setup fails before
+the launch is sent, the reservation stays held for operator review. Review the
+pending record and chain state before releasing it. Confirmation atomically
+registers and queues each mint once.
+
+Validation without a launch: `npm test`, `npm run build`, and
+`npx tsc -p api/tsconfig.json`. These do not prove a completed on-chain launch or
+an active trading worker; those require separate operational verification.

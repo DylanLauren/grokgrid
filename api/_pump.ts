@@ -262,13 +262,25 @@ export async function broadcastSetup(signed: string[], expectedMessages: string[
 }
 
 // Where a sent launch stands. Re-sent on every check until its blockhash expires.
-export async function launchProgress(raw: string, signature: string, lastValidBlockHeight: number): Promise<'landed' | 'failed' | 'expired' | 'pending'> {
+export async function launchProgress(raw: string, signature: string, _lastValidBlockHeight: number): Promise<'landed' | 'failed' | 'expired' | 'pending'> {
   const conn = connection()
   const [st] = (await conn.getSignatureStatuses([signature], { searchTransactionHistory: true })).value
   if (st?.err) return 'failed'
   if (st && (st.confirmationStatus === 'confirmed' || st.confirmationStatus === 'finalized')) return 'landed'
-  // Wallets may swap in a fresher blockhash while signing, so allow some slack past ours.
-  if ((await conn.getBlockHeight('confirmed')) > lastValidBlockHeight + 150) return st ? 'pending' : 'expired'
+  // Check the actual signed blockhash; wallets can replace the prepared one.
+  const tx = VersionedTransaction.deserialize(Buffer.from(raw, 'base64'))
+  const valid = await conn.isBlockhashValid(tx.message.recentBlockhash, { commitment: 'confirmed' })
+  if (!valid.value) return st ? 'pending' : 'expired'
   await conn.sendRawTransaction(Buffer.from(raw, 'base64'), { skipPreflight: true, maxRetries: 0 }).catch(() => {})
   return 'pending'
+}
+
+// A newly prepared lookup table may not exist yet; use the server's own saved list
+// to validate the launch before the visitor's setup transactions are broadcast.
+export async function validationTables(expectedMessage: string, setup: { table: string; expected: string[] } | null) {
+  if (setup) return [new AddressLookupTableAccount({ key: new PublicKey(setup.table), state: {
+    deactivationSlot: 18446744073709551615n, lastExtendedSlot: 0, lastExtendedSlotStartIndex: 0,
+    addresses: setup.expected.map((a) => new PublicKey(a)),
+  } })]
+  return tablesOf(VersionedMessage.deserialize(Buffer.from(expectedMessage, 'base64')))
 }

@@ -2,7 +2,7 @@
 // and the wallet's, then hands it to /api/launch/send. 80% of the coin's creator fees go to a
 // fresh trading wallet Grok Bot made for this bot, 20% to the $GRID burn wallet.
 import { hasStore, isAddress, redis } from '../_lib.js'
-import { BURN_WALLET, DRAFT_TTL, cleanDraft, friendly, keys, launchStatus, leaseWallet, limited, metadataJson, noStore, readJson, SITE_URL } from '../_launch.js'
+import { BURN_WALLET, DRAFT_TTL, LEASE_TTL, releaseWallet, cleanDraft, friendly, keys, launchStatus, leaseWallet, limited, metadataJson, noStore, readJson, SITE_URL } from '../_launch.js'
 import { prepareLaunch } from '../_pump.js'
 
 export async function POST(req: Request) {
@@ -24,16 +24,18 @@ export async function POST(req: Request) {
   if (Number(image) !== 1) return noStore({ error: 'Add the coin picture first.' }, 400)
   if (Number(pending) === 1) return noStore({ error: 'That coin address is taken. Try again for a fresh one.' }, 409)
 
+  const [reserved] = await redis(['SET', keys.pending(mint), '{}', 'NX', 'EX', LEASE_TTL])
+  if (reserved !== 'OK') return noStore({ error: 'That coin address is taken. Try again for a fresh one.' }, 409)
   const bot = await leaseWallet(mint)
   if (!bot) return noStore({ error: 'Grok Bot is making new trading wallets. Try again in a few minutes.' }, 503)
   try {
     await redis(['SET', keys.meta(mint), JSON.stringify(metadataJson(draft, mint)), 'EX', DRAFT_TTL])
     const prepared = await prepareLaunch({ launcher: b.launcher, mint, name: draft.name, ticker: draft.ticker, uri: `${SITE_URL}/m/${mint}`, firstBuy: draft.firstBuy, bot, burn: BURN_WALLET })
     const record = { draft, launcher: b.launcher, bot, burn: BURN_WALLET, message: prepared.message, lastValidBlockHeight: prepared.lastValidBlockHeight, setup: prepared.setup && { table: prepared.setup.table, expected: prepared.setup.expected, messages: prepared.setup.messages }, signature: null }
-    await redis(['SET', keys.pending(mint), JSON.stringify(record), 'EX', 3600])
+    await redis(['SET', keys.pending(mint), JSON.stringify(record), 'EX', LEASE_TTL])
     return noStore({ tx: prepared.tx, setup: prepared.setup?.txs ?? null, bot, burn: BURN_WALLET })
   } catch (e) {
-    await redis(['DEL', keys.lease(bot)]).catch(() => {})
+    await releaseWallet(bot, mint).catch(() => {})
     const msg = friendly(e)
     if (!msg) console.error('launch prepare', e)
     return noStore({ error: msg ?? 'Something broke building the launch. Nothing was spent, try again.' }, msg ? 400 : 500)
