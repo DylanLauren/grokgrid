@@ -8,10 +8,16 @@ const TWEETS = 'https://api.x.com/2/tweets';
 
 const enc = s => encodeURIComponent(s).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
 
-/** OAuth 1.0a header for a JSON POST (the JSON body is not part of the signature). */
+/**
+ * OAuth 1.0a header. JSON and multipart bodies are not signed; query parameters are, so a
+ * URL with a query string is signed over its base URL plus those parameters.
+ */
 export function oauthHeader(method, url, creds, nonce = randomBytes(16).toString('hex'), ts = Math.floor(Date.now() / 1000)) {
+  const u = new URL(url), query = Object.fromEntries(u.searchParams);
+  url = `${u.origin}${u.pathname}`;
   const p = { oauth_consumer_key: creds.apiKey, oauth_nonce: nonce, oauth_signature_method: 'HMAC-SHA1', oauth_timestamp: String(ts), oauth_token: creds.accessToken, oauth_version: '1.0' };
-  const params = Object.keys(p).sort().map(k => `${enc(k)}=${enc(p[k])}`).join('&');
+  const all = { ...query, ...p };
+  const params = Object.keys(all).sort().map(k => `${enc(k)}=${enc(all[k])}`).join('&');
   const base = [method.toUpperCase(), enc(url), enc(params)].join('&');
   const sig = createHmac('sha1', `${enc(creds.apiSecret)}&${enc(creds.accessSecret)}`).update(base).digest('base64');
   return 'OAuth ' + Object.entries({ ...p, oauth_signature: sig }).map(([k, v]) => `${enc(k)}="${enc(v)}"`).join(', ');
@@ -46,9 +52,45 @@ export function postGate(ledger, cfg, now) {
   return recent >= cfg.maxPerDay ? 'daily-cap' : 'ok';
 }
 
-export async function sendPost(text, creds, fetchImpl = fetch) {
+export async function sendPost(text, creds, fetchImpl = fetch, mediaIds = []) {
+  const body = mediaIds.length ? { text, media: { media_ids: mediaIds } } : { text };
   const r = await fetchImpl(TWEETS, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(10_000),
-    headers: { authorization: oauthHeader('POST', TWEETS, creds), 'content-type': 'application/json' }, body: JSON.stringify({ text }) });
+    headers: { authorization: oauthHeader('POST', TWEETS, creds), 'content-type': 'application/json' }, body: JSON.stringify(body) });
   let id = null; try { id = (await r.json())?.data?.id ?? null; } catch {}
   return { status: r.status, id };
+}
+
+const UPLOAD = 'https://api.x.com/2/media/upload';
+const CHUNK = 4 * 1024 * 1024;
+
+/**
+ * X API v2 chunked upload (initialize, append, finalize, then status while processing).
+ * Returns the media id, or null on any failure so the caller posts text only.
+ */
+export async function uploadMedia(bytes, mediaType, creds, fetchImpl = fetch, { sleep = ms => new Promise(r => setTimeout(r, ms)), maxPolls = 30 } = {}) {
+  try {
+    const category = mediaType.startsWith('video/') ? 'tweet_video' : 'tweet_image';
+    const call = async (method, url, init = {}) => {
+      const r = await fetchImpl(url, { method, redirect: 'error', signal: AbortSignal.timeout(60_000), ...init, headers: { authorization: oauthHeader(method, url, creds), ...(init.headers || {}) } });
+      if (!r.ok) throw Error(`upload ${r.status}`);
+      return r.status === 204 ? {} : r.json().catch(() => ({}));
+    };
+    const init = await call('POST', `${UPLOAD}/initialize`, { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ media_type: mediaType, total_bytes: bytes.length, media_category: category }) });
+    const id = init?.data?.id;
+    if (typeof id !== 'string' || !/^\d{1,32}$/.test(id)) return null;
+    for (let i = 0, off = 0; off < bytes.length; i++, off += CHUNK) {
+      const form = new FormData();
+      form.append('segment_index', String(i));
+      form.append('media', new Blob([bytes.subarray(off, off + CHUNK)], { type: 'application/octet-stream' }), 'chunk');
+      await call('POST', `${UPLOAD}/${id}/append`, { body: form });
+    }
+    let info = (await call('POST', `${UPLOAD}/${id}/finalize`))?.data?.processing_info;
+    for (let n = 0; info && n < maxPolls; n++) {
+      if (info.state === 'succeeded') break;
+      if (info.state === 'failed') return null;
+      await sleep(Math.min(30, Math.max(1, Number(info.check_after_secs) || 2)) * 1000);
+      info = (await call('GET', `${UPLOAD}?command=STATUS&media_id=${id}`))?.data?.processing_info;
+    }
+    return !info || info.state === 'succeeded' ? id : null;
+  } catch { return null; }
 }

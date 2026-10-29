@@ -37,3 +37,21 @@ GG=~/.config/grokgrid/runtime; read -rs -p 'API key: ' A; echo; read -rs -p 'API
 The keys stay on the Mac. They never go to Vercel or the repo.
 
 The installer runs this worker as `fun.grokgrid.x-posts` every 5 minutes. The pump.fun Callout worker runs as `fun.grokgrid.pump-callouts` on the same schedule, and stays off until `pumpCalloutsEnabled`.
+
+## Media: cards, clips and Grok art
+
+Every post gets a card in the site's style: dark ink, Geist / Geist Mono, green and red only for money, and the white-sphere mascot. The cards are rendered by `scripts/x-media.mjs` from local HTML in a headless system Chrome with a throwaway profile. The only network fetch is the coin picture (https, image types, ≤ 2 MB).
+
+| Post | Media |
+|---|---|
+| Each real reconciled trade (house and launched bots) | 1200×675 trade card: coin picture, ticker, side, SOL amount, P&L on sells, short tx id |
+| Sell at **+50% or better**, a **$GRID burn**, a **new bot launch** | Also a 7 s 1080×1080 silent H.264 clip (the card slides in, the numbers count up). It needs ffmpeg; without it the card is posted |
+| Daily recap, first run after 00:00 UTC (only if the previous day had trades or burns) | Recap card: trades, win rate, SOL in/out, $GRID burned, workers online |
+
+- **Upload:** X API v2 chunked upload: `initialize` → `append` in 4 MB chunks → `finalize` → `status` while it processes, all OAuth 1.0a. Query parameters are included in the signature.
+- **Fallback:** if any step fails, the post goes out as text only.
+- **Dedupe and cap:** everything is deduped in `x-posts.json` (trade signature, `burn:<cycle>`, `launch:<agent>`, `recap:<day>`) under the same 15/day cap. Paper journals are never read.
+
+**Preview:** `node scripts/x-post-worker.mjs --dry-run --render` writes the media to `runtime/x-media-preview/` and posts nothing. With nothing real queued, it renders labelled samples.
+
+**Grok-made art:** `generateArt(prompt)` in `scripts/x-media.mjs` is the hook for images from xAI. It returns null (use the rendered card) until dlao provides an xAI API key. The Grok desktop app's UI is deliberately not automated.
