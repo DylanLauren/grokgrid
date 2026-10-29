@@ -10,7 +10,7 @@ import './matrix.css'
 
 type Sort = 'mc' | 'newest'
 const SORTS: [Sort, string][] = [
-  ['mc', 'coins & grok bots'],
+  ['mc', 'tokens & grok bots'],
   ['newest', 'newest'],
 ]
 const by: Record<Sort, (a: Agent) => number> = {
