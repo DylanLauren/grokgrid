@@ -113,3 +113,17 @@ test('a coin that was just stopped out is not bought again inside the cooldown',
   assert.equal(paperTick(s, c, market(), now + 120000).positions.length, 0)
   assert.equal(paperTick(s, c, market(), now + 60000 + c.reentryCooldownMinutes * 60000 + 1).positions.length, 1)
 })
+
+test('live exits measure from the decision price, not a first-buy cost inflated by account rent', () => {
+  const held = { ...positions, positions: [{ mint: MINT, tokenUnits: '5000000', spendableTokenUnits: '5000000', decimals: 6, tokenProgram: 'x' }] }
+  // 5 tokens at 0.000001 SOL cost 5000 lamports; the wallet paid 12500 because of one-time rent.
+  const s = { ...emptyTradingState(policy), intents: [{ id: 'buy-1', agentId: 'house', wallet: policy.wallet, mint: MINT, side: 'buy', state: 'reconciled-confirmed', createdAt: now - 60000, receipt: { spentLamports: '12500', receivedTokenUnits: '5000000' } }] }
+  const m = { ...market(), sellQuotes: new Map([[MINT, '5000']]) }
+  const args = { tradingState: s, policy, c, peaks: {}, positions: held, market: m, now, liquidating: false }
+  assert.equal(livePlan(args).proposals[0]?.reason, 'stop-loss') // rent read as a 60% loss
+  const plan = livePlan({ ...args, entries: { [MINT]: { priceSol: 0.000001, at: now - 60000 } } })
+  assert.equal(plan.proposals.length, 0); assert.ok(plan.entries[MINT])
+  const buy = livePlan({ ...args, positions, tradingState: emptyTradingState(policy), market: market() })
+  assert.equal(buy.entries[MINT].priceSol, good.priceSol) // a new buy records its decision price
+  assert.deepEqual(livePlan({ ...args, positions, tradingState: emptyTradingState(policy), market: { metrics: new Map(), facts: new Map() }, entries: { [MINT]: { priceSol: 1, at: now - 11 * 60000 } } }).entries, {})
+})

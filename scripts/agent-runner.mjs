@@ -101,7 +101,7 @@ async function runLive(dir, agent, policy, c, market, ctx) {
   await withHeld(market, positions.positions.map(p => p.mint));
   market.sellQuotes = new Map();
   for (const p of positions.positions) if (BigInt(p.spendableTokenUnits) > 0n) { try { const q = await quoteSell(conn, { mint: p.mint, tokenUnits: p.spendableTokenUnits, tokenProgram: p.tokenProgram }); if (q) market.sellQuotes.set(p.mint, q); } catch {} }
-  let peaks = {}; try { peaks = (await json(join(dir, 'strategy-live.json'))).peaks || {}; } catch {}
+  let peaks = {}, entries = {}; try { ({ peaks = {}, entries = {} } = await json(join(dir, 'strategy-live.json'))); } catch {}
   let pending = null, planned, execution = { reason: 'observe-only' };
   const state = await withTradingStore(join(dir, 'trading'), policy, async s => {
     const verify = createFinalizedReceiptVerifier(rpcUrl);
@@ -110,7 +110,7 @@ async function runLive(dir, agent, policy, c, market, ctx) {
       if (s.intents.find(x => x.id === i.id)?.state === 'held-ambiguous' && Number.isSafeInteger(i.lastValidBlockHeight))
         s = dropExpiredSubmission(s, policy, i.id, await signatureStatus(conn, i.signature), await conn.getBlockHeight('finalized'));
     }
-    planned = livePlan({ tradingState: s, policy, c, peaks, positions, market, now, liquidating });
+    planned = livePlan({ tradingState: s, policy, c, peaks, entries, positions, market, now, liquidating });
     s = setAllowlist(s, policy, planned.allowlist, now);
     for (const p of planned.proposals) {
       const { reason, ...proposal } = p; void reason;
@@ -129,7 +129,7 @@ async function runLive(dir, agent, policy, c, market, ctx) {
   });
   // Journaled; only now broadcast. A send error leaves the intent held for settlement.
   if (pending) try { await conn.sendRawTransaction(pending.serialize(), { skipPreflight: false, preflightCommitment: 'finalized', maxRetries: 0 }); execution.broadcast = 'sent'; } catch { execution.broadcast = 'error-held'; }
-  await savePrivate(join(dir, 'strategy-live.json'), { peaks: planned.peaks, observedAt: now });
+  await savePrivate(join(dir, 'strategy-live.json'), { peaks: planned.peaks, entries: planned.entries, observedAt: now });
   const callouts = await postCallouts(root, state, { agent: agent.id, ledgerDir: dir }).catch(() => null);
   return { status: executes(policy) ? 'executing' : 'observing', execution, intents: state.intents.length, callouts };
 }

@@ -82,16 +82,20 @@ function costBasis(tradingState, decimalsByMint) {
  * Live planning. Returns the allowlist to store and at most one exit plus one entry
  * proposal per tick. Exits use finalized balances and the reconciled cost basis; a held
  * token with no reconciled buy has no basis and only exits on liquidation.
+ * `entries` holds the market price each buy was decided at. Exits measure moves from it,
+ * because the wallet cost of a first buy includes one-time account rent (token account,
+ * PumpSwap volume accumulator) that can exceed a small trade and would read as a loss.
  */
-export function livePlan({ tradingState, policy, c, peaks, positions, market, now, liquidating }) {
-  const proposals = [], nextPeaks = { ...peaks };
+export function livePlan({ tradingState, policy, c, peaks, entries: entryPrices = {}, positions, market, now, liquidating }) {
+  const proposals = [], nextPeaks = { ...peaks }, nextEntries = { ...entryPrices };
   const basis = costBasis(tradingState, new Map((positions.positions || []).map(p => [p.mint, p.decimals])));
   const busy = new Set(tradingState.intents.filter(i => ['planned', 'held-ambiguous', 'blocked-execution-disabled'].includes(i.state)).map(i => i.mint));
   const base = { agentId: policy.agentId, wallet: policy.wallet, slippageBps: Math.min(c.slippageBps, policy.maxSlippageBps), createdAt: now, expiresAt: now + Math.min(policy.maxIntentAgeMs, 45000) };
   for (const p of positions.positions || []) {
     if (BigInt(p.spendableTokenUnits) === 0n || busy.has(p.mint)) continue;
     const price = market.metrics.get(p.mint)?.priceSol ?? market.prices?.get(p.mint);
-    const b = basis.get(p.mint);
+    const recorded = nextEntries[p.mint]?.priceSol;
+    const b = basis.has(p.mint) && recorded > 0 ? { ...basis.get(p.mint), entryPriceSol: recorded } : basis.get(p.mint);
     nextPeaks[p.mint] = Math.max(nextPeaks[p.mint] || 0, price || 0);
     const reason = liquidating ? 'liquidate' : b ? exitDecision({ ...b, peakPriceSol: nextPeaks[p.mint] }, price, c, now) : null;
     if (!reason || !(price > 0)) continue;
@@ -115,8 +119,11 @@ export function livePlan({ tradingState, policy, c, peaks, positions, market, no
       allowlist = approve(allowlist, pick.mint, c, now, {});
       const spend = BigInt(c.tradeLamports) < BigInt(policy.maxTradeLamports) ? c.tradeLamports : policy.maxTradeLamports;
       proposals.push({ ...base, id: `buy-${randomUUID()}`, mint: pick.mint, side: 'buy', spendLamports: spend, reason: 'screen-passed' });
+      if (pick.m.priceSol > 0) nextEntries[pick.mint] = { priceSol: pick.m.priceSol, at: now };
     }
   }
   for (const k of Object.keys(nextPeaks)) if (!(positions.positions || []).some(p => p.mint === k)) delete nextPeaks[k];
-  return { allowlist, proposals, peaks: nextPeaks };
+  // Keep an entry while the coin is held or its buy is in flight; drop refused or sold ones.
+  for (const [k, e] of Object.entries(nextEntries)) if (!held.has(k) && now - (e?.at ?? 0) > 10 * 60000) delete nextEntries[k];
+  return { allowlist, proposals, peaks: nextPeaks, entries: nextEntries };
 }
