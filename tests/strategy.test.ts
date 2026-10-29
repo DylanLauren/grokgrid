@@ -96,3 +96,12 @@ test('callouts post each reconciled trade once; site rejections are not retried;
   assert.deepEqual(pendingCallouts(state, { posted: {} }).map((i: { signature: string }) => i.signature), [sig(1), sig(3)])
   assert.deepEqual(pendingCallouts(state, { posted: { [sig(1)]: { outcome: 'posted' }, [sig(3)]: { outcome: 'rejected-422' } } }), [])
 })
+
+test('phone heartbeat is healthy only while frames are fresh', async () => {
+  const { phoneBeat } = await import('../scripts/runtime-ingest.mjs')
+  const now = Date.parse('2026-10-29T03:00:00Z')
+  assert.equal(phoneBeat({ state: 'sending', lastSentAt: '2026-10-29T02:59:30Z' }, now).healthy, true)
+  assert.equal(phoneBeat({ state: 'sending', lastSentAt: '2026-10-29T02:58:30Z' }, now).healthy, false)
+  assert.equal(phoneBeat({ state: 'waiting-for-window', lastSentAt: '2026-10-29T02:59:59Z' }, now).note, 'waiting-for-window')
+  assert.equal(phoneBeat(null, now).healthy, false)
+})
