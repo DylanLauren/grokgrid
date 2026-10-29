@@ -161,7 +161,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
               setCheer((n) => n + 1)
             }}
           >
-            <LiveBot color={f.color} shape={f.shape} habit={CAST[i].habit} say={CAST[i].say} size={120} delay={i * -0.37} still />
+            <LiveBot color={f.color} shape={f.shape} habit={CAST[i].habit} say={CAST[i].say} size={120} delay={i * -0.37} flow={i} />
             <span className="gd-name">{f.name}</span>
           </button>
         ))}
@@ -170,7 +170,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
       <div className="gd-build">
         <div className="gd-side">
           <div className="card gd-preview">
-            <LiveBot key={`${d.look}-${cheer}`} color={look.color} shape={look.shape} habit={CAST[d.look].habit} size={170} selected />
+            <LiveBot key={`${d.look}-${cheer}`} color={look.color} shape={look.shape} habit={CAST[d.look].habit} size={170} selected flow={d.look} />
             <b>{d.name || 'your bot'}</b>
             <span>{d.strategy || 'one line on how it trades'}</span>
           </div>

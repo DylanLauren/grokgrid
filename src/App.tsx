@@ -175,13 +175,11 @@ export default function App() {
           ))}
         </nav>
         <div className="bar-right">
-          {feed.mode === 'live' ? (
+          {feed.mode === 'live' && (
             <span className="status mono live">
               <i />
               live
             </span>
-          ) : (
-            <span className="status mono" title="sample trades until his first real trade">sample data</span>
           )}
           {X_HANDLE && (
             <a className="chip chip-icon" href={`https://x.com/${X_HANDLE}`} target="_blank" rel="noreferrer" aria-label={`@${X_HANDLE} on X`} title={`@${X_HANDLE} on X`}><XMark /></a>

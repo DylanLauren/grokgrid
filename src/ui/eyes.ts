@@ -82,6 +82,7 @@ export interface Looker {
   paths: [SVGPathElement, SVGPathElement]
   shape: Shape
   doze?: boolean
+  flow?: number // set: the eyes follow this bot's own slow loop and ignore the pointer
   // eased state
   lx: number
   ly: number
@@ -98,6 +99,22 @@ export interface Looker {
   until: number
   next: number
 }
+
+// Flowing eyes: each bot traces its own slow loop (x, y frequencies, phase, reach), so no two
+// move alike. Sines in and out of every turn, so the motion never stops or snaps.
+const LOOPS: [number, number, number, number, number][] = [
+  [1, 2, 0, 0.55, 0.32], // figure eight
+  [1, 1, 1.57, 0.5, 0.38], // slow circle
+  [2, 3, 0.4, 0.5, 0.3], // knot
+  [1, 1, -1.57, 0.46, 0.42], // circle the other way
+  [3, 2, 1.1, 0.48, 0.3],
+  [1, 3, 0.7, 0.58, 0.26], // side to side with a ripple
+  [2, 1, 2.2, 0.42, 0.4], // up and down figure eight
+  [1, 2, 3.1, 0.52, 0.34],
+  [1, 1, 0.9, 0.3, 0.2], // a lazy drift
+]
+const FLOW_FACES: Face[] = ['blink', 'squint', 'wide', 'wink', 'blink', 'sleepy']
+const FLOW_TIME: Record<Face, number> = { none: 0, blink: 220, wink: 700, squint: 1500, wide: 1200, sleepy: 1800 }
 
 const lookers = new Set<Looker>()
 let raf = 0
@@ -120,9 +137,16 @@ function tick(now: number) {
     const bx = r.left + r.width / 2, by = r.top + r.height / 2
     const dx = px - bx, dy = py - by
     const dist = Math.hypot(dx, dy)
-    const near = dist < r.width * 0.6 // the pointer is on it
+    const flowing = b.flow !== undefined
+    const near = !flowing && dist < r.width * 0.6 // the pointer is on it
     let tx = 0, ty = 0, ts = 1
-    if (near) {
+    if (flowing) {
+      const [fx, fy, ph, ax, ay] = LOOPS[b.flow! % LOOPS.length]
+      const t = now / 1000 / (6.5 + (b.flow! % 4) * 0.9) * Math.PI * 2
+      tx = Math.sin(t * fx + ph) * ax
+      ty = Math.sin(t * fy + ph * 0.7) * ay
+      ts = 1 + Math.sin(t * 0.5 + ph) * 0.04 // the eyes breathe a little too
+    } else if (near) {
       // attentive: eyes come nearly front on, a little bigger, still following
       tx = (dx / (r.width * 0.6)) * 0.35
       ty = (dy / (r.width * 0.6)) * 0.35
@@ -145,8 +169,8 @@ function tick(now: number) {
     // now and then a face
     if (now > b.faceNext) {
       // tiny bots only blink: a squint or wink at that size just reads as shut eyes
-      b.face = r.width < 40 ? 'blink' : PICK[Math.floor(Math.random() * PICK.length)]
-      b.faceUntil = now + FACE_TIME[b.face]
+      b.face = r.width < 40 ? 'blink' : flowing ? FLOW_FACES[Math.floor(Math.random() * FLOW_FACES.length)] : PICK[Math.floor(Math.random() * PICK.length)]
+      b.faceUntil = now + (flowing ? FLOW_TIME : FACE_TIME)[b.face]
       b.faceNext = now + 3200 + Math.random() * 4200
     }
     if (now > b.faceUntil) b.face = 'none'
@@ -154,13 +178,15 @@ function tick(now: number) {
     const hoverFace = b.el.dataset.hoverFace as Face | undefined
     const face = near ? (hoverFace && FACES[hoverFace] ? hoverFace : b.face === 'blink' || b.face === 'wink' ? b.face : 'none') : b.face
     const [f1, f2, fs] = FACES[face]
-    const ease = face === 'blink' ? 0.5 : 0.2
+    // flowing eyes ease slower, so every face melts in and out
+    const ease = face === 'blink' ? (flowing ? 0.32 : 0.5) : flowing ? 0.07 : 0.2
     b.o1 += (f1 - b.o1) * ease
     b.o2 += (f2 - b.o2) * ease
     ts *= fs
     // smooth, a touch springy
-    b.lx += (tx - b.lx) * 0.12
-    b.ly += (ty - b.ly) * 0.12
+    const follow = flowing ? 0.06 : 0.12
+    b.lx += (tx - b.lx) * follow
+    b.ly += (ty - b.ly) * follow
     b.sc += (ts - b.sc) * 0.15
     const doze = b.doze && !near ? 0.22 : 1
     const [a1, a2] = eyePaths(b.shape, b.lx, b.ly, b.sc, b.o1 * doze, b.o2 * doze)
@@ -173,9 +199,9 @@ function tick(now: number) {
 }
 
 /** Start a bot looking around. Returns the stop function. */
-export function watch(el: HTMLElement, paths: [SVGPathElement, SVGPathElement], shape: Shape, doze = false) {
+export function watch(el: HTMLElement, paths: [SVGPathElement, SVGPathElement], shape: Shape, doze = false, flow?: number) {
   if (still) return () => {}
-  const b: Looker = { el, paths, shape, doze, lx: 0, ly: 0, sc: 1, o1: 1, o2: 1, face: 'none', faceUntil: 0, faceNext: performance.now() + 1500 + Math.random() * 4000, gx: 0, gy: 0, until: 0, next: performance.now() + Math.random() * 2500 }
+  const b: Looker = { el, paths, shape, doze: flow === undefined && doze, flow, lx: 0, ly: 0, sc: 1, o1: 1, o2: 1, face: 'none', faceUntil: 0, faceNext: performance.now() + 1500 + Math.random() * 4000, gx: 0, gy: 0, until: 0, next: performance.now() + Math.random() * 2500 }
   if (!lookers.size) addEventListener('pointermove', onMove, { passive: true })
   lookers.add(b)
   if (!raf) raf = requestAnimationFrame(tick)

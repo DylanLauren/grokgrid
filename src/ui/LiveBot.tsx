@@ -20,18 +20,20 @@ interface Props {
   shout?: boolean // keep the speech bubble out without a hover
   hoverFace?: Face // the face it pulls while you hover it
   still?: boolean // eyes stay put: no glancing or following the pointer
+  flow?: number // eyes trace this bot's own slow loop instead of watching the pointer
 }
 
-export const LiveBot = forwardRef<HTMLDivElement, Props>(function LiveBot({ color, shape, habit, size, say, delay = 0, selected, eye, shout, hoverFace, still }, ref) {
+export const LiveBot = forwardRef<HTMLDivElement, Props>(function LiveBot({ color, shape, habit, size, say, delay = 0, selected, eye, shout, hoverFace, still, flow }, ref) {
   const root = useRef<HTMLDivElement | null>(null)
   const e1 = useRef<SVGPathElement>(null)
   const e2 = useRef<SVGPathElement>(null)
   useEffect(() => {
     if (still || !root.current || !e1.current || !e2.current) return
-    return watch(root.current, [e1.current, e2.current], shape, habit === 'doze')
-  }, [shape, habit, still])
+    return watch(root.current, [e1.current, e2.current], shape, habit === 'doze', flow)
+  }, [shape, habit, still, flow])
+  const doze = habit === 'doze' && flow === undefined
   const house = color === 'house'
-  const [d1, d2] = eyePaths(shape, 0, 0, 1, habit === 'doze' ? 0.22 : 1)
+  const [d1, d2] = eyePaths(shape, 0, 0, 1, doze ? 0.22 : 1)
   const ink = eye ?? (house ? '#1a1a1a' : eyeInk(color))
   return (
     <div
@@ -54,7 +56,7 @@ export const LiveBot = forwardRef<HTMLDivElement, Props>(function LiveBot({ colo
           </svg>
         </div>
       </div>
-      {habit === 'doze' && <span className="lb-z mono">z</span>}
+      {doze && <span className="lb-z mono">z</span>}
       {say && (
         <span className="lb-say" aria-label={say}>
           {shout
