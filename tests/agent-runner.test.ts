@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { Keypair, SystemProgram, TransactionMessage, VersionedTransaction, PublicKey } from '@solana/web3.js'
-import { validateRunnerConfig, agentTradingPolicy, agentStrategy, privySigner, mapLimit } from '../scripts/agent-runner-core.mjs'
+import { validateRunnerConfig, agentTradingPolicy, agentStrategy, privySigner, mapLimit, outboxHealth } from '../scripts/agent-runner-core.mjs'
 import { DEFAULT_STRATEGY, validateStrategyConfig } from '../scripts/strategy-policy.mjs'
 
 const config = (over: Record<string, unknown> = {}) => validateRunnerConfig({ version: 1, mode: 'execute', stopFile: '/s', exitFile: '/e', privyServerFile: '/p', privyAuthorizationKeyFile: '/k', maxAgents: 50,
@@ -55,4 +55,13 @@ test('agents run a bounded few at a time, keep their order, and one failure does
   const base = { version: 1, mode: 'paper', stopFile: '/s', exitFile: '/e', maxAgents: 100, caps: { maxTradeLamports: '1', maxExposureLamports: '1', maxDailyLossLamports: '1', reserveLamports: '1', maxSlippageBps: 100 } }
   assert.equal(validateRunnerConfig({ ...base, concurrency: 8 }).concurrency, 8)
   assert.throws(() => validateRunnerConfig({ ...base, concurrency: 64 }), /concurrency/)
+})
+
+test('a slow launch outbox is tolerated for a few ticks, then reported down; success resets it', () => {
+  let failures: number | undefined
+  const seen: boolean[] = []
+  for (let i = 0; i < 5; i++) { const o = outboxHealth(failures, true); failures = o.failures; seen.push(o.healthy) }
+  assert.deepEqual(seen, [true, true, true, false, false])
+  assert.deepEqual(outboxHealth(failures, false), { failures: 0, healthy: true })
+  assert.deepEqual(outboxHealth(-3, true), { failures: 1, healthy: true }) // a corrupt count starts over
 })
