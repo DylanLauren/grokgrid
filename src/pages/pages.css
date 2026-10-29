@@ -57,8 +57,6 @@
 .btn.ghost:hover { border-color: var(--paper-50); }
 .btn:disabled { background: #1f1f1f; color: var(--paper-50); cursor: not-allowed; transform: none; }
 
-.live-pill { display: inline-flex; align-items: center; gap: 6px; color: var(--paper-70); }
-.live-pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--gain); box-shadow: 0 0 8px var(--gain); animation: pulse 1.6s infinite; }
 
 /* stats */
 .st-hero { display: grid; grid-template-columns: minmax(260px, 0.8fr) 2fr; gap: 14px; }

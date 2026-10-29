@@ -11,7 +11,6 @@ export interface LaunchDraft {
   name: string
   ticker: string
   description: string
-  website: string
   x: string
   telegram: string
   strategy: string

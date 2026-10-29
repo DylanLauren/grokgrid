@@ -28,7 +28,6 @@ export interface Draft {
   name: string
   ticker: string
   description: string
-  website: string
   x: string
   telegram: string
   strategy: string
@@ -70,7 +69,6 @@ export function cleanDraft(value: unknown): Draft {
     name: str('name'),
     ticker: str('ticker').replace(/^\$/, '').toUpperCase(),
     description: str('description'),
-    website: link(str('website'), null, 'website'),
     x: link(str('x'), ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com'], 'X'),
     telegram: link(str('telegram'), ['t.me'], 'Telegram'),
     strategy: str('strategy'),
@@ -86,6 +84,8 @@ export function cleanDraft(value: unknown): Draft {
   return d
 }
 
+export const botUrl = (mint: string) => `${SITE_URL}/#matrix/${mint}`
+
 // The token metadata pump.fun, wallets and explorers read, served from /m/<mint>.
 export const metadataJson = (d: Draft, mint: string) => ({
   name: d.name,
@@ -94,7 +94,8 @@ export const metadataJson = (d: Draft, mint: string) => ({
   image: `${SITE_URL}/i/${mint}`,
   showName: true,
   createdOn: SITE_URL,
-  website: d.website || `${SITE_URL}/#matrix`,
+  // every coin launched here links to its own bot's profile on GrokGrid
+  website: botUrl(mint),
   ...(d.x ? { twitter: d.x } : {}),
   ...(d.telegram ? { telegram: d.telegram } : {}),
 })

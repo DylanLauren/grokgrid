@@ -33,7 +33,7 @@ test('live Matrix last-trade entries retain the mint and resolve its picture', a
       const url = String(input)
       if (url.includes('redis.test')) {
         const body = String(init?.body)
-        return body.includes('gg:agents') ? Response.json([{ result: [] }]) : Response.json([{ result: ['trades', '1'] }, { result: JSON.stringify(call) }])
+        return body.includes('gg:agents') ? Response.json([{ result: [] }]) : Response.json([{ result: ['trades', '1'] }, { result: [JSON.stringify(call)] }])
       }
       if (url.includes('jup.ag')) return Response.json({})
       if (url.includes('dexscreener.com')) return Response.json([{ baseToken: { address: mint, symbol: 'Fartcoin', name: 'Fartcoin' }, info: { imageUrl: 'https://cdn.dexscreener.com/token.png' } }])

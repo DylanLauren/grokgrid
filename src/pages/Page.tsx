@@ -1,12 +1,13 @@
 import { type CSSProperties, type ReactNode } from 'react'
 import { LiveBot } from '../ui/LiveBot'
+import type { Shape } from '../ui/BotMark'
 import { Scramble } from '../ui/Scramble'
 import { GridBackdrop } from '../ui/GridBackdrop'
 import './pages.css'
 
 // The frame every page shares: an index and label, a big title whose letters lift
 // under the pointer, one line under it, and the content.
-export function Page({ n, label, title, sub, side, say, children }: { n: number; label: string; title: string; sub: ReactNode; side?: ReactNode; say: string; children: ReactNode }) {
+export function Page({ n, label, title, sub, side, say, host, children }: { n: number; label: string; title: string; sub: ReactNode; side?: ReactNode; say: string; host?: { color: string; shape: Shape }; children: ReactNode }) {
   return (
     <main
       // each page has its own entrance (pages.css): stats, matrix, grid, docs
@@ -38,7 +39,7 @@ export function Page({ n, label, title, sub, side, say, children }: { n: number;
           <p className="pg-sub">{sub}</p>
           {/* he keeps you company on every page */}
           <div className="pg-host">
-            <LiveBot color="house" eye="#0a0a0a" shape="sphere" habit="look" size={200} say={say} shout />
+            <LiveBot color={host?.color ?? 'house'} eye={host ? undefined : '#0a0a0a'} shape={host?.shape ?? 'sphere'} habit="look" size={200} say={say} shout />
           </div>
         </header>
         {children}

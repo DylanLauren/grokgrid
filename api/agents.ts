@@ -1,4 +1,5 @@
 import { beats, fresh } from './_heartbeat.js'
+import { tally } from './_tally.js'
 import { balances, hasStore, HOUSE_WALLET, json, MAIN_MINT, markets, parse, redis, solUsd, toHash } from './_lib.js'
 
 // Registry entry, written once by /api/ingest when Grok Bot launches an agent's coin.
@@ -16,23 +17,32 @@ export interface AgentRecord {
   privyWalletId?: string // the verified Privy wallet the agent runner signs from
 }
 
-interface CallLite { mint?: string; image?: string; hue?: string; side: 'buy' | 'sell'; symbol: string; spentSol: number; pnlUsd: number; ts: number; sig?: string }
+interface CallLite { mint: string; image?: string; hue?: string; name?: string; side: 'buy' | 'sell'; symbol: string; spentSol: number; sizeTokens?: number; pnlUsd: number | null; ts: number; sig?: string }
+
+const RECENT = 12 // trades per bot on the matrix; the profile gets the whole history
+const MAX_MINTS = 90 // traded coins looked up per request (three DexScreener batches)
 
 // Every bot on the grid with its coin attached: registry from the store,
-// balances from the chain, market data from DexScreener.
-export async function GET() {
-  if (!hasStore()) return json({ mode: 'demo' })
+// balances from the chain, market data from DexScreener. `only` (an id or a coin mint)
+// returns just that bot with its whole trade history and wallet curve.
+export async function grid(only?: string) {
   const [reg] = await redis(['HGETALL', 'gg:agents'])
-  const records = Object.values(toHash(reg))
+  const all = Object.values(toHash(reg))
     .map((v) => parse<AgentRecord>(v))
     .filter((a): a is AgentRecord => !!a)
-  const ids = ['house', ...records.map((r) => r.id)]
+  const records = only ? all.filter((r) => r.id === only || r.coin.mint === only) : all
+  const withHouse = !only || only === 'house' || (!!MAIN_MINT && only === MAIN_MINT)
+  const ids = [...(withHouse ? ['house'] : []), ...records.map((r) => r.id)]
+  if (!ids.length) return null
 
-  const perAgent = await redis(...ids.flatMap((id) => [['HGETALL', `gg:stats:${id}`], ['LINDEX', `gg:calls:${id}`, 0]]))
-  const lastCalls = ids.map((_, i) => parse<CallLite>(perAgent[i * 2 + 1]))
+  const per = await redis(...ids.flatMap((id) => [['HGETALL', `gg:stats:${id}`], ['LRANGE', `gg:calls:${id}`, 0, only ? 199 : 99], ...(only ? [['LRANGE', `gg:curve:${id}`, -300, -1]] : [])]))
+  const step = only ? 3 : 2
+  const callsOf = ids.map((_, i) => (Array.isArray(per[i * step + 1]) ? (per[i * step + 1] as unknown[]) : []).map((c) => parse<CallLite>(c)).filter((c): c is CallLite => !!c && !!c.mint))
+  const shown = callsOf.map((c) => (only ? c : c.slice(0, RECENT)))
+  const traded = [...new Set(shown.flat().map((c) => c.mint))].slice(0, MAX_MINTS)
   const [bal, mkt, price, beat] = await Promise.all([
-    balances([HOUSE_WALLET, ...records.map((r) => r.wallet)]),
-    markets([MAIN_MINT, ...records.map((r) => r.coin.mint), ...lastCalls.flatMap((c) => c?.mint ? [c.mint] : [])]),
+    balances([...(withHouse ? [HOUSE_WALLET] : []), ...records.map((r) => r.wallet)]),
+    markets([MAIN_MINT, ...records.map((r) => r.coin.mint), ...traded]),
     solUsd(),
     beats().then((b) => b.trading).catch(() => undefined),
   ])
@@ -50,15 +60,27 @@ export async function GET() {
   }
 
   // privyWalletId stays server-side: the runner gets it from the authenticated launch outbox.
-  const agents = [houseRecord, ...records].map(({ privyWalletId: _pw, ...r }, i) => {
-    const st = toHash(perAgent[i * 2])
-    const last = lastCalls[i]
-    const lastToken = last?.mint ? mkt[last.mint] : undefined
+  const agents = [...(withHouse ? [houseRecord] : []), ...records].map(({ privyWalletId: _pw, ...r }, i) => {
+    const st = toHash(per[i * step])
+    const calls = callsOf[i]
+    const t = tally(calls)
     const m = mkt[r.coin.mint]
+    const trade = (c: CallLite) => {
+      const tok = mkt[c.mint]
+      const p = t.pnl.get(c)
+      return {
+        mint: c.mint, side: c.side, sig: c.sig, ts: c.ts,
+        symbol: tok?.symbol || c.symbol, name: tok?.name || c.name || '', image: tok?.image || c.image, hue: c.hue || r.color,
+        spentSol: c.spentSol, pnlUsd: c.pnlUsd ?? (p === undefined ? null : p * price), pnlSol: p ?? null,
+        coin: tok ? { mcUsd: tok.mcUsd, vol24hUsd: tok.vol24hUsd, change24h: tok.change24h } : undefined,
+      }
+    }
+    const recent = shown[i].map(trade)
+    const curve = only ? ((per[i * step + 2] as unknown[]) ?? []).map((p) => parse<{ ts: number; sol: number }>(p)).filter((p): p is { ts: number; sol: number } => !!p) : undefined
     return {
       ...r,
       house: r.id === 'house' || undefined,
-      launchedAt: r.launchedAt || Number(st.firstTs ?? Date.now()),
+      launchedAt: r.launchedAt || Number(st.firstTs ?? calls.at(-1)?.ts ?? Date.now()),
       coin: {
         ...r.coin,
         symbol: m?.symbol || r.coin.symbol,
@@ -68,16 +90,27 @@ export async function GET() {
         vol24hUsd: m?.vol24hUsd ?? 0,
         change24h: m?.change24h ?? 0,
         feesSol: Number(st.feesSol ?? 0),
+        real: !!r.coin.mint,
       },
       walletSol: bal[r.wallet] ?? 0,
-      pnlSol: null,
-      trades: Number(st.trades ?? 0),
-      winRate: null,
+      pnlSol: t.pnlSol,
+      closed: t.closed,
+      trades: Math.max(Number(st.trades ?? 0), calls.length),
+      winRate: t.winRate,
       burnedMain: Number(st.burnedMain ?? 0),
-      last: last ? { mint: last.mint, image: lastToken?.image || last.image, hue: last.hue || r.color, side: last.side, symbol: lastToken?.symbol || last.symbol, spentSol: last.spentSol, pnlUsd: last.pnlUsd, ts: last.ts, sig: last.sig } : undefined,
+      last: recent[0],
+      recent,
+      ...(curve ? { curve } : {}),
     }
   })
+  return { agents, records, price, solUsd: price }
+}
 
-  const live = records.length > 0 || Number(toHash(perAgent[0]).trades ?? 0) > 0
+export async function GET() {
+  if (!hasStore()) return json({ mode: 'demo' })
+  const g = await grid()
+  if (!g) return json({ mode: 'demo' })
+  const { agents, records, price } = g
+  const live = records.length > 0 || agents[0].trades > 0
   return json({ mode: live ? 'live' : 'demo', updatedAt: Date.now(), solUsd: price, agents })
 }

@@ -32,7 +32,6 @@ interface Draft {
   name: string
   ticker: string
   description: string
-  website: string
   x: string
   telegram: string
   strategy: string
@@ -42,7 +41,7 @@ interface Draft {
   firstBuy: string
 }
 
-const EMPTY: Draft = { look: 3, name: '', ticker: '', description: '', website: '', x: '', telegram: '', strategy: '', maxSol: '0.05', takeProfit: '100', stopLoss: '30', firstBuy: '' }
+const EMPTY: Draft = { look: 3, name: '', ticker: '', description: '', x: '', telegram: '', strategy: '', maxSol: '0.05', takeProfit: '100', stopLoss: '30', firstBuy: '' }
 const DRAFT_KEY = 'gg-launch-draft'
 const MAX_TRADE = 0.05 // the signer policy's per-buy cap: a higher max could never be used
 const LIMITS = { name: 32, ticker: 10, description: 600, strategy: 140 }
@@ -57,7 +56,6 @@ function check(d: Draft) {
   if (!d.ticker) e.ticker = 'pick a ticker'
   else if (!/^[A-Z0-9]{2,10}$/.test(d.ticker)) e.ticker = '2 to 10 letters or numbers'
   if (bytes(d.description) > LIMITS.description) e.description = `${LIMITS.description} bytes at most`
-  if (d.website && !/^https:\/\/[^\s/]+\.[^\s]+$/.test(d.website)) e.website = 'a full https:// link'
   if (d.x && !/^https:\/\/(x|twitter)\.com\/[A-Za-z0-9_]{1,15}(\/status\/\d+)?\/?$/.test(d.x)) e.x = 'an x.com link to a profile or post'
   if (d.telegram && !/^https:\/\/t\.me\/[A-Za-z0-9_+]{3,}\/?$/.test(d.telegram)) e.telegram = 'a t.me link'
   if (!d.strategy.trim()) e.strategy = 'one line on how it trades'
@@ -187,7 +185,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             </div>
             <p>{d.description || 'what the coin is about.'}</p>
             <div className="gd-links mono">
-              {d.website && <span>web</span>}
+              <span>web · grokgrid profile</span>
               {d.x && <span>x</span>}
               {d.telegram && <span>telegram</span>}
               <span className="dim">launched on grokgrid</span>
@@ -245,10 +243,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             </Field>
           </Group>
 
-          <Group n="02" title="links" note="optional">
-            <Field label="website" error={err('website')}>
-              <input inputMode="url" value={d.website} placeholder="https://" onBlur={() => touch('website')} onChange={(e) => set('website', e.target.value.trim())} />
-            </Field>
+          <Group n="02" title="socials" note="optional · its website is its grokgrid profile">
             <div className="gd-row">
               <Field label="x" error={err('x')}>
                 <input inputMode="url" value={d.x} placeholder="https://x.com/yourbot" onBlur={() => touch('x')} onChange={(e) => set('x', e.target.value.trim())} />

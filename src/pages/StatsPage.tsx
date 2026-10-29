@@ -29,7 +29,6 @@ export function StatsPage({ feed }: { feed: Feed }) {
       label="stats"
       title="His numbers"
       sub={feed.mode === 'live' ? 'read from his wallet on chain, not from us. every trade links to its transaction.' : 'his wallet goes on chain at launch. until then, this is a sample of what he will look like.'}
-      side={feed.mode === 'live' ? <span className="live-pill"><i />live</span> : <span className="live-pill">sample</span>}
     >
       <div className="st-hero">
         <div className="card st-wallet">

@@ -16,3 +16,5 @@ export const ago = (ts: number, now = Date.now()) => {
 }
 export const short = (a: string) => (a.length > 10 ? `${a.slice(0, 4)}…${a.slice(-4)}` : a)
 export const compact = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${Math.round(n)}`)
+// SOL amounts: tiny test-size trades keep their digits, big ones stay short
+export const sol = (n: number) => n === 0 ? '0' : n.toFixed(Math.abs(n) >= 1 ? 2 : Math.abs(n) >= 0.01 ? 3 : 4)

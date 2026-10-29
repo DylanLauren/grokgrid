@@ -12,7 +12,7 @@
 .mx-table { background: #0f0f10; border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; }
 .mx-row {
   display: grid;
-  grid-template-columns: 26px minmax(190px, 1.5fr) minmax(140px, 1fr) repeat(7, minmax(60px, 0.5fr)) minmax(150px, 1fr) 56px;
+  grid-template-columns: 26px minmax(180px, 1.4fr) minmax(130px, 1fr) repeat(7, minmax(56px, 0.5fr)) minmax(176px, 1.15fr) 56px;
   gap: 12px; align-items: center;
   padding: 10px 14px; font-size: 13.5px;
 }
@@ -82,3 +82,25 @@
   .mx-links { grid-column: 3; }
 }
 .mx-sample { margin-left: 6px; font-size: 9.5px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--paper-50); border: 1px solid var(--hair-strong); border-radius: 6px; padding: 1px 5px; vertical-align: 2px; }
+
+/* a row opens its bot's profile */
+.mx-row:not(.mx-th) { cursor: pointer; }
+.mx-row:not(.mx-th):focus-visible { outline: 1px solid var(--paper-50); outline-offset: -1px; }
+.mx-peek { display: inline-grid; border-radius: 10px; transition: transform 0.3s cubic-bezier(.3,1.5,.5,1), box-shadow 0.3s; }
+.mx-peek:hover { transform: scale(1.12); box-shadow: 0 0 0 2px #ffffff30; }
+
+/* his latest trades: coins in a row that fan out on hover */
+.mx-last { overflow: visible; }
+.mx-strip { display: inline-flex; align-items: center; }
+.mx-tr { position: relative; display: inline-grid; margin-left: -6px; border-radius: 9px; box-shadow: 0 0 0 2px #0f0f10; transition: transform 0.32s cubic-bezier(.3,1.5,.5,1), margin 0.32s cubic-bezier(.2,.8,.2,1), box-shadow 0.25s; z-index: calc(10 - var(--k, 0)); }
+.mx-tr:first-child { margin-left: 0; }
+.mx-row:hover .mx-tr { margin-left: 2px; }
+.mx-row:hover .mx-tr:first-child { margin-left: 0; }
+.mx-tr:hover { transform: translateY(-3px) scale(1.14); z-index: 20; }
+.mx-tr i { position: absolute; right: -2px; bottom: -2px; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 2px #0f0f10; }
+.mx-tr.buy i { background: var(--gain); }
+.mx-tr.sell i { background: var(--loss); }
+.mx-tr.buy:hover { box-shadow: 0 0 0 2px #4ade8099; }
+.mx-tr.sell:hover { box-shadow: 0 0 0 2px #f8717199; }
+.mx-strip small { margin-left: 10px; font-size: 11.5px; color: var(--paper-50); white-space: nowrap; }
+.mx-none { font-size: 12px; color: var(--paper-30); }
