@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { MAIN_MINT, MAIN_NAME, MAIN_TICKER, X_HANDLE, buyUrl } from './config'
 import { stats, useFeed } from './data/useFeed'
 import type { View } from './scene/Scene'
@@ -25,6 +26,27 @@ const CREW: [string, Shape, Habit][] = [
   ['#ff2e9a', 'cone', 'hop'],
   ['#1683ff', 'squircle', 'flip'],
 ]
+
+// The callout you click in the dock glides into its place in the calls panel while the
+// panel slides in around it. Browsers without view transitions just open the panel.
+function morphOpen(card: HTMLElement, id: string, open: () => void) {
+  const start = (document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } }).startViewTransition
+  if (!start || matchMedia('(prefers-reduced-motion: reduce)').matches) return open()
+  card.style.viewTransitionName = 'call-open'
+  document.documentElement.classList.add('vt-calls')
+  const vt = start.call(document, () => {
+    flushSync(open)
+    card.style.viewTransitionName = ''
+    const target = document.querySelector<HTMLElement>(`.panel [data-call="${CSS.escape(id)}"]`)
+    target?.scrollIntoView({ block: 'center', behavior: 'instant' })
+    const cc = target?.querySelector<HTMLElement>('.cc')
+    if (cc) cc.style.viewTransitionName = 'call-open'
+  })
+  vt.finished.finally(() => {
+    document.documentElement.classList.remove('vt-calls')
+    document.querySelectorAll<HTMLElement>('.panel .cc').forEach((el) => (el.style.viewTransitionName = ''))
+  })
+}
 
 const Scene = lazy(() => import('./scene/Scene').then((m) => ({ default: m.Scene })))
 
@@ -138,10 +160,12 @@ export default function App() {
             <CallCard
               call={c}
               compact
-              onOpen={() => {
-                setFocusCall(c.id)
-                setTab('calls')
-              }}
+              onOpen={(card) =>
+                morphOpen(card, c.id, () => {
+                  setFocusCall(c.id)
+                  setTab('calls')
+                })
+              }
             />
           </div>
         ))}
@@ -167,7 +191,9 @@ export default function App() {
         <button className="panel-x" onClick={() => setTab('desk')} aria-label="close">
           <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
         </button>
-        <CallsPanel feed={feed} focus={tab === 'calls' ? focusCall : undefined} />
+        <div className="panel-body">
+          <CallsPanel feed={feed} focus={tab === 'calls' ? focusCall : undefined} />
+        </div>
       </aside>
 
       {tab === 'stats' && <StatsPage feed={feed} />}

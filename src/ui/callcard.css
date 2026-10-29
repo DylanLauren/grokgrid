@@ -11,8 +11,10 @@ button.cc:active { transform: scale(0.98); }
 button.cc .cc-ago::after { content: ' ↗'; opacity: 0; transition: opacity 0.2s; }
 button.cc:hover .cc-ago::after { opacity: 1; }
 /* the call you opened, lit up in the panel */
-.cc-focus { border-color: var(--paper-70); animation: cc-focus 1.6s ease-out; }
-@keyframes cc-focus { 0% { box-shadow: 0 0 0 0 #ffffff60; transform: scale(1.02); } 100% { box-shadow: 0 0 0 14px #ffffff00; transform: none; } }
+.cc-focus { border-color: rgb(var(--tone) / 0.5); animation: cc-focus 1.8s 0.45s ease-out backwards; }
+@keyframes cc-focus { 0% { box-shadow: 0 0 0 0 rgb(var(--tone) / 0.45); } 100% { box-shadow: 0 0 0 16px rgb(var(--tone) / 0); } }
+.cc-focus::before, .cc-focus::after { animation: cc-lit 2.6s ease-out; }
+@keyframes cc-lit { 0%, 55% { opacity: 1; } }
 .cc { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; background: #0e0e0f; border-color: #262628; border-radius: 14px; padding: 12px 14px; }
 .cc-av { width: 30px; height: 30px; display: grid; place-items: center; }
 .cc-main { min-width: 0; }
@@ -76,7 +78,7 @@ button.cc:hover .cc-ago::after { opacity: 1; }
   background: radial-gradient(180px circle at var(--mx, 50%) var(--my, 0%), rgb(var(--tone) / 0.75), transparent 70%);
 }
 .cc:hover::before, .cc:hover::after, .cc:focus-visible::before, .cc:focus-visible::after { opacity: 1; }
-:is(a, button).cc:hover { transform: translateY(-3px); border-color: #3a3a3e; box-shadow: 0 14px 34px #0008, 0 0 0 1px rgb(var(--tone) / 0.08); }
+.cc:hover { transform: translateY(-3px); border-color: #3a3a3e; box-shadow: 0 14px 34px #0008, 0 0 0 1px rgb(var(--tone) / 0.08); }
 .cc-pos { position: relative; overflow: hidden; transition: background 0.3s; }
 .cc-pos::after {
   content: ''; position: absolute; inset: 0; pointer-events: none; transform: translateX(-120%);
@@ -99,6 +101,7 @@ button.cc:hover .cc-ago::after { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   .cc, .cc *, .cc::before, .cc::after, .cc-pos::after { transition: none !important; }
-  :is(a, button).cc:hover, .cc:hover .cc-pos > :first-child, .cc:hover .cc-av, .cc:hover .cc-side { transform: none; }
+  .cc:hover, .cc:hover .cc-pos > :first-child, .cc:hover .cc-av, .cc:hover .cc-side { transform: none; }
   .cc:hover .cc-pos::after { transform: translateX(-120%); }
 }
+.cc-foot span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
