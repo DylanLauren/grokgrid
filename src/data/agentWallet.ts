@@ -7,6 +7,7 @@ export interface AgentWalletSession {
   walletId: string
   wallet: WalletLike
   authorizationReady: boolean
+  accessToken: () => Promise<string | null>
 }
 export type WalletReadiness = { canAuthorize: false; walletAuthorizationReady: false; executionEnabled: false; reason: string } | {
   canAuthorize: true; walletAuthorizationReady: boolean; executionEnabled: false; reason: string;

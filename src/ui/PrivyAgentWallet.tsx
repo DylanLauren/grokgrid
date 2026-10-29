@@ -38,9 +38,9 @@ function WalletControls({ onWalletChange }: AgentWalletSetupProps) {
 
   }, [address, connected, signTransaction])
   useEffect(() => {
-    onWalletChange(address && walletId && adapter ? { address, walletId, wallet: adapter, authorizationReady: checked?.address === address && checked.readiness.walletAuthorizationReady } : null)
+    onWalletChange(address && walletId && adapter ? { address, walletId, wallet: adapter, accessToken: getAccessToken, authorizationReady: checked?.address === address && checked.readiness.walletAuthorizationReady } : null)
     return () => onWalletChange(null)
-  }, [address, walletId, adapter, checked, onWalletChange])
+  }, [address, walletId, adapter, checked, onWalletChange, getAccessToken])
   async function act(fn: () => Promise<void>) {
     setBusy(true); setMessage('')
     try { await fn() } catch { setMessage('Wallet action did not complete. Check your session and try again. No launch or trade was submitted.') }
