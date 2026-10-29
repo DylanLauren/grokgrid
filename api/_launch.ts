@@ -1,6 +1,7 @@
 // Launchpad rules shared by the launch routes: what a bot draft may hold, the pool of
 // trading wallets Grok Bot hands out, per-IP limits, and where pending launches live.
 // No keys here: the pool only ever holds public addresses Grok Bot posted.
+import { beats, runnerReady } from './_heartbeat.js'
 import { HOUSE_WALLET, isAddress, redis } from './_lib.js'
 
 export const SITE_URL = (process.env.SITE_URL || 'https://grokgrid-alpha.vercel.app').replace(/\/$/, '')
@@ -151,12 +152,18 @@ export async function addWallets(list: string[]) {
 export async function launchStatus(): Promise<{ open: boolean; reason: string | null; free: number; walletModel: 'launcher'; oneAgentPerWallet: true }> {
   const model = { free: 0, walletModel: 'launcher' as const, oneAgentPerWallet: true as const }
   // Wallet connection supplies identity only. It cannot authorize an unattended signer.
-  if (!executorReady()) return { ...model, open: false, reason: 'Agent trading is not ready yet. Coin launches are paused.' }
+  if (!(await executorReady())) return { ...model, open: false, reason: 'Agent trading is not ready yet. Coin launches are paused.' }
   if (!isAddress(BURN_WALLET)) return { ...model, open: false, reason: 'Launching opens once the burn wallet is set.' }
   return { ...model, open: true, reason: null }
 }
 
-export const executorReady = (): boolean => false
+export async function executorReady(): Promise<boolean> {
+  try {
+    return runnerReady(await beats(), process.env.LAUNCHES_ENABLED)
+  } catch {
+    return false
+  }
+}
 
 // ---- per-IP limits ----
 // Fixed one-minute windows in Redis. If Redis is down the request goes through.
