@@ -47,7 +47,7 @@ export const EDGE_1S = 'public, max-age=0, s-maxage=1'
 export const isAddress = (s: unknown): s is string => typeof s === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s)
 export const isSig = (s: unknown): s is string => typeof s === 'string' && /^[1-9A-HJ-NP-Za-km-z]{64,90}$/.test(s)
 
-async function rpc<T>(method: string, params: unknown[]): Promise<T | null> {
+export async function rpc<T>(method: string, params: unknown[]): Promise<T | null> {
   try {
     const res = await fetch(RPC, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) })
     const j = (await res.json()) as { result?: T }

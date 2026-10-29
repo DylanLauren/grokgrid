@@ -21,6 +21,7 @@ const SECTIONS: [string, string, ReactNode][] = [
     <Fragment key="b">
       <FlowDiagram />
       <p>The intended ${MAIN_TICKER} fee allocation is 80% to the treasury and 20% to the burn wallet. The official mint must be configured and verified before its buy-and-burn route can be activated. Automatic buying and burning are not active yet.</p>
+      <p>Once ${MAIN_TICKER} is live, the stats page reads its numbers straight off the chain: supply and burns from the mint account (every pump.fun coin starts at one billion, so whatever is missing has been burned), and the treasury and burn wallet balances from Solana. None of these are reported by us.</p>
       <p>The prepared grid-bot launch flow sets 80% of creator fees to the connected launcher wallet, which is also that bot’s trading wallet, and 20% to the burn wallet. It checks the on-chain recipients and locked fee split before registering the bot. Fee allocation alone does not start a trading worker or execute a burn.</p>
     </Fragment>,
   ],
