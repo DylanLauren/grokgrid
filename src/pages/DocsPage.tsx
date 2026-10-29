@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import { GITHUB_URL, MAIN_TICKER } from '../config'
+import { GITHUB_URL, MAIN_TICKER, X_HANDLE } from '../config'
+import { XMark } from '../ui/XMark'
 import { Addresses, CostTable } from '../ui/Panels'
 import { GitHubMark } from '../ui/GitHubMark'
 import { Reveal } from '../ui/Reveal'
@@ -135,6 +136,10 @@ export function DocsPage({ onTour }: { onTour: () => void }) {
           <a className="btn ghost" href={GITHUB_URL} target="_blank" rel="noreferrer">
             <GitHubMark />
             <Roll>GitHub</Roll>
+          </a>
+          <a className="btn ghost" href={`https://x.com/${X_HANDLE}`} target="_blank" rel="noreferrer">
+            <XMark />
+            <Roll>{`@${X_HANDLE}`}</Roll>
           </a>
         </nav>
         <article className="dc-body">
