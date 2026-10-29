@@ -80,7 +80,9 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
   const [owner, setOwner] = useState<OwnerWallet | null>(null)
   // the owner's own wallet launches; the bot trades from its own wallet
   const me = owner?.address ?? ''
-  const onWalletChange = useCallback((wallet: AgentWalletSession | null) => setAgentWallet(wallet), [])
+  // only a real change re-renders the page: same wallet, same readiness keeps the old session
+  const onWalletChange = useCallback((wallet: AgentWalletSession | null) => setAgentWallet((prev) =>
+    prev && wallet && prev.address === wallet.address && prev.walletId === wallet.walletId && prev.authorizationReady === wallet.authorizationReady && !!prev.authorize === !!wallet.authorize && prev.policySummary === wallet.policySummary ? prev : wallet), [])
   const status = useLaunchStatus(me)
   const [connecting, setConnecting] = useState(false)
   const [step, setStep] = useState<number | null>(null)

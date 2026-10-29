@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { PrivyProvider, usePrivy, useSigners } from '@privy-io/react-auth'
+import { PrivyProvider, usePrivy, useSigners, type PrivyClientConfig } from '@privy-io/react-auth'
 import { defaultSolanaRpcsPlugin, toSolanaWalletConnectors, useCreateWallet, useSignTransaction, useWallets } from '@privy-io/react-auth/solana'
 import { privyWalletAdapter } from '../data/privyWalletAdapter'
 import { canDelegateWallet, embeddedSolanaAccounts, verifyAgentWallet, type WalletReadiness } from '../data/agentWallet'
@@ -7,11 +7,17 @@ import type { WalletLike } from '../data/wallet'
 import type { AgentWalletSetupProps } from './AgentWalletSetup'
 
 // Sign-in is the owner's Phantom: connect it and sign one free message (no transaction).
-const solanaWallets = toSolanaWalletConnectors({ shouldAutoConnect: false })
+// One config object for the page's lifetime: a fresh one each render makes Privy re-initialise,
+// which re-renders the page, which made a fresh config again (React error 185, an update loop).
+const CONFIG = {
+  loginMethods: ['wallet'], appearance: { theme: 'dark', accentColor: '#40bda6', walletChainType: 'solana-only', walletList: ['phantom', 'detected_solana_wallets'], showWalletLoginFirst: true },
+  externalWallets: { solana: { connectors: toSolanaWalletConnectors({ shouldAutoConnect: false }) } },
+  embeddedWallets: { ethereum: { createOnLogin: 'off' }, solana: { createOnLogin: 'off' } }, plugins: [defaultSolanaRpcsPlugin()],
+} satisfies PrivyClientConfig
 
 export default function PrivyAgentWallet({ appId, onWalletChange, onSignedIn }: AgentWalletSetupProps & { appId: string; onSignedIn: (phantom: string | null) => void }) {
   const props = { onWalletChange, onSignedIn }
-  return <PrivyProvider appId={appId} config={{ loginMethods: ['wallet'], appearance: { theme: 'dark', accentColor: '#40bda6', walletChainType: 'solana-only', walletList: ['phantom', 'detected_solana_wallets'], showWalletLoginFirst: true }, externalWallets: { solana: { connectors: solanaWallets } }, embeddedWallets: { ethereum: { createOnLogin: 'off' }, solana: { createOnLogin: 'off' } }, plugins: [defaultSolanaRpcsPlugin()] }}><WalletControls {...props} /></PrivyProvider>
+  return <PrivyProvider appId={appId} config={CONFIG}><WalletControls {...props} /></PrivyProvider>
 }
 
 // Connect, and everything else happens on its own: the bot's wallet is created on first sign-in
@@ -59,7 +65,7 @@ function WalletControls({ onWalletChange, onSignedIn }: AgentWalletSetupProps & 
   useEffect(() => {
     if (!address || !walletId || !connected || checked?.address === address) return
     verify().catch(() => setMessage('Wallet check is unavailable right now. Launching waits until it passes.'))
-  }, [address, walletId, connected, checked, verify])
+  }, [address, walletId, !!connected, checked, verify]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const authorize = useCallback(async () => {
     if (!address || !walletId) throw Error('Connect your wallet first.')
@@ -70,19 +76,24 @@ function WalletControls({ onWalletChange, onSignedIn }: AgentWalletSetupProps & 
     await verify()
   }, [address, walletId, getAccessToken, signerId, policyId, addSigners, verify])
 
+  // Privy hands back new function objects on many renders; the session reads the latest ones
+  // through refs so it is only rebuilt when the wallet or its check actually changes.
+  const hasWallet = !!connected
+  const fns = useRef({ signTransaction, getAccessToken, authorize })
+  useLayoutEffect(() => { fns.current = { signTransaction, getAccessToken, authorize } })
   useEffect(() => {
-    const adapter: WalletLike | null = address && connected ? privyWalletAdapter(address,
-      () => current.current.authenticated && current.current.address === address && current.current.wallet === connected,
-      async transaction => (await signTransaction({ wallet: connected, transaction, chain: 'solana:mainnet' })).signedTransaction) : null
+    const adapter: WalletLike | null = address && hasWallet ? privyWalletAdapter(address,
+      () => current.current.authenticated && current.current.address === address && !!current.current.wallet,
+      async transaction => (await fns.current.signTransaction({ wallet: current.current.wallet!, transaction, chain: 'solana:mainnet' })).signedTransaction) : null
     const r = checked && address && checked.address === address ? checked.readiness : null
     onWalletChange(address && walletId && adapter ? {
-      address, walletId, wallet: adapter, accessToken: getAccessToken,
+      address, walletId, wallet: adapter, accessToken: () => fns.current.getAccessToken(),
       authorizationReady: !!r?.walletAuthorizationReady,
-      authorize: r?.canAuthorize ? authorize : undefined,
+      authorize: r?.canAuthorize ? () => fns.current.authorize() : undefined,
       policySummary: r?.canAuthorize ? r.policySummary : undefined,
     } : null)
     return () => onWalletChange(null)
-  }, [address, walletId, connected, signTransaction, checked, onWalletChange, getAccessToken, authorize])
+  }, [address, walletId, hasWallet, checked, onWalletChange])
 
   async function act(fn: () => Promise<void>) {
     setBusy(true); setMessage('')
