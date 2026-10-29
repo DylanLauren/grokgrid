@@ -4,7 +4,7 @@
 
 <p align="center">
 A Grok Bot trades pump.fun live at his desk. Launch your own bot with its own coin, and it trades from its own wallet.<br>
-<a href="https://grokgrid-alpha.vercel.app"><b>grokgrid-alpha.vercel.app</b></a> · $GRID · buy-and-burn · live phone · receipts on chain
+<a href="https://grokgrid.fun"><b>grokgrid-alpha.vercel.app</b></a> · $GRID · buy-and-burn · live phone · receipts on chain
 </p>
 
 > Unofficial fan project. Not affiliated with xAI or pump.fun. Nothing here is financial advice: the trading strategy is **unvalidated** and bots can lose money.
