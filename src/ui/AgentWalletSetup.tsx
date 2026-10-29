@@ -4,10 +4,24 @@ import { connectWallet, provider, rejected, type WalletLike } from '../data/wall
 const PrivyAgentWallet = lazy(() => import('./PrivyAgentWallet'))
 export interface OwnerWallet { address: string; wallet: WalletLike }
 export interface AgentWalletSetupProps { onWalletChange: (wallet: AgentWalletSession | null) => void }
-class WalletLoadBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
-  render() { return this.state.failed ? <p role="alert">Wallet connect could not load. Reload this page to try again.</p> : this.props.children }
+class WalletLoadBoundary extends Component<{ children: ReactNode }, { error: string | null; key: number }> {
+  state = { error: null as string | null, key: 0 }
+  static getDerivedStateFromError(e: unknown) { return { error: String((e as Error)?.message || e).slice(0, 140) } }
+  componentDidCatch(e: unknown, info: { componentStack?: string | null }) { console.error('wallet panel crashed', e, info.componentStack) }
+  // sign-in state left behind by an older visit is the usual culprit, so clearing it is the fix
+  reset = () => {
+    try { for (const k of Object.keys(localStorage)) if (k.startsWith('privy:')) localStorage.removeItem(k) } catch { /* private mode */ }
+    location.reload()
+  }
+  render() {
+    if (!this.state.error) return <div key={this.state.key}>{this.props.children}</div>
+    return <div role="alert" className="gd-note bad">
+      <p>Wallet sign-in couldn’t load. If you use Brave or an ad blocker, allow grokgrid.fun (it blocks the sign-in service), then reset.</p>
+      <p className="mono"><small>{this.state.error}</small></p>
+      <button type="button" className="btn ghost" onClick={() => this.setState((s) => ({ error: null, key: s.key + 1 }))}>Try again</button>{' '}
+      <button type="button" className="btn ghost" onClick={this.reset}>Reset sign-in</button>
+    </div>
+  }
 }
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`
 
