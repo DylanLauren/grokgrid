@@ -9,21 +9,25 @@ export const DEFAULT_GUARDIAN = Object.freeze({ bounds: { x: 10, y: 40, width: 4
 // identity and request failures stay with the operator.
 export const FIXABLE = new Set(['phone-window-geometry-invalid', 'browser-viewport-invalid', 'browser-url-mismatch', 'window-changed-during-capture']);
 
-/** What to do to the window. `w` is { fullScreen, bounds, url } as read from Chrome. */
-export function windowFixes(w, browserUrl, bounds) {
+/**
+ * What to do to the window. `w` is { fullScreen, bounds, url } as read from Chrome; `target` is
+ * the page it should show (the house profile, or the coin the house is trading). It only moves
+ * between pump.fun pages: a window on any other site is left alone.
+ */
+export function windowFixes(w, browserUrl, bounds, target = browserUrl) {
   const fixes = [];
   if (!w) return fixes;
   if (w.fullScreen === true) fixes.push('exit-full-screen');
-  // Only a page inside the pinned profile (a tab or query the viewer clicked) is put back.
-  if (typeof w.url === 'string' && w.url !== browserUrl && w.url.startsWith(browserUrl)) fixes.push('reset-url');
+  if (typeof w.url === 'string' && w.url !== target && w.url.startsWith('https://pump.fun/')) fixes.push('show-target');
   const b = w.bounds;
   if (!b || ['x', 'y', 'width', 'height'].some(k => Math.abs(b[k] - bounds[k]) > 2)) fixes.push('restore-bounds');
   return fixes;
 }
 
-// Hides the page scrollbar in the captured window. Idempotent; a reload drops it and the next
-// run puts it back. Style only: it reads nothing from the page.
-export const HIDE_SCROLLBAR_JS = "(()=>{if(!document.getElementById('gg-noscroll')){const s=document.createElement('style');s.id='gg-noscroll';s.textContent='html,body{scrollbar-width:none!important}::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}';(document.head||document.documentElement).appendChild(s)}return 'ok'})()";
+// Hides the page scrollbar in the captured window. The style sits on <html> (the page re-renders
+// <head>) and an observer puts it back if it is removed; a full reload drops both and the next
+// run re-applies them. Style only: it reads nothing from the page.
+export const HIDE_SCROLLBAR_JS = "(()=>{const css='html,body{scrollbar-width:none!important}::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}';const put=()=>{if(!document.getElementById('gg-noscroll')){const s=document.createElement('style');s.id='gg-noscroll';s.textContent=css;document.documentElement.appendChild(s)}};put();if(!window.__ggNoScroll){window.__ggNoScroll=new MutationObserver(put);window.__ggNoScroll.observe(document.documentElement,{childList:true,subtree:true})}return 'ok'})()";
 
 /** Resume only a feed the supervisor stopped for a window problem, never a manual pause. */
 export function shouldResume({ pausedFile, appState, supervisorState, supervisorReason }) {

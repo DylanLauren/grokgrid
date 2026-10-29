@@ -1,3 +1,4 @@
+import { pageAllowed, titleAllowed } from './phone-follow-core.mjs'
 // Pure policy and one-frame pipeline. No capture or network side effects at import.
 const PHONE_ORIGINS = ['https://grokgrid-alpha.vercel.app', 'https://www.grokgrid.fun']
 export function capabilityExpiry(token, now = Date.now()) {
@@ -23,14 +24,17 @@ export function validateConfig(input) {
   }
   return { ...input, site, everyMs }
 }
-export function verifyWindow(snapshot, config) {
+// The pinned window may show the house profile (`browserUrl`) or, while the house is trading, a
+// coin page on the guardian's fresh follow list (scripts/phone-follow-core.mjs). Identity (window
+// id, owner, bundle, layer) never changes.
+export function verifyWindow(snapshot, config, follow = null, now = Date.now()) {
   // CoreGraphics omits minimized windows. A missing pin permits waiting only,
   // never capture, substitution, or automatic selection of another window.
   if (snapshot === null) throw Error('window-unavailable')
-  if (!snapshot || snapshot.id !== config.windowId || snapshot.pid !== config.ownerPid || snapshot.bundleId !== config.bundleId || snapshot.title !== config.title || (snapshot.onScreen !== true && snapshot.onScreen !== false) || snapshot.layer !== 0) throw Error('window-identity-mismatch')
+  if (!snapshot || snapshot.id !== config.windowId || snapshot.pid !== config.ownerPid || snapshot.bundleId !== config.bundleId || (config.bundleId === 'com.google.Chrome' ? !titleAllowed(snapshot.title, config.title) : snapshot.title !== config.title) || (snapshot.onScreen !== true && snapshot.onScreen !== false) || snapshot.layer !== 0) throw Error('window-identity-mismatch')
   const b = snapshot.bounds
   if (!b || !['x', 'y', 'width', 'height'].every(k => Number.isFinite(b[k])) || b.width < 250 || b.height < 400 || b.width / b.height < .35 || b.width / b.height > .85) throw Error('phone-window-geometry-invalid')
-  if (config.bundleId === 'com.google.Chrome' && snapshot.browserUrl !== config.browserUrl) throw Error('browser-url-mismatch')
+  if (config.bundleId === 'com.google.Chrome' && !pageAllowed(snapshot.browserUrl, config.browserUrl, follow, now)) throw Error('browser-url-mismatch')
   // The same fully verified source may be temporarily hidden by another Space
   // or minimized. Never capture it, but do not treat availability as a new source.
   if (snapshot.onScreen === false) throw Error('window-temporarily-unavailable')
@@ -77,10 +81,10 @@ export async function encodePhoneCapture(sourceWidth, encode) {
 }
 export async function captureAndSend(config, deps) {
   capabilityExpiry(deps.token, deps.now())
-  const before = verifyWindow(await deps.inspect(), config)
+  const before = verifyWindow(await deps.inspect(), config, await deps.follow?.(), deps.now())
   const bytes = await deps.capture(before)
   validateJpeg(bytes)
-  const after = verifyWindow(await deps.inspect(), config)
+  const after = verifyWindow(await deps.inspect(), config, await deps.follow?.(), deps.now())
   if (!sameWindow(before, after)) throw Error('window-changed-during-capture')
   capabilityExpiry(deps.token, deps.now())
   await deps.send(bytes)
