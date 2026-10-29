@@ -1,10 +1,8 @@
-# House worker: offline planning and observation
+# House worker: observation, planning and gated execution
 
-This worker is an offline foundation, **not a live trader**. It reads the existing
-house observer, maintains a durable intent journal, and can evaluate hypothetical
-buy and sell proposals. Its optional receipt adapter makes read-only RPC queries. It has no market strategy,
-key loader, signer, swap builder, broadcast transport, or automatic agent-launch consumer. No configuration
-can enable execution. The CLI does not simulate fills or claim a trade occurred.
+By default (`mode: "observe-only"`) this worker is **not a live trader**. It reads the house observer, keeps a durable intent journal and evaluates buy and sell proposals. It never signs.
+
+An explicit `mode: "execute"` policy turns on the executor (`scripts/trading-executor.mjs`). Only dlao sets it, after approving the limits. See "Execute mode" below. There is still **no market strategy**: intents come only from proposals (`--proposal`), and only for mints on `allowedMints`.
 
 ## Run the observer
 
@@ -201,3 +199,26 @@ this is not complete or durable external delivery. The local journal retains at
 most 1,000 observed identities and reports capacity/truncation instead of silently
 claiming full intake. A separate verified launch-delivery and per-agent execution
 integration is still required.
+
+
+## Execute mode
+
+The policy needs `"mode": "execute"`, `"executionEnabled": true`, `"signingEnabled": true`, an absolute `stopFile` and an absolute `keypairFile`. The key file must be mode 0600 and match `wallet`. Anything else fails validation. These are the placeholder limits dlao is approving:
+
+```json
+{ "mode": "execute", "executionEnabled": true, "signingEnabled": true,
+  "stopFile": "/Users/<you>/.config/grokgrid/runtime/STOP", "keypairFile": "/Users/<you>/.config/grokgrid/<house keypair>.json",
+  "maxTradeLamports": "50000000", "maxExposureLamports": "500000000", "maxDailyLossLamports": "250000000",
+  "maxSlippageBps": 1500, "reserveLamports": "20000000", "maxPendingIntents": 1, "maxIntentAgeMs": 60000 }
+```
+
+Each tick:
+
+1. It settles held submissions. A finalized receipt reconciles one (`--reconcile`). A blockhash that has passed, with the signature never seen, marks one `dropped-expired`. Anything else stays held.
+2. It plans a proposal. In execute mode the risk snapshot comes from the journal: exposure is every unsold lamport spent, and today's loss is today's net outflow. Both overstate real risk, so trading only stops sooner.
+3. It signs at most one `planned` intent. Signing needs: no stop file, nothing held, the daily-loss stop not hit, room under the exposure limit, and at least 5 seconds before the intent expires.
+4. It journals the signature, `lastValidBlockHeight` and the buy cost ceiling (budget + 0.0021 SOL token-account rent) to disk, and only then broadcasts. A send error leaves the intent held.
+
+Routes are the pump.fun bonding curve, or the canonical PumpSwap pool after graduation (`scripts/pump-chain.mjs`). Buys are exact-out under a SOL ceiling. Sells set the on-chain minimum to the intent's `minimumReceiveLamports`. Every transaction is simulated before signing.
+
+`touch` the stop file to halt signing on the next tick. Deleting the key file also stops it.

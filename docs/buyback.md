@@ -5,7 +5,7 @@
 ## What one cycle does
 
 1. It reads the burn wallet's finalized SOL balance and the official mint. The mint must exist, be SPL or Token-2022, and have **no mint authority and no freeze authority**.
-2. If the balance is at least the trigger, it spends `min(balance − reserve − fee allowance, max per cycle)` on a pump.fun bonding-curve buy. The quote is sized so the slippage ceiling lands on that amount, and the buy is simulated before signing.
+2. If the balance is at least the trigger, it spends `min(balance − reserve − fee allowance, max per cycle)` on $GRID. It buys on the pump.fun bonding curve, or on the canonical PumpSwap pool once the coin has graduated. Both are exact-out buys, and the quote is sized so the slippage ceiling lands on that amount. The buy is simulated before signing.
 3. Once the buy is finalized, it burns **every** $GRID token in the burn wallet with an SPL `BurnChecked` (opcode 15). Total supply goes down on chain.
 
 ## Safety rules
@@ -18,7 +18,7 @@
   - A failed or expired buy closes the cycle.
   - A lock left behind by a crash needs an operator. It is never cleared automatically.
 - **No key output.** The key is never logged or written anywhere. Status and error output never include the config, RPC URL or key.
-- **Graduated coins.** Once the coin has moved to PumpSwap, the tick reports `graduated-route-unsupported` and doesn't buy. The PumpSwap route is a follow-up.
+- **Routes.** It buys on the bonding curve, or on the canonical SOL-quoted PumpSwap pool after graduation. A coin with neither reports `no-supported-route` and doesn't buy.
 
 ## Config (`~/.config/grokgrid/runtime/buyback-config.json`, mode 0600)
 
@@ -53,5 +53,5 @@ Values are the placeholder limits dlao is approving:
 
 - A dry tick against mainnet with the default config ran clean.
 - The unsigned buy for a live bonding-curve coin simulates OK with a funded payer.
-- A graduated coin returns `graduated-route-unsupported`.
+- The unsigned buy for a live coin that has graduated to PumpSwap also simulates OK. A coin migrated elsewhere (not a PumpSwap pool) returns `no-supported-route`.
 - The burn builds as Token / Token-2022 `BurnChecked` with one signer.

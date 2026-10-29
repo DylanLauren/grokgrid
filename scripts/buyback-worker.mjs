@@ -10,7 +10,7 @@ import { resolve, join } from 'node:path';
 import { homedir } from 'node:os';
 import { validateBuybackConfig, executionBlockers, plannedSpend, openCycle, recordBuy, settleLeg, recordBurn, closeEmpty } from './buyback-policy.mjs';
 import { withBuybackStore } from './buyback-store.mjs';
-import { connect, readMint, readWallet, signatureStatus, buildBuy, buildBurn, loadSigner, signedSignature } from './buyback-chain.mjs';
+import { connect, readMint, readWallet, signatureStatus, buildBuy, buildBurn, loadSigner, signedSignature } from './pump-chain.mjs';
 
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
 const args = process.argv.slice(2);
@@ -79,7 +79,7 @@ async function tick() {
     if (spend === null) { action = config.officialMint ? 'below-trigger' : 'awaiting-official-mint'; return; }
     if (!live) { action = 'funds-detected-execution-blocked'; detail = spend; return; }
     const built = await buildBuy(conn, { wallet: config.burnWallet, mint: config.officialMint, spendLamports: spend, slippageBps: config.maxSlippageBps, tokenProgram: mint.tokenProgram });
-    if (!built) { action = 'graduated-route-unsupported'; return; }
+    if (!built) { action = 'no-supported-route'; return; }
     built.tx.sign([signer]);
     await commit(recordBuy(s, config, { cycleId: randomUUID(), spendLamports: spend, minTokenUnits: built.minTokenUnits,
       signature: signedSignature(built.tx), lastValidBlockHeight: built.lastValidBlockHeight, now: Date.now() }));
