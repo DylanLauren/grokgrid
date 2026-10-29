@@ -59,3 +59,17 @@ Posts are best effort and never include secrets. Set `GROKGRID_INGEST=off` to se
   - An outage, 429 or 5xx is retried on the next tick.
 - Each posted trade also writes one `action` line, for example "bought $X for 0.050 SOL · strategy unvalidated".
 - Paper fills post as `action` lines prefixed **`paper:`**. They are never `trade` events, which need real signatures.
+
+## pump.fun Callouts (house profile)
+
+A pump.fun Callout push-notifies the profile's followers and counts on pump.fun's caller leaderboard. pump.fun allows one per 6 hours, and only for a coin the profile's wallet holds. The house profile is "GrokGrid" (the house wallet).
+
+- **Route.** The house's logged-in pump.fun session in Chrome. AppleScript runs a script in an existing `https://pump.fun/` tab, so every request is same-origin with that session. The cookie/JWT never leaves Chrome; the script returns only a short result string.
+  - It first calls `GET frontend-api-v3.pump.fun/callout/eligibility/{mint}`, the same call the page makes.
+  - Outside a dry run it then calls `POST /callout/create` (multipart: `coinMint`, `thesis`).
+- **Requirements.** Chrome > View > Developer > *Allow JavaScript from Apple Events*, and a normal pump.fun tab open in the house session. The script doesn't navigate, resize or move any window.
+- **Which coin.** The newest reconciled **real** buy that the house still holds. Paper fills never reach this.
+- **Limits.** At most one call per 6 hours, no repeat of a signature or of a coin within 24 hours, and a private ledger `pump-callouts.json`. It's off unless `callout-config.json` has `"pumpCalloutsEnabled": true`.
+- **Dry run.** `node scripts/pump-callout-worker.mjs --dry-run [--mint <mint>]` asks for eligibility and stops before create.
+  - On 2026-10-29 a dry run for FLOATER returned `verdict-INSUFFICIENT_BALANCE`: the house holds nothing yet, so pump.fun's own gate works as expected.
+  - The verdict string pump.fun returns for an allowed call hasn't been seen yet. The worker accepts `OK`, `ELIGIBLE` or `ALLOWED` and fails closed on anything else. Check it with a dry run on a held coin before enabling.
