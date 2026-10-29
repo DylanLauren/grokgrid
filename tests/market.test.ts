@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { rows } from '../scripts/market-recorder.mjs'
 import { series, simulate, passes, evaluate } from '../scripts/market-analyze.mjs'
+import { candleRows } from '../scripts/market-backfill.mjs'
 
 const MINT = 'So11111111111111111111111111111111111111pump'
 const row = (t: number, price: number, extra: Record<string, unknown> = {}) => ({ t, mint: MINT, price, ageMin: 30, liq: 20000, mc: 50000, v5m: 6000, b5m: 60, s5m: 30, c5m: 10, c1h: 40, ...extra })
@@ -38,4 +39,14 @@ test('scale-out: half is sold at the first target and the rest trails the peak',
   assert.equal(t.reason, 'trail')
   const entry = 1.03, net = (p: number) => (p * 0.97 / entry) * 0.9875 * 0.9875
   assert.ok(Math.abs(t.ret - (0.5 * net(1.4) + 0.5 * net(1.5) - 1)) < 1e-9)
+})
+
+test('backfill candles become tape rows with trailing 5m/1h change and volume', () => {
+  const m = 60
+  const c = [[0, 1, 1, 1, 1, 10], [5 * m, 1, 2, 1, 2, 20], [10 * m, 2, 2, 2, 3, 30]]
+  const r = candleRows({ mint: MINT, sym: 'X', dex: 'pump-fun', createdAt: 0 }, c)
+  assert.equal(r.length, 3); assert.equal(r[2].ageMin, 10); assert.equal(r[2].mc, 3e9)
+  assert.equal(r[2].c5m, 50); assert.equal(r[2].v5m, 30); assert.equal(r[0].c5m, null)
+  const f = { age: [0, 100], liq: 0, mc: [0, 1e12], v5m: 0, ratio: 0, c5m: [-100, 100], c1h: [-1e9, 1e9] }
+  assert.equal(passes({ ...r[2], c1h: 0 }, f), true) // ratio 0 means the rule ignores buy/sell counts
 })
