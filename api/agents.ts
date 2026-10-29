@@ -2,6 +2,7 @@ import { beats, fresh } from './_heartbeat.js'
 import { chainCurve } from './_curve.js'
 import { curveFrom, tally } from './_tally.js'
 import { balances, hasStore, HOUSE_WALLET, json, MAIN_MINT, markets, parse, redis, solUsd, toHash } from './_lib.js'
+import { tradeMcs } from './_trademc.js'
 
 // Registry entry, written once by /api/ingest when Grok Bot launches an agent's coin.
 export interface AgentRecord {
@@ -43,12 +44,13 @@ export async function grid(only?: string) {
   const traded = [...new Set(shown.flat().map((c) => c.mint))].slice(0, MAX_MINTS)
   // a profile also gets its wallet history as the chain recorded it
   const chains = only ? Promise.all(ids.map((id, i) => chainCurve(id, i === 0 && withHouse ? HOUSE_WALLET : records[i - (withHouse ? 1 : 0)].wallet))) : Promise.resolve([])
-  const [bal, mkt, price, beat, chain] = await Promise.all([
+  const [bal, mkt, price, beat, chain, mcs] = await Promise.all([
     balances([...(withHouse ? [HOUSE_WALLET] : []), ...records.map((r) => r.wallet)]),
     markets([MAIN_MINT, ...records.map((r) => r.coin.mint), ...traded]),
     solUsd(),
     beats().then((b) => b.trading).catch(() => undefined),
     chains,
+    tradeMcs(shown.flat()),
   ])
   const houseMode = fresh(beat) ? beat.mode : null
 
@@ -75,6 +77,7 @@ export async function grid(only?: string) {
       return {
         mint: c.mint, side: c.side, sig: c.sig, ts: c.ts,
         symbol: tok?.symbol || c.symbol, name: tok?.name || c.name || '', image: tok?.image || c.image, hue: c.hue || r.color,
+        tradeMc: mcs.get(`${c.sig}:${c.mint}`)?.mcUsd, tradeMcApprox: mcs.get(`${c.sig}:${c.mint}`)?.approx,
         spentSol: c.spentSol, sizeTokens: c.sizeTokens, pnlUsd: c.pnlUsd ?? (p === undefined ? null : p * price), pnlSol: p ?? null,
         coin: tok ? { mcUsd: tok.mcUsd, vol24hUsd: tok.vol24hUsd, change24h: tok.change24h } : undefined,
       }

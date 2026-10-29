@@ -4,7 +4,7 @@ import type { Agent, AgentsFeed, BotTrade, Feed, WalletPoint } from '../data/typ
 import { ago, compact, mc, pct, short, usd } from '../lib/format'
 import { CoinChip } from '../ui/CoinChip'
 import { peek, PeekLayer } from '../ui/CoinPeek'
-import { BestWorst, rounds } from '../ui/BestWorst'
+import { atMc, BestWorst, rounds } from '../ui/BestWorst'
 import { positions, Positions } from '../ui/Positions'
 import { houseRow, tradeCoin } from '../ui/Matrix'
 import { Page } from './Page'
@@ -151,8 +151,8 @@ function Profile({ a, now, solUsd, onBack }: { a: Agent; now: number; solUsd: nu
                 <span>side</span>
                 <span className="r">sol</span>
                 <span className="r">realised</span>
+                <span className="r">mc at trade</span>
                 <span className="r">mc now</span>
-                <span className="r">24h</span>
                 <span className="r">when</span>
                 <span />
               </div>
@@ -184,8 +184,8 @@ function TradeRow({ t, i, now, solUsd }: { t: BotTrade; i: number; now: number; 
       <span><em className={`bp-side mono ${t.side}`}>{t.side}</em></span>
       <span className="r mono">{t.spentSol.toFixed(4)}</span>
       <span className={`r mono ${pnl === null ? 'dim' : pnl >= 0 ? 'gain' : 'loss'}`}>{t.side === 'sell' && pnl !== null ? `${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)}` : '–'}</span>
+      <span className="r mono" title={t.tradeMcApprox ? 'estimated from the fill price' : undefined}>{atMc(t)}</span>
       <span className="r mono">{t.coin?.mcUsd ? mc(t.coin.mcUsd) : '–'}</span>
-      <span className={`r mono ${t.coin?.mcUsd ? (t.coin.change24h >= 0 ? 'gain' : 'loss') : 'dim'}`}>{t.coin?.mcUsd ? pct(t.coin.change24h) : '–'}</span>
       <span className="r mono dim">{ago(t.ts, now)}</span>
       <span className="r">
         {t.sig && (

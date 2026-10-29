@@ -1,10 +1,10 @@
 import { mc, usd } from '../lib/format'
 import { CoinChip } from './CoinChip'
 import { peek, type PeekCoin } from './CoinPeek'
-import { dur, sol, type Trade } from './BestWorst'
+import { atMc, dur, sol, type Trade } from './BestWorst'
 
 // Coins he holds right now: every buy since his last sell of that coin.
-export interface Open { buy: Trade; tokens: number; cost: number; since: number; value: number | null }
+export interface Open { buy: Trade; first: Trade; tokens: number; cost: number; since: number; value: number | null }
 const SUPPLY = 1e9 // every pump.fun coin mints one billion tokens, so price = market cap / 1e9
 
 export function positions(trades: Trade[], solUsd: number): Open[] {
@@ -13,7 +13,7 @@ export function positions(trades: Trade[], solUsd: number): Open[] {
     if (c.side === 'sell') { held.delete(c.mint); continue }
     const o = held.get(c.mint)
     if (o) { o.tokens += c.sizeTokens ?? 0; o.cost += c.spentSol; o.buy = c }
-    else held.set(c.mint, { buy: c, tokens: c.sizeTokens ?? 0, cost: c.spentSol, since: c.ts, value: null })
+    else held.set(c.mint, { buy: c, first: c, tokens: c.sizeTokens ?? 0, cost: c.spentSol, since: c.ts, value: null })
   }
   return [...held.values()].map((o) => {
     const mcUsd = o.buy.coin?.mcUsd
@@ -35,6 +35,7 @@ export function Positions({ open, solUsd, now = Date.now() }: { open: Open[]; so
           symbol: c.symbol, name: c.name, image: c.image, hue: c.hue ?? '#5a5a66', tag: 'holding',
           ...(c.coin ?? {}),
           rows: [
+            ['bought at', `${atMc(o.first)} mc`],
             ['in', `${o.cost.toFixed(4)} SOL`],
             ['worth now', o.value === null ? '–' : `${o.value.toFixed(4)} SOL`],
             ['unrealised', pnl === null ? '–' : `${sol(pnl)} (${pct! >= 0 ? '+' : ''}${pct!.toFixed(1)}%)`, tone],
@@ -52,7 +53,7 @@ export function Positions({ open, solUsd, now = Date.now() }: { open: Open[]; so
             </span>
             <span className="pos-cell mono"><small>in</small>{o.cost.toFixed(4)}</span>
             <span className="pos-cell mono"><small>now</small>{o.value === null ? '–' : o.value.toFixed(4)}</span>
-            <span className="pos-cell mono"><small>mc</small>{c.coin?.mcUsd ? mc(c.coin.mcUsd) : '–'}</span>
+            <span className="pos-cell mono"><small>mc</small>{o.first.tradeMc ? `${atMc(o.first)} → ` : ''}{c.coin?.mcUsd ? mc(c.coin.mcUsd) : '–'}</span>
             <span className="pos-cell mono"><small>held</small>{dur(now - o.since)}</span>
             <b className={`pos-pct ${tone}`}>
               {pct === null ? '–' : `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`}
