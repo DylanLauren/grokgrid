@@ -84,6 +84,7 @@ export interface BotTrade {
   image?: string
   hue?: string
   spentSol: number // SOL out for a buy, SOL in for a sell (checked on chain)
+  sizeTokens?: number // tokens bought or sold
   pnlUsd: number | null
   pnlSol: number | null // realised on a sell
   coin?: { mcUsd: number; vol24hUsd: number; change24h: number }

@@ -356,3 +356,19 @@
 .st-bw-sub a { color: var(--paper-70); }
 .st-bw-sub a:hover { color: var(--paper); }
 @media (max-width: 720px) { .st-bw { grid-template-columns: 1fr; } }
+
+/* open positions (stats + bot profile) */
+.pos { display: grid; gap: 8px; }
+.pos-row { display: grid; grid-template-columns: minmax(150px, 1.4fr) repeat(4, minmax(64px, 1fr)) minmax(84px, auto); align-items: center; gap: 12px; padding: 10px 16px 10px 12px; }
+.pos-row > .pos-coin { grid-area: auto; }
+.pos-coin b { font-size: 15px; }
+.pos-cell { display: grid; font-size: 13px; color: var(--paper-70); line-height: 1.2; }
+.pos-cell small { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--paper-50); }
+.pos-pct { display: grid; justify-items: end; font-size: 22px; font-weight: 520; letter-spacing: -0.03em; line-height: 1.1; }
+.pos-pct small { font-size: 11px; font-weight: 400; color: var(--paper-50); letter-spacing: 0; }
+.pos-empty { margin: 0; font-size: 12px; color: var(--paper-50); }
+@media (max-width: 720px) {
+  .pos-row { grid-template-columns: 1fr 1fr 1fr auto; }
+  .pos-row .pos-coin { grid-column: 1 / -2; }
+  .pos-row .pos-pct { grid-column: -2; grid-row: 1; }
+}

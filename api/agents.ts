@@ -75,7 +75,7 @@ export async function grid(only?: string) {
       return {
         mint: c.mint, side: c.side, sig: c.sig, ts: c.ts,
         symbol: tok?.symbol || c.symbol, name: tok?.name || c.name || '', image: tok?.image || c.image, hue: c.hue || r.color,
-        spentSol: c.spentSol, pnlUsd: c.pnlUsd ?? (p === undefined ? null : p * price), pnlSol: p ?? null,
+        spentSol: c.spentSol, sizeTokens: c.sizeTokens, pnlUsd: c.pnlUsd ?? (p === undefined ? null : p * price), pnlSol: p ?? null,
         coin: tok ? { mcUsd: tok.mcUsd, vol24hUsd: tok.vol24hUsd, change24h: tok.change24h } : undefined,
       }
     }
