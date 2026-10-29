@@ -13,6 +13,7 @@ import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { DEFAULT_GUARDIAN, HIDE_SCROLLBAR_JS, windowFixes, shouldResume } from './phone-guardian-core.mjs';
 import { FOLLOW_FILE, followMints, targetPage, calloutMint } from './phone-follow-core.mjs';
+import { safeError } from './log-safe.mjs';
 
 const run = promisify(execFile);
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
@@ -80,9 +81,9 @@ async function main() {
   let seen = '';
   for (let next = 0; ; await new Promise(r => setTimeout(r, 1500))) {
     const now = await changed();
-    if (Date.now() >= next || now !== seen) { seen = now; next = Date.now() + 30_000; await tick().catch(e => console.error(`phone guardian: ${String(e?.message || e).slice(0, 120)}`)); }
+    if (Date.now() >= next || now !== seen) { seen = now; next = Date.now() + 30_000; await tick().catch(e => console.error(`phone guardian: ${safeError(e)}`)); }
     else await keepScrollbarHidden();
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main().catch(e => { console.error(`phone guardian: ${String(e?.message || e).slice(0, 120)}`); process.exit(1); });
+if (import.meta.url === `file://${process.argv[1]}`) main().catch(e => { console.error(`phone guardian: ${safeError(e)}`); process.exit(1); });
