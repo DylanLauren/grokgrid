@@ -31,7 +31,7 @@ export async function GET() {
     calls: list.map((c) => {
       const call = t.pnl.has(c) ? { ...c, pnlSol: t.pnl.get(c) } : c
       const token = metadata[c.mint]
-      return token ? { ...call, symbol: token.symbol || call.symbol, name: token.name || call.name, image: token.image || call.image } : call
+      return token ? { ...call, symbol: token.symbol || call.symbol, name: token.name || call.name, image: token.image || call.image, coin: { mcUsd: token.mcUsd, vol24hUsd: token.vol24hUsd, change24h: token.change24h } } : call
     }),
     curve: points,
     burnedMain: Number(h.burnedMain ?? 0),
