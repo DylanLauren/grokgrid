@@ -41,12 +41,16 @@ export function nextExecutable(state, policy, now, stopFilePresent) {
   if (!executes(policy)) return { reason: 'observe-only' };
   if (stopFilePresent !== false) return { reason: 'stop-switch-engaged' };
   if (state.intents.some(i => i.state === 'held-ambiguous')) return { reason: 'submission-unresolved' };
+  const live = state.intents.filter(i => i.state === 'planned' && i.expiresAt > now + 5000);
+  // Sells go first and are never held back by a loss stop: a stop must not trap a dumping coin.
+  const sell = live.find(i => i.side === 'sell');
+  if (sell) return { intent: sell };
+  const intent = live[0];
+  if (!intent) return { reason: 'nothing-planned' };
   const risk = journalRisk(state, policy.wallet, now);
   if (BigInt(risk.dailyLossLamports) >= BigInt(policy.maxDailyLossLamports)) return { reason: 'daily-loss-stop' };
   if (policy.maxTotalLossLamports !== undefined && BigInt(risk.totalLossLamports) >= BigInt(policy.maxTotalLossLamports)) return { reason: 'total-loss-stop' };
-  const intent = state.intents.find(i => i.state === 'planned' && i.expiresAt > now + 5000);
-  if (!intent) return { reason: 'nothing-planned' };
-  if (intent.side === 'buy' && BigInt(risk.exposureLamports) + BigInt(intent.spendLamports) > BigInt(policy.maxExposureLamports)) return { reason: 'exposure-limit' };
+  if (BigInt(risk.exposureLamports) + BigInt(intent.spendLamports) > BigInt(policy.maxExposureLamports)) return { reason: 'exposure-limit' };
   return { intent };
 }
 

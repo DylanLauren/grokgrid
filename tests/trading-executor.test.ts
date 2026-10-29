@@ -103,7 +103,8 @@ test('exposure is the open cost basis: a flat book after losses has none, but th
   assert.equal(risk.dailyLossLamports, '1900000') // 3.0M spent - 1.1M received today
   const flat = { ...s, intents: [...s.intents, r('s3', 'sell', B, now - 100, { soldTokenUnits: '300', receivedLamports: '200000' })] }
   assert.equal(journalRisk(flat, wallet, now).exposureLamports, '0')
-  assert.equal(nextExecutable(flat, { ...p, maxDailyLossLamports: '1000000' }, now, false).reason, 'daily-loss-stop')
+  const wantsBuy = { ...flat, intents: [...flat.intents, { ...planned(p).intents[0], id: 'buy9', createdAt: now }] }
+  assert.equal(nextExecutable(wantsBuy, { ...p, maxDailyLossLamports: '1000000' }, now, false).reason, 'daily-loss-stop')
 })
 
 test('optional total-loss stop: realised losses over the journal life stop new buys; absent means none', () => {
@@ -120,4 +121,22 @@ test('optional total-loss stop: realised losses over the journal life stop new b
   assert.equal(nextExecutable({ ...s, intents: [...s.intents, { ...planned(capped).intents[0], createdAt: now }] }, capped, now, false).reason, 'total-loss-stop')
   assert.notEqual(nextExecutable({ ...s, intents: [...s.intents, { ...planned(execute({ maxDailyLossLamports: '5000000' })).intents[0], createdAt: now }] }, execute({ maxDailyLossLamports: '5000000' }), now, false).reason, 'total-loss-stop')
   assert.throws(() => validateTradingPolicy(execute({ maxDailyLossLamports: '5000000', maxTotalLossLamports: '1000' })), /Invalid limits/) // below the daily stop
+})
+
+test('a planned sell always executes, even while the daily or total loss stop blocks buys', () => {
+  const r = (id: string, side: 'buy' | 'sell', at: number, receipt: Record<string, string>) => ({ id, side, mint, state: 'reconciled-confirmed', createdAt: at, receipt })
+  const losses = [r('b1', 'buy', now - 2000, { spentLamports: '9000000', receivedTokenUnits: '100' }), r('s1', 'sell', now - 1000, { soldTokenUnits: '100', receivedLamports: '1000000' })]
+  const sell = { id: 'sell2', agentId: 'house', wallet, mint, side: 'sell', state: 'planned', createdAt: now, expiresAt: now + 60000, tokenUnits: '5', tokenDecimals: 6, minimumReceiveLamports: '1', slippageBps: 1500 }
+  const buy = { ...planned(execute()).intents[0], id: 'buy2', createdAt: now }
+  for (const p of [execute({ maxDailyLossLamports: '5000000' }), execute({ maxDailyLossLamports: '8000000', maxTotalLossLamports: '8000000' })]) {
+    const s = { ...emptyTradingState(p), intents: [...losses, buy, sell] }
+    assert.equal(nextExecutable(s, p, now, false).intent?.id, 'sell2') // sell first, stop or not
+    const buysOnly = { ...s, intents: [...losses, buy] }
+    assert.ok(['daily-loss-stop', 'total-loss-stop'].includes(nextExecutable(buysOnly, p, now, false).reason as string))
+  }
+  const total = execute({ maxDailyLossLamports: '8000000', maxTotalLossLamports: '8000000' })
+  const yesterday = losses.map(i => ({ ...i, createdAt: i.createdAt - 86_400_000 }))
+  assert.equal(nextExecutable({ ...emptyTradingState(total), intents: [...yesterday, buy] }, total, now, false).reason, 'total-loss-stop')
+  assert.equal(nextExecutable({ ...emptyTradingState(total), intents: [...yesterday, buy, sell] }, total, now, false).intent?.id, 'sell2')
+  assert.equal(nextExecutable({ ...emptyTradingState(total), intents: [...yesterday, sell] }, { ...total }, now, true).reason, 'stop-switch-engaged') // the STOP file still freezes everything
 })
