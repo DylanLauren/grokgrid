@@ -14,6 +14,24 @@ export function positionRefreshPlan(policy, attempt, positions, now, force=false
   const nextAttemptAt=attempt.lastAttemptAt+delay;
   return {refresh:now>=nextAttemptAt,reason:now>=nextAttemptAt?'scheduled-refresh':positionsAreFresh(policy,positions,now)?'fresh-cache':'retry-backoff',nextAttemptAt};
 }
+// Diagnostic evidence only. A current snapshot is not approval of its rules.
+export function launchRuleReadiness(observation,observerFresh,now) {
+  const e=observation?.launchRules;
+  const countNames=['observedCount','rulesObservedCount','identityConflictCount','ruleChangeCount','rulesUnavailableCount'];
+  const valid=e?.snapshotSchemaVersion===1&&Number.isSafeInteger(e.observedAt)&&countNames.every(k=>Number.isSafeInteger(e[k])&&e[k]>=0)&&countNames.slice(1).every(k=>e[k]<=e.observedCount)&&e.activePolicy===null&&e.acknowledged===false&&e.executionEnabled===false&&e.historyComplete===false&&typeof e.queueAvailable==='boolean'&&typeof e.registryFresh==='boolean'&&typeof e.capacityReached==='boolean';
+  const snapshotFresh=!!(valid&&observerFresh&&now-e.observedAt>=0&&now-e.observedAt<=90000);
+  const blockers=['launch-history-incomplete','launch-policy-unapproved','automatic-launches-disabled'];
+  if(!snapshotFresh)blockers.push('launch-rule-evidence-unavailable');
+  else {
+    if(!e.queueAvailable)blockers.push('launch-queue-unavailable');
+    if(e.identityConflictCount)blockers.push('launch-identity-conflict');
+    if(e.ruleChangeCount)blockers.push('launch-rule-change-review-required');
+    if(e.observedCount&&(!e.registryFresh||e.rulesUnavailableCount||e.rulesObservedCount<e.observedCount))blockers.push('launch-rules-unavailable');
+    if(e.capacityReached)blockers.push('launch-evidence-capacity-reached');
+  }
+  return {readyForLaunches:false,snapshotFresh,queueAvailable:snapshotFresh?e.queueAvailable:null,registryFresh:snapshotFresh?e.registryFresh:null,
+    ...Object.fromEntries(countNames.map(k=>[k,snapshotFresh?e[k]:null])),historyComplete:false,policyApproved:false,activePolicy:null,acknowledged:false,executionEnabled:false,blockers};
+}
 export function tradingReadiness(policy,observation,positions,state,now) {
   const observerFresh=observerIsFresh(policy,observation,now),inventoryFresh=positionsAreFresh(policy,positions,now);
   const blockers=['execution-disabled','signer-unavailable','strategy-unvalidated','accounting-unverified'];
@@ -23,7 +41,7 @@ export function tradingReadiness(policy,observation,positions,state,now) {
   if(!policy.allowedMints.length)blockers.push('mint-allowlist-empty');
   if(state.intents.some(i=>i.state==='held-ambiguous'))blockers.push('unresolved-submission');
   if((state.launchesObserved??[]).some(i=>i.state==='identity-conflict'))blockers.push('launch-identity-conflict');
-  return {readyForLiveTrading:false,executionEnabled:false,signingEnabled:false,observerFresh,inventoryFresh,inventoryComplete:inventoryFresh?true:null,inventoryMintCount:inventoryFresh?positions.positions.length:null,costBasisVerified:false,riskAccountingVerified:false,blockers};
+  return {readyForLiveTrading:false,executionEnabled:false,signingEnabled:false,observerFresh,inventoryFresh,inventoryComplete:inventoryFresh?true:null,inventoryMintCount:inventoryFresh?positions.positions.length:null,costBasisVerified:false,riskAccountingVerified:false,launchReadiness:launchRuleReadiness(observation,observerFresh,now),blockers};
 }
 // Only durable local observation. No external queue read/write, acknowledgment,
 // agent creation, key assignment, rule approval or execution occurs here.
