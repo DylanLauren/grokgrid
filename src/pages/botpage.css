@@ -66,3 +66,9 @@
   .bp-tr > :last-child { display: none; }
 }
 @media (max-width: 520px) { .bp-tiles { gap: 10px; } .bp-tile { padding: 12px 14px; } }
+
+/* best and worst closed trades, on the profile */
+.bp-bw { padding: 18px; display: grid; gap: 12px; }
+.bp-bw .st-bw-card { background: #ffffff05; border: 1px solid var(--hair); border-radius: 14px; }
+.bp-bw:hover { transform: none; }
+.bp-bw .bp-trades-head { padding: 0; }

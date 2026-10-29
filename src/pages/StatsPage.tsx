@@ -6,6 +6,8 @@ import { useToken, type GridToken } from '../data/useToken'
 import { useWorkers, type WorkerName, type Workers } from '../data/useWorkers'
 import { ago, compact, mc, pct, signedUsd, usd } from '../lib/format'
 import { CoinChip } from '../ui/CoinChip'
+import { PeekLayer } from '../ui/CoinPeek'
+import { BestWorst, dur, rounds, sol } from '../ui/BestWorst'
 import { Addresses } from '../ui/Panels'
 import { Page, Section } from './Page'
 
@@ -14,11 +16,15 @@ export function StatsPage({ feed }: { feed: Feed }) {
   const token = useToken(true)
   const workers = useWorkers(true)
   const burned = token?.burned ?? feed.burnedMain
+  const done = useMemo(() => rounds(feed.calls, feed.mode === 'live', feed.solUsd), [feed])
+  const real = done.length ? done.reduce((n, r) => n + r.pnl, 0) : null
+  const holds = done.flatMap((r) => (r.held === null ? [] : [r.held]))
+  const avgHold = holds.length ? holds.reduce((a, b) => a + b, 0) / holds.length : null
   const tiles: [string, string, string?, string?][] = [
     ['trades', `${s.trades}`, `${feed.calls.filter((c) => c.side === 'sell').length} closed`],
     ['win rate', s.winRate === null ? '–' : `${s.winRate.toFixed(0)}%`, 'of closed trades'],
-    ['best trade', s.best ? signedUsd(s.best.pnlUsd) : '–', s.best?.symbol, 'gain'],
-    ['worst trade', s.worst ? signedUsd(s.worst.pnlUsd) : '–', s.worst?.symbol, 'loss'],
+    ['realised', real === null ? '–' : `${real >= 0 ? '+' : ''}${real.toFixed(4)}`, 'SOL from closed trades', real === null ? undefined : real >= 0 ? 'gain' : 'loss'],
+    ['avg hold', avgHold === null ? '–' : dur(avgHold), 'buy to sell'],
     ['fees in', `${feed.feesSol.toFixed(2)}`, 'SOL from creator fees'],
     [`$${MAIN_TICKER} burned`, burned ? compact(burned) : '0', token?.burned != null ? 'gone from supply, on chain' : 'bought and burned'],
   ]
@@ -57,6 +63,12 @@ export function StatsPage({ feed }: { feed: Feed }) {
         ))}
       </div>
 
+      {done.length > 0 && (
+        <Section title="Best and worst" note={`of ${done.length} closed`}>
+          <BestWorst done={done} solUsd={feed.solUsd} />
+        </Section>
+      )}
+
       <Section title="Recent trades" note={`${Math.min(14, feed.calls.length)} of ${feed.calls.length}`}>
         <div className="st-trades" role="table">
           <div className="st-tr th mono" role="row">
@@ -81,8 +93,12 @@ export function StatsPage({ feed }: { feed: Feed }) {
               </span>
               <em className={`mono ${c.side}`}>{c.side}</em>
               <span className="r mono">{c.spentSol} SOL</span>
-              <span className="r mono">{mc(c.nowMc)}</span>
-              <span className={`r mono ${c.side === 'buy' ? 'dim' : c.pnlUsd === null ? 'dim' : c.pnlUsd >= 0 ? 'gain' : 'loss'}`}>{c.side === 'buy' ? '–' : signedUsd(c.pnlUsd)}</span>
+              <span className="r mono">{mc(c.coin?.mcUsd || c.nowMc)}</span>
+              {typeof c.pnlSol === 'number' && c.side === 'sell' ? (
+                <span className={`r mono ${c.pnlSol >= 0 ? 'gain' : 'loss'}`}>{sol(c.pnlSol)}</span>
+              ) : (
+                <span className={`r mono ${c.side === 'buy' ? 'dim' : c.pnlUsd === null ? 'dim' : c.pnlUsd >= 0 ? 'gain' : 'loss'}`}>{c.side === 'buy' ? '–' : signedUsd(c.pnlUsd)}</span>
+              )}
               <span className="r mono dim">{ago(c.ts)}</span>
               {c.sig ? (
                 <a href={solscan('tx', c.sig)} target="_blank" rel="noreferrer" title="transaction on Solscan" aria-label="transaction on Solscan">↗</a>
@@ -101,6 +117,7 @@ export function StatsPage({ feed }: { feed: Feed }) {
       <Section title="Addresses">
         <Addresses />
       </Section>
+      <PeekLayer />
     </Page>
   )
 }
@@ -216,4 +233,5 @@ function WalletChart({ feed }: { feed: Feed }) {
     </div>
   )
 }
+
 

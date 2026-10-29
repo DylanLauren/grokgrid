@@ -4,6 +4,7 @@ import type { Agent, AgentsFeed, BotTrade, Feed, WalletPoint } from '../data/typ
 import { ago, compact, mc, pct, short, usd } from '../lib/format'
 import { CoinChip } from '../ui/CoinChip'
 import { peek, PeekLayer } from '../ui/CoinPeek'
+import { BestWorst, rounds } from '../ui/BestWorst'
 import { houseRow, tradeCoin } from '../ui/Matrix'
 import { Page } from './Page'
 import './botpage.css'
@@ -55,6 +56,7 @@ export function BotPage({ which, grid, feed, onBack }: { which: string; grid: Ag
 function Profile({ a, now, solUsd, onBack }: { a: Agent; now: number; solUsd: number; onBack: () => void }) {
   const sample = a.id.startsWith('demo')
   const trades = a.recent ?? []
+  const done = useMemo(() => rounds(trades, !sample, solUsd), [trades, sample, solUsd])
   const pnl = a.pnlSol
   const tiles: [string, React.ReactNode, string?, string?][] = [
     ['wallet', <Sol n={a.walletSol} d={4} />, '', a.wallet ? short(a.wallet) : ''],
@@ -116,6 +118,16 @@ function Profile({ a, now, solUsd, onBack }: { a: Agent; now: number; solUsd: nu
         </div>
 
         {a.curve && a.curve.length > 1 && <Curve points={a.curve} />}
+
+        {done.length > 0 && (
+          <section className="card bp-bw">
+            <div className="bp-trades-head">
+              <h2>Best and worst</h2>
+              <span className="mono">of {done.length} closed</span>
+            </div>
+            <BestWorst done={done} solUsd={solUsd} />
+          </section>
+        )}
 
         <section className="bp-trades card">
           <div className="bp-trades-head">
