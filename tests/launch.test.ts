@@ -36,3 +36,14 @@ test('first buy amounts are exact and capped', () => {
 test('agent ids fit the registry format', () => {
   assert.match(agentId('NIGHT', '8TD5SUxyz'), /^[a-z0-9-]{2,32}$/)
 })
+
+test('launches close once the grid is full, and when the count is unknown', async () => {
+  const { agentCap, isFull } = await import('../api/_launch.ts')
+  assert.equal(agentCap(undefined), 100)
+  assert.equal(agentCap('50'), 50)
+  assert.equal(agentCap('0'), 100)
+  assert.equal(agentCap('9000'), 100)
+  assert.equal(isFull(100, 99), false)
+  assert.equal(isFull(100, 100), true)
+  assert.equal(isFull(100, null), true)
+})
