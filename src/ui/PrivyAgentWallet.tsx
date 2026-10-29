@@ -6,7 +6,8 @@ import { canDelegateWallet, embeddedSolanaAccounts, verifyAgentWallet, type Wall
 import type { WalletLike } from '../data/wallet'
 import type { AgentWalletSetupProps } from './AgentWalletSetup'
 
-export default function PrivyAgentWallet({ appId, ...props }: AgentWalletSetupProps & { appId: string }) {
+export default function PrivyAgentWallet({ appId, onWalletChange }: AgentWalletSetupProps & { appId: string }) {
+  const props = { onWalletChange }
   return <PrivyProvider appId={appId} config={{ loginMethods: ['email', 'google'], appearance: { theme: 'dark', accentColor: '#40bda6', walletChainType: 'solana-only' }, embeddedWallets: { ethereum: { createOnLogin: 'off' }, solana: { createOnLogin: 'off' } }, plugins: [defaultSolanaRpcsPlugin()] }}><WalletControls {...props} /></PrivyProvider>
 }
 
@@ -89,21 +90,21 @@ function WalletControls({ onWalletChange }: AgentWalletSetupProps) {
 
   if (!ready) return <p role="status">Connecting…</p>
   if (!authenticated) return <div className="gd-connect-row">
-    <div><h2>Connect</h2><p>Sign in and your bot gets its own wallet. You fund it, it trades, you can withdraw any time.</p></div>
-    <button type="button" className="btn" onClick={() => login()}>Connect wallet</button>
+    <div><h2>Make your bot’s wallet</h2><p>Sign in once so the bot’s trading wallet belongs to you. It never holds your Phantom keys.</p></div>
+    <button type="button" className="btn" onClick={() => login()}>Sign in</button>
   </div>
   const r = checked && address && checked.address === address ? checked.readiness : null
   return <div className="gd-connect-on">
     <div className="gd-connect-row">
       <div>
-        <h2>{address ? 'Connected' : 'Making your bot’s wallet…'}</h2>
-        {address && <p>Fund your Grok Bot by sending SOL to this address from Phantom or any wallet. {r?.walletAuthorizationReady ? 'Grok Bot can trade it inside its limits.' : 'Launching lets Grok Bot trade it inside the limits below.'}</p>}
+        <h2>{address ? 'Ready to launch' : 'Making your bot’s wallet…'}</h2>
+        {address && <p>Your bot trades from this wallet. Launching funds it from Phantom in the same approval{r?.walletAuthorizationReady ? '' : ' and lets Grok Bot trade it inside the limits below'}.</p>}
         {!address && hasUnreadyWallet && <p>This account’s wallet needs a manual check before it can trade. Contact us on X.</p>}
       </div>
-      <button type="button" className="btn ghost" disabled={busy} onClick={() => void act(async () => { setChecked(null); onWalletChange(null); await logout() })}>Disconnect</button>
+      <button type="button" className="btn ghost" disabled={busy} onClick={() => void act(async () => { setChecked(null); onWalletChange(null); await logout() })}>Sign out</button>
     </div>
     {address && <div className="gd-addr">
-      <span className="mono">{address}</span>
+      <span className="mono"><small>bot wallet</small> {address}</span>
       <button type="button" className="btn ghost" disabled={busy} onClick={() => void act(async () => { await navigator.clipboard.writeText(address); setMessage('Address copied.') })}>Copy</button>
     </div>}
     {r?.canAuthorize && <details className="gd-limits"><summary className="mono">Grok Bot’s limits on this wallet</summary><p style={{ whiteSpace: 'pre-wrap' }}>{r.policySummary}</p>

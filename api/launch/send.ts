@@ -4,7 +4,7 @@ import { hasStore, isAddress, parse, redis } from '../_lib.js'
 import { friendly, keys, limited, noStore, readJson } from '../_launch.js'
 import { claimLaunchOwner } from '../_launch-owner.js'
 import { authorizedLaunch } from '../_verify.js'
-import { OPEN } from '../_finish.js'
+import { OPEN, routable } from '../_finish.js'
 import { validationTables, broadcastLaunch, broadcastSetup, saveTable, tableReady } from '../_pump.js'
 
 type Pending = { routingVersion?: number; launcher?: string; bot: string; message: string; setup: { table: string; expected: string[]; messages: string[] } | null; signature: string | null } & Record<string, unknown>
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   const [raw] = await redis(['GET', keys.pending(b.mint)])
   const pending = parse<Pending>(raw)
   if (!pending || !isAddress(pending.bot) || typeof pending.message !== 'string') return noStore({ error: 'This launch expired. Try again.' }, 410)
-  if(pending.routingVersion!==2||!isAddress(pending.launcher)||pending.bot!==pending.launcher)return noStore({error:'This older launch requires review. Do not submit it again.'},409)
+  if(!isAddress(pending.launcher)||!routable(pending))return noStore({error:'This older launch requires review. Do not submit it again.'},409)
   if (pending.signature) return noStore({ signature: pending.signature })
   if (pending.sending) return noStore({ error: 'This launch is already being submitted. Check its status before retrying.' }, 409)
   let signature: string

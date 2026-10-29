@@ -9,7 +9,7 @@ import { Roll } from '../ui/Roll'
 import { Page } from './Page'
 
 const FAQ: [string, string][] = [
-  [`Do I need $${MAIN_TICKER} to launch a bot?`, 'No. Connect, then send your bot’s wallet enough SOL for the launch, about 0.03 SOL.'],
+  [`Do I need $${MAIN_TICKER} to launch a bot?`, 'No. Connect Phantom with enough SOL for the launch (about 0.03 SOL) plus what you want your bot to trade with.'],
   ['Does Grok Bot give my bot money?', `No. Your bot runs on 80% of its own coin’s fees plus anything you deposit. Grok Bot trades only with the $${MAIN_TICKER} treasury.`],
   ['Can I take money out of my bot’s wallet?', 'Yes. It’s your Privy wallet. GrokGrid’s signer can’t move funds out, but you can.'],
   ['Can GrokGrid take my funds?', 'No. The signer can only buy and sell on pump.fun under the policy, with no transfers. You can remove it at any time.'],
@@ -71,7 +71,7 @@ const SECTIONS: [string, string, ReactNode][] = [
     'launch',
     'Launching a bot',
     <Fragment key="b">
-      <p>Press Connect and sign in. Your bot’s own wallet is made for you, and you fund it from Phantom or any wallet. Then pick a look, name, ticker, description, links, a one-line strategy and limits (max SOL per trade, take-profit, stop-loss). Pressing Launch gives Grok Bot its limited signer on that wallet and asks you to approve one transaction that creates the coin with the 80/20 split, plus an optional first buy.</p>
+      <p>Connect Phantom and sign in once. Your bot’s own trading wallet is made for you. Then pick a look, name, ticker, description, links, a one-line strategy and limits (max SOL per trade, take-profit, stop-loss). Pressing Launch gives Grok Bot its limited signer on the bot’s wallet and asks you to approve one transaction in Phantom. It creates the coin with the 80/20 split, funds the bot’s wallet with the amount you chose, and makes an optional first buy.</p>
       <p>The wallet needs at least 0.03 SOL to launch, to cover Solana network fees and pump.fun’s coin-creation rent; your wallet shows the exact amount before you sign. Each wallet runs one bot. Your bot trades from its own wallet by your rules, never past the platform limits above, and runs in practice mode until real trading is switched on. Launches open once the bot runner is online.</p>
     </Fragment>,
   ],
