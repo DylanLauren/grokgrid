@@ -19,7 +19,7 @@ import { connect, quoteSell } from './pump-chain.mjs';
 import { validateTradingPolicy, planIntent, executes } from './trading-policy.mjs';
 import { withTradingStore } from './trading-store.mjs';
 import { action } from './runtime-ingest.mjs';
-import { quotePrices, confirmExit } from './exit-watcher-core.mjs';
+import { quotePrices, confirmExit, sellJustExpired } from './exit-watcher-core.mjs';
 
 const run = promisify(execFile);
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
@@ -64,7 +64,11 @@ async function tick(conn) {
     // Two consecutive checks must agree before a quote-triggered sell is planned.
     const pending = {};
     let confirmed = false;
-    if (sell) { const r = confirmExit(mine.pending, sell.mint, sell.reason, now); confirmed = r.fire; if (r.pending) pending[sell.mint] = r.pending; }
+    if (sell) {
+      // A sell that was already confirmed but expired unsent is re-planned without waiting again.
+      const r = confirmExit(mine.pending, sell.mint, sell.reason, now); confirmed = r.fire || sellJustExpired(s.intents, sell.mint, now);
+      if (!confirmed && r.pending) pending[sell.mint] = r.pending;
+    }
     await savePrivate('exit-watcher-state.json', { peaks: planned.peaks, pending, observedAt: now });
     if (!sell || !confirmed) return s;
     const { reason, ...proposal } = sell;

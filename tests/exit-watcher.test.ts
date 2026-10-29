@@ -49,3 +49,12 @@ test('a stale sighting restarts the confirmation window instead of blocking it f
   assert.equal(again.fire, false); assert.equal(again.pending!.at, now) // restarted
   assert.equal(confirmExit({ [MINT]: again.pending }, MINT, 'stop-loss', now + 5000).fire, true)
 })
+
+test('a sell that expired unsent is re-planned without a second confirmation', async () => {
+  const { sellJustExpired } = await import('../scripts/exit-watcher-core.mjs')
+  const sell = (state: string, at: number) => ({ side: 'sell', mint: MINT, state, createdAt: at })
+  assert.equal(sellJustExpired([sell('expired', now - 50_000)], MINT, now), true)
+  assert.equal(sellJustExpired([sell('expired', now - 130_000)], MINT, now), false) // too old: confirm again
+  assert.equal(sellJustExpired([sell('reconciled-confirmed', now - 1000)], MINT, now), false)
+  assert.equal(sellJustExpired([{ ...sell('expired', now - 1000), mint: 'other' }], MINT, now), false)
+})
