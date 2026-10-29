@@ -10,7 +10,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 RUNTIME="${GROKGRID_RUNTIME_DIR:-$HOME/.config/grokgrid/runtime}"
 AGENTS="$HOME/Library/LaunchAgents"
 NODE="$(command -v node)"
-JOBS=(runtime-observer trading-observer phone-renewal buyback strategy agent-runner pump-callouts x-posts)
+JOBS=(runtime-observer trading-observer phone-renewal buyback strategy agent-runner pump-callouts x-posts market-recorder)
 UID_N="$(id -u)"
 APPLY=""; CHECK=""
 for a in "$@"; do case "$a" in --apply-limits) APPLY="$a";; --check) CHECK=1;; esac; done
