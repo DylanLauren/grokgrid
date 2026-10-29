@@ -104,3 +104,4 @@ button.cc:hover .cc-ago::after { opacity: 1; }
   .cc:hover, .cc:hover .cc-pos > :first-child, .cc:hover .cc-av, .cc:hover .cc-side { transform: none; }
   .cc:hover .cc-pos::after { transform: translateX(-120%); }
 }
+.cc-foot span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
