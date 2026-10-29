@@ -137,3 +137,55 @@ test('WHIP proxy rewrites only successful SDP POST bodies and frames the new bod
   const plain=await createWhipProxy('https://test.livekit.cloud/w/test-only-key',{fetchImpl:async()=>new Response(answer,{status:200,headers:{'content-type':'text/plain'}})})
   try{assert.equal(await (await fetch(plain.url,{method:'POST',body:'offer'})).text(),answer)}finally{await plain.close()}
 })
+
+test('native failure diagnostics distinguish unavailable metadata from mismatches without leaking values', async()=>{
+  const {safeCaptureFailure}=await import('../scripts/phone-video-core.mjs')
+  for(const reason of ['source-native-title-unavailable','source-native-title-mismatch','source-native-position-changed','source-page-timeout','source-url-mismatch','source-viewport-height-changed','source-device-scale-changed'])assert.equal(safeCaptureFailure(reason+'\n'),reason)
+  assert.equal(safeCaptureFailure('source-native-title-unavailable\nsource-page-timeout\n'),'source-page-timeout')
+  assert.equal(safeCaptureFailure('source-url-mismatch: https://private.example/secret'),'none-or-suppressed')
+  assert.equal(safeCaptureFailure('source-page-timeout\nprivate arbitrary error text'),'source-page-timeout')
+})
+
+test('actual native retry policy bounds owner rereads and never retries conflicts or dead processes',{skip:process.platform!=='darwin'},async()=>{
+  const {readFile}=await import('node:fs/promises'),{execFile}=await import('node:child_process'),{promisify}=await import('node:util')
+  const source=await readFile(new URL('../scripts/phone-video-capture.swift',import.meta.url),'utf8')
+  const policy=source.split('// BEGIN_OWNER_RETRY_POLICY')[1].split('// END_OWNER_RETRY_POLICY')[0]
+  const dir=await mkdtemp(join(tmpdir(),'phone-owner-policy-'))
+  try{
+    const file=join(dir,'check.swift')
+    await writeFile(file,policy+`
+func exercise(_ reasons:[String],_ liveness:[Bool],_ expectReads:Int,_ expectPauses:Int,_ expectRecovery:Int,_ expectSuccess:Bool) {
+ var reads=0,pauses=0,recoveries=0,aliveReads=0,reason=""
+ let result:Int?=OwnerMetadataRetry.perform(read:{reason=reasons[min(reads,reasons.count-1)];reads+=1;return reason=="success" ? 7:nil},reason:{reason},alive:{let value=liveness[min(aliveReads,liveness.count-1)];aliveReads+=1;return value},pause:{pauses+=1},recovered:{recoveries+=1})
+ precondition(reads==expectReads && pauses==expectPauses && recoveries==expectRecovery && (result != nil)==expectSuccess)
+}
+exercise(["source-owner-unavailable","success"],[true],2,1,1,true)
+exercise(["source-owner-unavailable"],[true],3,2,0,false)
+exercise(["source-owner-unavailable"],[false],1,0,0,false)
+exercise(["source-owner-unavailable","success"],[true,false],1,1,0,false)
+exercise(["source-owner-unavailable","source-url-mismatch","success"],[true],2,1,0,false)
+for reason in ["source-owner-mismatch","source-native-title-unavailable","source-native-title-mismatch","source-native-size-changed","source-url-mismatch","source-page-timeout"] {exercise([reason,"success"],[true],1,0,0,false)}
+`)
+    await promisify(execFile)('/usr/bin/swift',[file],{timeout:20000,maxBuffer:4096})
+  }finally{await rm(dir,{recursive:true,force:true})}
+})
+
+test('actual native origin policy permits only an unchanged-size uniquely bound move',{skip:process.platform!=='darwin'},async()=>{
+  const {readFile}=await import('node:fs/promises'),{execFile}=await import('node:child_process'),{promisify}=await import('node:util')
+  const source=await readFile(new URL('../scripts/phone-video-capture.swift',import.meta.url),'utf8')
+  const policy=source.split('// BEGIN_ORIGIN_POLICY')[1].split('// END_ORIGIN_POLICY')[0]
+  const dir=await mkdtemp(join(tmpdir(),'phone-origin-policy-'))
+  try{
+    const file=join(dir,'check.swift')
+    await writeFile(file,'import CoreGraphics\n'+policy+`
+let old=CGRect(x:10,y:40,width:406,height:851), moved=CGRect(x:30,y:40,width:406,height:851)
+precondition(SourceOriginPolicy.accepts(previous:old,native:moved,browser:moved,uniqueMatches:1,pageUnchanged:true))
+precondition(!SourceOriginPolicy.accepts(previous:old,native:moved,browser:old,uniqueMatches:1,pageUnchanged:true))
+precondition(!SourceOriginPolicy.accepts(previous:old,native:moved,browser:moved,uniqueMatches:2,pageUnchanged:true))
+precondition(!SourceOriginPolicy.accepts(previous:old,native:moved,browser:moved,uniqueMatches:1,pageUnchanged:false))
+let resized=CGRect(x:30,y:40,width:440,height:851)
+precondition(!SourceOriginPolicy.accepts(previous:old,native:resized,browser:resized,uniqueMatches:1,pageUnchanged:true))
+`)
+    await promisify(execFile)('/usr/bin/swift',[file],{timeout:20000,maxBuffer:4096})
+  }finally{await rm(dir,{recursive:true,force:true})}
+})

@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { RoomServiceClient } from 'livekit-server-sdk'
-import { readPrivateVideoFile, validateVideoConfig, preparePhoneVideoSource, countPhoneViewers, videoDemand, videoRestartDecision, videoStartupFailure, ffmpegPhoneArgs } from './phone-video-core.mjs'
+import { readPrivateVideoFile, validateVideoConfig, preparePhoneVideoSource, countPhoneViewers, videoDemand, videoRestartDecision, videoStartupFailure, safeCaptureFailure, ffmpegPhoneArgs } from './phone-video-core.mjs'
 import { createWhipProxy } from './phone-video-whip.mjs'
 import { recoverPhoneLock } from './phone-supervisor.mjs'
 
@@ -54,7 +54,7 @@ export async function runPhoneVideo(configPath, checkOnly = true) {
   const lock = await open(lockPath, 'wx', 0o600); await lock.writeFile(String(process.pid)); const own = await lock.stat(); await lock.close()
   let ending = false, capture = null, encoder = null, proxy = null, lastViewerAt = 0, running = false, failures = 0
   let attempts = 0, retryAt = 0, startedAt = 0
-  let encoderError = '', captureError = '', frameBytes = 0, signaling = [], frameSize=0
+  let encoderError = '', captureError = '', frameBytes = 0, signaling = [], frameSize=0, ownerRecoveries=0, originRebindings=0, captureLine=''
   const parent = process.ppid
   const stop = async () => {
     running = false
@@ -76,10 +76,9 @@ export async function runPhoneVideo(configPath, checkOnly = true) {
       if (viewers) lastViewerAt = Date.now()
       const startupFailure=running?videoStartupFailure({elapsedMs:Date.now()-startedAt,frameBytes,signaling}):null
       if (running && (startupFailure || capture.exitCode !== null || capture.signalCode !== null || encoder.exitCode !== null || encoder.signalCode !== null)) {
-        const allowedCapture=['source-check-failed','capture-permission-required','window-identity-mismatch','window-binding-ambiguous','viewport-invalid','viewport-changed','frame-format-invalid','capture-stopped','capture-unavailable','encoder-disconnected']
-        const safeCapture=captureError.split(/\r?\n/).map(s=>s.trim()).reverse().find(s=>allowedCapture.includes(s))||'none-or-suppressed'
+        const safeCapture=safeCaptureFailure(captureError)
         const category=/Invalid argument/i.test(encoderError)?'invalid-argument':/Connection refused/i.test(encoderError)?'connection-refused':/Server returned|HTTP error/i.test(encoderError)?'http-rejected':/timed out|timeout/i.test(encoderError)?'timeout':'unclassified'
-        await writePrivate(c.statusFile+'.diagnostic.json',JSON.stringify({observedAt:new Date().toISOString(),captureCode:capture.exitCode,captureSignal:capture.signalCode,captureReason:safeCapture,encoderCode:encoder.exitCode,encoderSignal:encoder.signalCode,encoderCategory:category,frameBytes,signaling,startupFailure}))
+        await writePrivate(c.statusFile+'.diagnostic.json',JSON.stringify({observedAt:new Date().toISOString(),captureCode:capture.exitCode,captureSignal:capture.signalCode,captureReason:safeCapture,encoderCode:encoder.exitCode,encoderSignal:encoder.signalCode,encoderCategory:category,frameBytes,ownerRecoveries,originRebindings,signaling,startupFailure}))
         await writePrivate(c.statusFile+'.encoder-stderr.log',encoderError)
         await writePrivate(c.statusFile+'.capture-stderr.log',captureError)
         const retry = startupFailure ? {restart:attempts<3,delayMs:5000*2**attempts,reason:'publisher-review-required'} : videoRestartDecision({captureCode:capture.exitCode,captureSignal:capture.signalCode,encoderCode:encoder.exitCode,encoderSignal:encoder.signalCode,attempts})
@@ -95,13 +94,18 @@ export async function runPhoneVideo(configPath, checkOnly = true) {
       if (demand === 'start' && Date.now() >= retryAt) {
         let dimensions
         try { dimensions = await prepareSource(false) } catch { await status(c.statusFile,'source-review-required',viewers); return }
-        encoderError='';captureError='';frameBytes=0;signaling=[]
+        encoderError='';captureError='';frameBytes=0;signaling=[];ownerRecoveries=0;originRebindings=0;captureLine=''
         frameSize=dimensions.width*dimensions.height*4
         proxy = await createWhipProxy(await readPrivateVideoFile(c.whipUrlFile),{onEvent:event=>{if(signaling.length<20)signaling.push(event)}})
         encoder = spawn(c.ffmpegPath, ffmpegPhoneArgs(dimensions, proxy.url), { stdio: ['pipe','ignore','pipe'] })
         capture = spawn(c.captureBinaryPath, [], { stdio: ['pipe','pipe','pipe'] })
         encoder.stderr.on('data',data=>{encoderError=(encoderError+data).slice(-64000)})
-        capture.stderr.on('data',data=>{captureError=(captureError+data).slice(-2000)})
+        capture.stderr.on('data',data=>{
+          captureError=(captureError+data).slice(-2000)
+          const lines=(captureLine+data).split('\n');captureLine=lines.pop().slice(-2000)
+          ownerRecoveries+=lines.filter(line=>line==='source-owner-recovered').length
+          originRebindings+=lines.filter(line=>line==='source-origin-rebound').length
+        })
         capture.stdout.on('data',data=>{frameBytes+=data.length})
         encoder.on('error', terminate); capture.on('error', terminate)
         encoder.stdin.on('error', () => capture?.kill('SIGTERM'))
@@ -111,7 +115,7 @@ export async function runPhoneVideo(configPath, checkOnly = true) {
         running = true
         startedAt = Date.now()
       }
-      await status(c.statusFile, running ? 'publisher-processes-running' : retryAt > Date.now() && viewers ? 'transport-retry-backoff' : queryOk ? 'waiting-for-viewers' : 'viewer-query-unavailable', viewers, running?{frameBytes,completeFrames:Math.floor(frameBytes/frameSize),elapsedMs:Date.now()-startedAt,signaling:signaling.slice(-3)}:{})
+      await status(c.statusFile, running ? 'publisher-processes-running' : retryAt > Date.now() && viewers ? 'transport-retry-backoff' : queryOk ? 'waiting-for-viewers' : 'viewer-query-unavailable', viewers, running?{frameBytes,ownerRecoveries,originRebindings,completeFrames:Math.floor(frameBytes/frameSize),elapsedMs:Date.now()-startedAt,signaling:signaling.slice(-3)}:{})
       await delay(c.pollMs)
     }
   } finally {
