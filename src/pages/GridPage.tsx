@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { MAIN_TICKER } from '../config'
 import { STEPS, launchBot, svgToImage, toImage } from '../data/launch'
 import { fetchLaunchStatus, unavailableLaunchStatus, type LaunchStatus } from '../data/launchStatus'
-import { connectWallet, isMobile, provider, rejected, walletLinks } from '../data/wallet'
+import { connectWallet, rejected } from '../data/wallet'
+import { PUBLIC_AGENT_LAUNCHES_ENABLED, type AgentWalletSession } from '../data/agentWallet'
+import { AgentWalletSetup } from '../ui/AgentWalletSetup'
 import type { AgentsFeed } from '../data/types'
 import { BODY, EYES, FAMILY, type Shape } from '../ui/BotMark'
 import { LiveBot, type Habit } from '../ui/LiveBot'
@@ -80,8 +82,10 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
     }
   }, [d])
   const [image, setImage] = useState<{ url: string; name: string } | null>(null)
-  const [me, setMe] = useState('')
-  const [walletCheck, setWalletCheck] = useState(0)
+  const [agentWallet, setAgentWallet] = useState<AgentWalletSession | null>(null)
+  const me = agentWallet?.address ?? ''
+  const onWalletChange = useCallback((wallet: AgentWalletSession | null) => setAgentWallet(wallet), [])
+  const walletCheck = 0
   const status = useLaunchStatus(me, walletCheck)
   const [connecting, setConnecting] = useState(false)
   const [step, setStep] = useState<number | null>(null)
@@ -97,29 +101,10 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
   const errs = check(d)
   const botPic = useMemo(() => botImage(d.look), [d.look])
   const pic = image?.url ?? botPic
-  const ready = !!status?.open && Object.keys(errs).length === 0 && step === null && !connecting && !made
+  const ready = PUBLIC_AGENT_LAUNCHES_ENABLED && !!agentWallet?.authorizationReady && !!status?.open && Object.keys(errs).length === 0 && step === null && !connecting && !made
   const mine = grid.mode === 'live' ? grid.agents.filter((a) => !a.house && a.coin.real !== false) : []
   const userBots = mine.length
   const err = (k: keyof Draft) => (touched[k] ? errs[k] : undefined)
-
-  const noWallet = typeof window !== 'undefined' && !provider() && isMobile()
-
-  async function checkWallet() {
-    const w = provider()
-    if (!w) return setFail('no Solana wallet found. install Phantom, Solflare or Backpack, then reload.')
-    setConnecting(true)
-    setFail('')
-    try {
-      const address = await connectWallet(w)
-      if (address !== me) setMade(null)
-      setMe(address)
-      setWalletCheck(n => n + 1)
-    } catch (err) {
-      setFail(rejected(err) ? 'wallet connection cancelled.' : (err as Error).message)
-    } finally {
-      setConnecting(false)
-    }
-  }
 
   async function launch(e: FormEvent) {
     e.preventDefault()
@@ -127,13 +112,13 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
     if (!ready) return
     setFail('')
     setMade(null)
-    const w = provider()
-    if (!w) return setFail('no Solana wallet found. install Phantom, Solflare or Backpack, then reload.')
+    const w = agentWallet?.wallet
+    if (!w) return setFail('Set up your embedded agent wallet first.')
     setConnecting(true)
     try {
       // Read the wallet's current account; a previously connected account may have changed.
       const addr = await connectWallet(w)
-      setMe(addr)
+      if (addr !== agentWallet?.address) throw Error('Agent wallet changed. Verify setup again.')
       const current = await fetchLaunchStatus(addr, AbortSignal.timeout(8_000)).catch(() => unavailableLaunchStatus())
       if (!current.open) throw Error(current.reason ?? 'Launching is paused.')
       const picture = image?.url ?? (await svgToImage(botPic))
@@ -157,7 +142,8 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
   }
 
   return (
-    <Page say="make me a sibling" n={5} label="the grid" title="Launch a bot" sub={`one agent per wallet, with its own coin on pump.fun. your connected wallet is also its trading wallet. public launches are paused while execution is prepared.`}>
+    <Page say="make me a sibling" n={5} label="the grid" title="Launch a bot" sub={`one agent per wallet, with its own coin on pump.fun. create a wallet you own before launch. that same wallet launches and trades for its agent. public launches are paused while execution is prepared.`}>
+      <AgentWalletSetup onWalletChange={onWalletChange} />
       <div className="gd-line" role="radiogroup" aria-label="pick a bot">
         {FAMILY.map((f, i) => (
           <button
@@ -291,7 +277,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             <div className="gd-split">
               <div>
                 <b>80%</b>
-                <span>of creator fees go to your connected wallet — also your bot’s trading wallet</span>
+                <span>of creator fees go to your agent wallet — the same address that launches and trades</span>
               </div>
               <div>
                 <b>20%</b>
@@ -300,24 +286,9 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             </div>
             <p className="gd-note">Connecting your wallet does not give the bot permission to spend. Automatic trading and buying or burning ${MAIN_TICKER} remain disabled until their execution paths are ready.</p>
             <p className="gd-note mono">one agent per wallet · 80/20 split locked at creation · review the exact network fees, rent and optional first buy before signing</p>
-            {noWallet ? (
-              <div className="gd-wallets">
-                {walletLinks().map((w) => (
-                  <a key={w.name} className="btn" href={w.href}>
-                    <Roll>{`Open in ${w.name}`}</Roll>
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <>
-                <button type="button" className="btn ghost" disabled={connecting || step !== null} onClick={() => void checkWallet()}>
-                  <Roll>{connecting ? 'Checking wallet' : me ? 'Check connected wallet' : 'Connect wallet'}</Roll>
-                </button>
-                <button type="submit" className="btn" disabled={!ready}>
-                  <Roll>{step !== null ? STEPS[step] : connecting ? 'Checking wallet' : me ? 'Launch bot' : 'Connect wallet and launch'}</Roll>
-                </button>
-              </>
-            )}
+            <button type="submit" className="btn" disabled={!ready}>
+              <Roll>{step !== null ? STEPS[step] : 'Launches paused'}</Roll>
+            </button>
             {me && <p className="gd-note mono">launcher + trading wallet: <span style={{ overflowWrap: 'anywhere' }}>{me}</span></p>}
             {step !== null && (
               <ol className="gd-steps mono" aria-live="polite">
@@ -339,9 +310,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
                   ? 'checking the launchpad'
                   : !status.open
                     ? `${status.reason ?? 'launching is closed right now.'} your draft stays saved in this tab, except the picture.`
-                    : noWallet
-                      ? 'open this page in your wallet app to launch from a phone.'
-                      : Object.keys(errs).length
+                    : Object.keys(errs).length
                         ? 'fill in the fields marked above to launch.'
                         : 'review the launch and locked fee split in your wallet. trading requires separate execution readiness.')}
             </p>
