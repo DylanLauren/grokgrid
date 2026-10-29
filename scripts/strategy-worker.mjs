@@ -16,6 +16,7 @@ import { validateTradingPolicy, planIntent, setAllowlist, executes } from './tra
 import { withTradingStore } from './trading-store.mjs';
 import { journalRisk } from './trading-executor.mjs';
 import { heartbeat, action } from './runtime-ingest.mjs';
+import { feesReceived24h } from './trade-budget.mjs';
 
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
 if (process.argv.slice(2).some(x => x !== '--once')) { console.error('Usage: strategy-worker.mjs [--once]'); process.exit(1); }
@@ -73,6 +74,9 @@ async function tick() {
     let positions; try { positions = await json(join(root, 'trading-positions.json')); } catch { positions = null; }
     if (!positions?.complete || positions.wallet !== policy.wallet) throw Error('Finalized positions unavailable');
     let peaks = {}, entries = {}; try { ({ peaks = {}, entries = {} } = await json(join(root, 'strategy-live.json'))); } catch {}
+    // House income: its 80% share of $GRID creator fees the fee router actually paid out in 24h.
+    let fees = '0'; try { const b = await json(join(root, 'buyback-config.json')); if (b.officialMint) fees = feesReceived24h(await json(join(root, 'fee-distributor-state.json')), [b.officialMint], 8000, now); } catch {}
+    const sizing = { walletLamports: observation?.house?.balanceLamports ?? '0', feesLamports24h: fees };
     const market = await gather(c, conn, rpc.rpcUrl, positions.positions.map(p => p.mint), now);
     market.sellQuotes = new Map();
     for (const p of positions.positions) if (BigInt(p.spendableTokenUnits) > 0n) {
@@ -81,7 +85,7 @@ async function tick() {
     const outcomes = [];
     let planned;
     await withTradingStore(join(root, 'trading'), policy, async s => {
-      planned = livePlan({ tradingState: s, policy, c, peaks, entries, positions, market, now, liquidating });
+      planned = livePlan({ tradingState: s, policy, c, peaks, entries, positions, market, now, liquidating, sizing });
       s = setAllowlist(s, policy, planned.allowlist, now);
       for (const p of planned.proposals) {
         const { reason, ...proposal } = p;
@@ -93,10 +97,10 @@ async function tick() {
       return s;
     });
     await savePrivate('strategy-live.json', { peaks: planned.peaks, entries: planned.entries, observedAt: now });
-    Object.assign(status, { scanned: market.scanned, preScreened: market.preScreened, chainChecked: market.facts.size, allowlisted: planned.allowlist.length, proposals: outcomes });
+    Object.assign(status, { scanned: market.scanned, preScreened: market.preScreened, chainChecked: market.facts.size, allowlisted: planned.allowlist.length, proposals: outcomes, budget: planned.budget });
   }
   await savePrivate('strategy-status.json', status);
-  await heartbeat(root, 'strategy', { mode: c.mode === 'paper' ? 'paper' : 'execute', healthy: true, note: c.mode === 'paper' ? `paper equity ${status.paper.equitySol.toFixed(3)} SOL, unvalidated` : `${status.proposals.length} proposals, unvalidated` });
+  await heartbeat(root, 'strategy', { mode: c.mode === 'paper' ? 'paper' : 'execute', healthy: true, note: c.mode === 'paper' ? `paper equity ${status.paper.equitySol.toFixed(3)} SOL, unvalidated` : `tier ${(Number(status.budget?.tierCapLamports ?? 0) / 1e9)} · fees24h ${(Number(status.budget?.feesLamports24h ?? 0) / 1e9).toFixed(4)} · trade ${(Number(status.budget?.perTradeLamports ?? 0) / 1e9).toFixed(4)} · exposure ${(Number(status.budget?.exposureLamports ?? 0) / 1e9).toFixed(4)} · daily loss ${(Number(status.budget?.dailyLossLamports ?? 0) / 1e9).toFixed(4)} SOL` });
   console.log(JSON.stringify({ mode: status.mode, scanned: status.scanned, chainChecked: status.chainChecked, paper: status.paper ?? null, proposals: status.proposals?.length ?? 0 }));
 }
 

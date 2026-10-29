@@ -30,6 +30,8 @@ Create `trading-config.json` in the existing protected runtime directory
 
 These numbers are illustrative offline limits, not approved spending amounts.
 
+The strategy sizes each buy below these limits from the bot's fee tier and spendable balance (see [Trade size](strategy.md#trade-size-budget-follows-fees-and-balance)). The limits here are the hard ceiling the executor enforces.
+
 Risk limits, all from the journal:
 - **`maxExposureLamports`:** the cost still open in coins held. Realised losses are not exposure.
 - **`maxDailyLossLamports`:** today's net outflow. Today's realised losses count here.
