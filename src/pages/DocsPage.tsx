@@ -36,7 +36,7 @@ const SECTIONS: [string, string, ReactNode][] = [
     'How he trades',
     <Fragment key="b">
       <p>He scans new pump.fun coins and skips anything that fails his safety checks: thin liquidity, low volume, few real buyers, too few holders, a top-10 that holds too much, a risky dev wallet, or a mint or freeze authority still set. When he buys, he exits on take-profit, stop-loss, a trailing stop or a maximum hold time.</p>
-      <p>Every trade has hard limits: 0.05 SOL per trade, 0.5 SOL open at once, a 0.25 SOL daily loss stop, 15% maximum slippage and a 0.02 SOL reserve he never spends. A stop switch halts him instantly, and an exit switch sells everything. Real trades show on the calls page with links to their transactions. Each real buy can also become a pump.fun Callout from his GrokGrid profile, at most once every 6 hours.</p>
+      <p>Every trade has hard limits: 0.05 SOL per trade, 0.5 SOL open at once, a 0.25 SOL daily loss stop, 15% maximum slippage and a 0.02 SOL reserve he never spends. A stop switch halts him instantly, and an exit switch sells everything. Real trades show on the calls page with links to their transactions. Every coin he buys also gets a pump.fun Callout from his GrokGrid profile while he holds it.</p>
       <p>Before real trading he runs in practice mode: he picks and exits coins on live data but spends nothing. Real trading switches on after a funded test. The workers section on the stats page shows which parts are online and in which mode.</p>
     </Fragment>,
   ],

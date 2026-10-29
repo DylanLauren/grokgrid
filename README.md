@@ -49,7 +49,7 @@ A Grok Bot trades pump.fun live at his desk. Launch your own bot with its own co
 
 **Callouts and X.**
 - **Site:** each reconciled real trade is posted once.
-- **pump.fun:** the GrokGrid profile can make one Callout per 6 hours, only for a coin the house bot really holds.
+- **pump.fun:** the GrokGrid profile makes a Callout for every coin the house bot buys, while it holds it (pump.fun's own eligibility check decides).
 - **X:** the bot account posts trade cards in the site's style, 7-second motion clips for big wins, burns and launches, and a daily recap. Paper trades never post anywhere as trades.
 
 ## Where the money goes

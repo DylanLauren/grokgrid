@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { pickCallout, calloutGate, thesis, pageScript, runCallout, SIX_HOURS } from '../scripts/pump-callouts.mjs'
+import { pickCallout, calloutGate, thesis, pageScript, runCallout } from '../scripts/pump-callouts.mjs'
 
 const now = 1_800_000_000_000
 const sig = (n: number) => '5'.repeat(87) + n
@@ -15,13 +15,21 @@ test('calls the newest real buy still held; never paper or sold coins', () => {
   assert.equal(pickCallout(s, held()), null)
 })
 
-test('gate: off by default, one per 6 hours, no repeat of a signature or a coin within a day', () => {
+test('every held buy gets its own call: called coins are skipped for the next one', () => {
+  const s = { intents: [buy(1, A, now - 10), buy(2, B, now)] }
+  const done = { calls: [{ at: now - 1000, mint: B, signature: sig(2), outcome: 'posted' }] }
+  assert.equal(pickCallout(s, held(A, B), done, now)!.signature, sig(1))
+  assert.equal(pickCallout(s, held(B), done, now), null)
+})
+
+test('gate: off by default, no wait between coins, no repeat of a signature or a coin within a day', () => {
   const on = { pumpCalloutsEnabled: true }, i = buy(1, A, now)
   assert.equal(calloutGate({ calls: [] }, { pumpCalloutsEnabled: false }, i, now), 'disabled')
   assert.equal(calloutGate({ calls: [] }, on, i, now), 'ok')
-  assert.equal(calloutGate({ calls: [{ at: now - 1000, mint: B, signature: sig(9), outcome: 'posted' }] }, on, i, now), 'cooldown')
-  assert.equal(calloutGate({ calls: [{ at: now - SIX_HOURS - 1, mint: B, signature: sig(9), outcome: 'posted' }] }, on, i, now), 'ok')
-  assert.equal(calloutGate({ calls: [{ at: now - SIX_HOURS - 1, mint: A, signature: sig(8), outcome: 'posted' }] }, on, i, now), 'already-called')
+  assert.equal(calloutGate({ calls: [{ at: now - 1000, mint: B, signature: sig(9), outcome: 'posted' }] }, on, i, now), 'ok')
+  assert.equal(calloutGate({ calls: [{ at: now - 1000, mint: A, signature: sig(8), outcome: 'posted' }] }, on, i, now), 'already-called')
+  assert.equal(calloutGate({ calls: [{ at: now - 1000, mint: A, signature: sig(1), outcome: 'verdict-COOLDOWN' }] }, on, i, now), 'retry-later')
+  assert.equal(calloutGate({ calls: [{ at: now - 11 * 60000, mint: A, signature: sig(1), outcome: 'verdict-COOLDOWN' }] }, on, i, now), 'ok')
   assert.equal(calloutGate({ calls: [] }, on, null, now), 'nothing-held')
 })
 

@@ -1,6 +1,6 @@
 // pump.fun Callouts for the house profile ("GrokGrid", the house wallet). A callout
-// push-notifies followers and counts on pump.fun's caller leaderboard; pump.fun allows one
-// per 6 hours and only for a coin the profile's wallet holds.
+// push-notifies followers and counts on pump.fun's caller leaderboard. Every coin the house
+// buys gets called while it still holds it; pump.fun's own eligibility check is the only limit.
 //
 // Route: the house's logged-in pump.fun session in Chrome. AppleScript runs a script in an
 // existing pump.fun tab, so requests are same-origin with that session; the cookie/JWT
@@ -12,26 +12,28 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
-export const SIX_HOURS = 6 * 3600000;
+const DAY = 24 * 3600000, RETRY_MS = 10 * 60000;
 const API = 'https://frontend-api-v3.pump.fun';
 
 export const DEFAULT_CALLOUTS = Object.freeze({ pumpCalloutsEnabled: false, tabUrlPrefix: 'https://pump.fun/' });
 
-/** The coin to call: the newest reconciled real buy whose tokens the house still holds. */
-export function pickCallout(tradingState, positions) {
+const posted = (ledger, i, now) => (ledger?.calls || []).some(c => c.outcome === 'posted' && (c.signature === i.signature || (c.mint === i.mint && now - c.at < DAY)));
+
+/** The coin to call: the newest reconciled real buy the house still holds and hasn't called. */
+export function pickCallout(tradingState, positions, ledger = { calls: [] }, now = Date.now()) {
   const held = new Set((positions?.positions || []).filter(p => BigInt(p.tokenUnits) > 0n).map(p => p.mint));
-  const buys = tradingState.intents.filter(i => i.state === 'reconciled-confirmed' && i.side === 'buy' && held.has(i.mint))
+  const buys = tradingState.intents.filter(i => i.state === 'reconciled-confirmed' && i.side === 'buy' && held.has(i.mint) && !posted(ledger, i, now))
     .sort((a, b) => b.createdAt - a.createdAt);
   return buys[0] || null;
 }
 
-/** Why not to call now, or 'ok'. Pure. */
+/** Why not to call now, or 'ok'. Pure. A failed attempt on a buy is retried after ten minutes. */
 export function calloutGate(ledger, cfg, intent, now) {
   if (!cfg.pumpCalloutsEnabled) return 'disabled';
   if (!intent) return 'nothing-held';
-  if ((ledger.calls || []).some(c => c.signature === intent.signature || (c.mint === intent.mint && now - c.at < 24 * 3600000))) return 'already-called';
-  const last = Math.max(0, ...(ledger.calls || []).filter(c => c.outcome === 'posted').map(c => c.at));
-  return now - last < SIX_HOURS ? 'cooldown' : 'ok';
+  if (posted(ledger, intent, now)) return 'already-called';
+  if ((ledger.calls || []).some(c => c.signature === intent.signature && now - c.at < RETRY_MS)) return 'retry-later';
+  return 'ok';
 }
 
 export function thesis(intent, symbol) {
