@@ -1,7 +1,7 @@
 import { mc, usd } from '../lib/format'
 import { CoinChip } from './CoinChip'
 import { peek, type PeekCoin } from './CoinPeek'
-import { atMc, dur, sol, type Trade } from './BestWorst'
+import { atMc, avgRows, dur, sol, type AvgMc, type Trade } from './BestWorst'
 
 // Coins he holds right now: every buy since his last sell of that coin.
 export interface Open { buy: Trade; first: Trade; tokens: number; cost: number; since: number; value: number | null }
@@ -23,7 +23,7 @@ export function positions(trades: Trade[], solUsd: number): Open[] {
   }).sort((a, b) => b.since - a.since)
 }
 
-export function Positions({ open, solUsd, now = Date.now() }: { open: Open[]; solUsd: number; now?: number }) {
+export function Positions({ open, solUsd, now = Date.now(), avg }: { open: Open[]; solUsd: number; now?: number; avg?: Map<string, AvgMc> }) {
   return (
     <div className="pos">
       {open.map((o) => {
@@ -36,6 +36,7 @@ export function Positions({ open, solUsd, now = Date.now() }: { open: Open[]; so
           ...(c.coin ?? {}),
           rows: [
             ['bought at', `${atMc(o.first)} mc`],
+            ...avgRows(avg?.get(c.mint)),
             ['in', `${o.cost.toFixed(4)} SOL`],
             ['worth now', o.value === null ? '–' : `${o.value.toFixed(4)} SOL`],
             ['unrealised', pnl === null ? '–' : `${sol(pnl)} (${pct! >= 0 ? '+' : ''}${pct!.toFixed(1)}%)`, tone],

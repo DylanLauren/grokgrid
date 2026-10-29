@@ -1,18 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { preloadJazz, soundPref, startJazz } from '../lib/jazz'
 import { BODY, FAMILY, type Shape } from './BotMark'
 import { eyeInk, eyePaths } from './eyes'
 import './intro.css'
 
 // The opening: the whole bot family flies across the screen like Superman, leaning in,
-// swoops back and circles up around Grok Bot, then waits there with the Enter button.
-// While it waits the friends watch the pointer, lean toward it and hop when it comes
-// close. Enter (the button, or the Enter key) bursts the ring, starts the music and
-// shows the room.
+// swoops back and circles up around Grok Bot, then the ring bursts and shows the room.
+// The friends watch the pointer on the way in. A click, Enter or Space skips ahead.
 const FLY = 1050 // ms each bot spends crossing and swooping into the ring
 const STAGGER = 42
-const SETTLE = 1900 // the ring has closed and slows to a drift
-const OUT = 520 // the burst after Enter
+const SETTLE = 1900 // the ring has closed: it bursts on its own here
+const OUT = 520 // the burst
 
 const BOTS: { color: string; shape: Shape }[] = [
   ...FAMILY.filter((f) => f.name !== 'black'),
@@ -22,8 +19,11 @@ const BOTS: { color: string; shape: Shape }[] = [
   { color: '#1683ff', shape: 'drop' },
 ]
 
-// every visit starts here: the Enter click is what lets the music play
-export const introDue = () => true
+// once per browser session: switching pages or reloading never replays it
+const SEEN = 'gg-intro'
+export const introDue = () => {
+  try { return !sessionStorage.getItem(SEEN) } catch { return true }
+}
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v))
@@ -40,14 +40,12 @@ const lerp = (rate: number, dt: number) => 1 - Math.pow(1 - rate, dt / 16.67)
 export function Intro({ onDone }: { onDone: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const [leaving, setLeaving] = useState(false)
-  const [ready, setReady] = useState(false)
   const done = useRef(onDone)
   const enter = useRef<() => void>(() => {})
   useEffect(() => { done.current = onDone })
 
   useEffect(() => {
-    // the band's recorded notes start downloading while the friends fly in
-    if (soundPref()) preloadJazz().catch(() => {})
+    try { sessionStorage.setItem(SEEN, '1') } catch { /* private mode: it just plays again */ }
     const canvas = ref.current
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return done.current()
@@ -98,6 +96,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
       onMove(e)
       const now = performance.now() - t0
       for (const b of bots) b.hop = Math.max(b.hop, now - Math.random() * 120)
+      enter.current()
     }
 
     const slot = (i: number, ang: number, r: number): P => {
@@ -129,7 +128,6 @@ export function Intro({ onDone }: { onDone: () => void }) {
     let last = 0
     let ang = 0
     let enteredAt = -1
-    let shown = false
     let left = false
     const frame = (stamp: number) => {
       if (!t0) t0 = stamp - (still ? SETTLE : 0)
@@ -139,10 +137,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, w, h)
 
-      if (!shown && now > 1350) {
-        shown = true
-        setReady(true)
-      }
+      if (enteredAt < 0 && now > SETTLE) enter.current()
       const burst = enteredAt < 0 ? 0 : clamp((now - enteredAt) / OUT)
       const r = ringR * (1 - 0.12 * clamp((now - 1300) / 600)) + burst * burst * unit * 0.9
       const alpha = 1 - burst
@@ -290,7 +285,6 @@ export function Intro({ onDone }: { onDone: () => void }) {
 
     enter.current = () => {
       if (enteredAt >= 0) return
-      if (soundPref()) startJazz()
       enteredAt = Math.max(performance.now() - t0, 0)
     }
     const onKey = (e: KeyboardEvent) => {
@@ -316,10 +310,6 @@ export function Intro({ onDone }: { onDone: () => void }) {
     <div className={`intro ${leaving ? 'out' : ''}`}>
       <canvas ref={ref} aria-hidden="true" />
       <span className="intro-word" aria-hidden="true">GrokGrid</span>
-      <button className={`intro-enter ${ready ? 'on' : ''}`} onClick={() => enter.current()}>
-        <span>Enter</span>
-        <i className="intro-eq" aria-hidden="true"><b /><b /><b /></i>
-      </button>
     </div>
   )
 }

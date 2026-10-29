@@ -81,7 +81,7 @@ export function MonitorScreen({ feed, live }: { feed: Feed; live: Live }) {
             {live.actions.length === 0 && <div className="dim">No activity reported.</div>}
             {live.actions.slice(0, 7).reverse().map((a, i, arr) => (
               <div key={a.ts} className={i === arr.length - 1 ? 'now' : ''}>
-                <span className="dim">{new Date(a.ts).toLocaleTimeString([], { hour12: false })}</span> {a.text}
+                <span className="dim">{new Date(a.ts).toLocaleTimeString([], { hour12: false })}</span> {friendly(a.text)}
               </div>
             ))}
             <div className="wl-cursor">▍</div>
@@ -152,4 +152,11 @@ function Candles({ call }: { call: Call & { entryMc: number; nowMc: number } }) 
       <text x="444" y={y(call.nowMc) + 3} fontSize="9" fill="#fff" fontFamily="var(--mono)">{mc(call.nowMc).replace('$', '')}</text>
     </svg>
   )
+}
+
+// The exit watcher reports in its own shorthand; the log reads it out in plain words.
+const EXITS: Record<string, string> = { 'take-profit': 'taking profit', 'take_profit': 'taking profit', 'stop-loss': 'cutting a loss', 'stop_loss': 'cutting a loss', 'trailing-stop': 'locking in gains', 'trailing_stop': 'locking in gains', 'max-hold': 'closing an old position', 'max_hold': 'closing an old position', liquidate: 'closing out' }
+function friendly(text: string) {
+  const m = /^exit (\S+) planned within seconds$/.exec(text)
+  return m ? `${EXITS[m[1]] ?? 'selling'}…` : text
 }

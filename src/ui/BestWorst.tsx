@@ -2,6 +2,8 @@ import { solscan } from '../config'
 import { ago, mc, usd } from '../lib/format'
 import { CoinChip } from './CoinChip'
 import { peek, type PeekCoin } from './CoinPeek'
+import { avgRows, type AvgMc } from '../lib/avgMc'
+export { avgMcs, avgRows, type AvgMc } from '../lib/avgMc'
 
 // Every closed round trip: the sell, what it made, and how long he held.
 // Live sells carry the SOL that came back; the demo story records what went in.
@@ -10,6 +12,8 @@ export interface Round { sell: Trade; buy?: Trade; pnl: number; cost: number; pc
 
 // The coin's market cap when he traded; ≈ marks an estimate from the fill price.
 export const atMc = (t?: Trade) => (t?.tradeMc ? `${t.tradeMcApprox ? '≈' : ''}${mc(t.tradeMc)}` : '–')
+
+
 export function rounds(trades: Trade[], live: boolean, solUsd: number): Round[] {
   const open = new Map<string, Trade>() // mint to the first buy of the holding
   const out: Round[] = []
@@ -37,7 +41,7 @@ export const dur = (ms: number) => {
 export const sol = (n: number, d = 4) => `${n >= 0 ? '+' : ''}${n.toFixed(d)} SOL`
 
 // The best and worst closed trades, by return. Hover the coin for its card.
-export function BestWorst({ done, solUsd }: { done: Round[]; solUsd: number }) {
+export function BestWorst({ done, solUsd, avg }: { done: Round[]; solUsd: number; avg?: Map<string, AvgMc> }) {
   const best = done.reduce((a, r) => (r.pct > a.pct ? r : a))
   const worst = done.reduce((a, r) => (r.pct < a.pct ? r : a))
   const pair: [string, Round][] = done.length > 1 ? [['best trade', best], ['worst trade', worst]] : [['only closed trade', best]]
@@ -51,6 +55,7 @@ export function BestWorst({ done, solUsd }: { done: Round[]; solUsd: number }) {
             rows: [
               ['bought at', `${atMc(r.buy)} mc`],
               ['sold at', `${atMc(c)} mc`],
+              ...avgRows(avg?.get(c.mint)),
               ['in', `${r.cost.toFixed(4)} SOL`],
               ['out', `${(r.cost + r.pnl).toFixed(4)} SOL`],
               ['realised', `${sol(r.pnl)} (${r.pct >= 0 ? '+' : ''}${r.pct.toFixed(1)}%)`, r.pnl >= 0 ? 'gain' : 'loss'],
@@ -74,7 +79,7 @@ export function BestWorst({ done, solUsd }: { done: Round[]; solUsd: number }) {
                 {(r.buy?.tradeMc || c.tradeMc) && <span>{atMc(r.buy)} → {atMc(c)} mc</span>}
                 <span>{usd(Math.abs(r.pnl * solUsd))}</span>
                 {r.held !== null && <span>held {dur(r.held)}</span>}
-                {c.sig && <a href={solscan('tx', c.sig)} target="_blank" rel="noreferrer">tx ↗</a>}
+                {c.sig && <a className="sx" href={solscan('tx', c.sig)} target="_blank" rel="noreferrer" title="View on Solscan" aria-label="View on Solscan"><img src="/brands/solscan.svg" alt="" width={14} height={14} /></a>}
               </span>
             </div>
           )

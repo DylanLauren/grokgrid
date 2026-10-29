@@ -1,9 +1,0 @@
-Recorded notes used by the site's background music (src/lib/jazz.ts), trimmed and re-encoded:
-
-piano-*.mp3  Salamander Grand Piano V3 by Alexander Holm, CC BY 3.0
-             https://archive.org/details/SalamanderGrandPianoV3 (via github.com/Tonejs/audio)
-bass-*.mp3   bass-electric samples from tonejs-instruments by Nicholaus P. Brosowsky, CC BY 3.0
-             https://github.com/nbrosowsky/tonejs-instruments
-
-License: https://creativecommons.org/licenses/by/3.0/
-The music itself is generated live in the browser; no recorded music is used.

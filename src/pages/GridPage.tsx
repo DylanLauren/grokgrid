@@ -118,7 +118,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
     setFail('')
     setMade(null)
     const w = owner?.wallet
-    if (!w || !agentWallet) return setFail('Connect Phantom and sign in first.')
+    if (!w || !agentWallet) return setFail('Connect Phantom and sign the message first.')
     setConnecting(true)
     try {
       // Read the wallet's current account; a previously connected account may have changed.
@@ -153,7 +153,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
   }
 
   return (
-    <Page say="make me a sibling" n={5} label="the grid" title="Launch a bot" sub={`one agent per wallet, with its own coin on pump.fun. connect phantom and sign in once. one approval launches the coin and funds your bot’s own trading wallet. ${status?.open ? 'launches are open.' : 'launches open once the bot runner is live.'}`}>
+    <Page say="make me a sibling" n={5} label="the grid" title="Launch a bot" sub={`one agent per wallet, with its own coin on pump.fun. connect phantom and sign one free message. one approval launches the coin and funds your bot’s own trading wallet. ${status?.open ? 'launches are open.' : 'launches open once the bot runner is live.'}`}>
       <AgentWalletSetup onWalletChange={onWalletChange} owner={owner} onOwnerChange={setOwner} />
       <div className="gd-line" role="radiogroup" aria-label="pick a bot">
         {FAMILY.map((f, i) => (
@@ -299,7 +299,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             <p className="gd-note">Pressing Launch lets Grok Bot trade your bot’s wallet, only inside its fixed limits. You can stop it at any time.</p>
             <p className="gd-note mono">one bot per Phantom · 80/20 split locked at creation · review the exact network fees, rent and optional first buy before signing</p>
             <button type="submit" className="btn" disabled={!ready}>
-              <Roll>{step !== null ? STEPS[step] : status === null ? 'Checking launchpad…' : !status.open ? 'Launches paused' : !owner ? 'Connect Phantom' : !agentWallet ? 'Sign in to make its wallet' : !(agentWallet.authorizationReady || agentWallet.authorize) ? 'Checking your wallet…' : 'Launch bot'}</Roll>
+              <Roll>{step !== null ? STEPS[step] : status === null ? 'Checking launchpad…' : !status.open ? 'Launches paused' : !owner ? 'Connect Phantom' : !agentWallet ? 'Sign the message in Phantom' : !(agentWallet.authorizationReady || agentWallet.authorize) ? 'Checking your wallet…' : 'Launch bot'}</Roll>
             </button>
             {me && agentWallet && <p className="gd-note mono">launches from <span style={{ overflowWrap: 'anywhere' }}>{me}</span> · trades from <span style={{ overflowWrap: 'anywhere' }}>{agentWallet.address}</span></p>}
             {step !== null && (
