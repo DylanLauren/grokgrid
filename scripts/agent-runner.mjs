@@ -10,7 +10,7 @@ import { resolve, join } from 'node:path';
 import { homedir } from 'node:os';
 import { PrivyClient } from '@privy-io/node';
 import { PublicKey } from '@solana/web3.js';
-import { validateRunnerConfig, agentTradingPolicy, agentStrategy, privySigner } from './agent-runner-core.mjs';
+import { validateRunnerConfig, agentTradingPolicy, agentStrategy, privySigner, mapLimit } from './agent-runner-core.mjs';
 import { validateStrategyConfig, DEFAULT_STRATEGY } from './strategy-policy.mjs';
 import { gatherMarket, marketMetrics } from './strategy-data.mjs';
 import { paperTick, paperSummary, emptyPaper, livePlan } from './strategy-engine.mjs';
@@ -151,15 +151,19 @@ async function tick() {
   const wallets = new Set();
   const ready = Object.values(state.agents).filter(a => a.status === 'ready' && !wallets.has(a.wallet) && wallets.add(a.wallet)).slice(0, c.maxAgents);
   const liquidating = await exists(c.exitFile), stopFilePresent = await exists(c.stopFile);
-  let privy = null, authorizationKey = null;
+  // One Privy client for the tick, created on first use; agents run concurrently, so share the promise.
+  let privyReady = null;
   const signerFor = agent => async tx => {
-    if (!privy) { const cfg = await json(c.privyServerFile); privy = new PrivyClient({ appId: cfg.appId, appSecret: cfg.appSecret }); authorizationKey = await text(c.privyAuthorizationKeyFile); }
+    privyReady ??= (async () => { const cfg = await json(c.privyServerFile); return { privy: new PrivyClient({ appId: cfg.appId, appSecret: cfg.appSecret }), authorizationKey: await text(c.privyAuthorizationKeyFile) }; })();
+    const { privy, authorizationKey } = await privyReady;
     return privySigner({ wallets: privy.wallets(), walletId: agent.privyWalletId, address: agent.wallet, authorizationKey })(tx);
   };
   // One market read for every agent: candidates plus everything any agent holds.
   const market = await gatherMarket(global, conn, rpc.rpcUrl, [], now);
   const report = {};
-  for (const agent of ready) {
+  // Agents share the one market read and run a few at a time; each has its own wallet, journal
+  // and directory, and one agent's error never stops the others.
+  await mapLimit(ready, c.concurrency ?? 6, async agent => {
     const dir = join(root, 'agents', agent.id);
     await mkdir(dir, { recursive: true, mode: 0o700 });
     try {
@@ -174,7 +178,7 @@ async function tick() {
           : { status: 'awaiting-wallet-id' };
       }
     } catch (e) { report[agent.id] = { status: 'error', error: String(e?.message || e).slice(0, 120).replace(/api-key=[^&\s]+/gi, '') }; }
-  }
+  });
   const healthy = Object.values(report).every(r => r.status !== 'error');
   await savePrivate(join(root, 'agent-runner-status.json'), { observedAt: new Date(now).toISOString(), mode: c.mode, strategyValidated: false, liquidating, stopFilePresent,
     known: Object.keys(state.agents).length, running: ready.length, cursor: state.cursor, agents: report });

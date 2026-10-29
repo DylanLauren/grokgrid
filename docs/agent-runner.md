@@ -13,9 +13,10 @@
 `agent-runner-config.json` (0600) holds the global caps. An agent's `maxSol` can only lower the per-trade cap, and its take-profit and stop-loss can only tighten the strategy (`tighten()`). These are the placeholder caps dlao is approving:
 
 ```json
-{ "version": 1, "mode": "paper", "stopFile": "/abs/STOP", "exitFile": "/abs/EXIT", "maxAgents": 50,
+{ "version": 1, "mode": "paper", "stopFile": "/abs/STOP", "exitFile": "/abs/EXIT", "maxAgents": 100, "concurrency": 6,
   "privyServerFile": "/abs/privy-server.json", "privyAuthorizationKeyFile": "/abs/privy-authorization.key",
   "caps": { "maxTradeLamports": "50000000", "maxExposureLamports": "500000000", "maxDailyLossLamports": "250000000",
+`concurrency` (1–16, default 6) is how many agents run at once. They share one market read per tick; each keeps its own wallet, journal and directory, and one agent's error never stops the others.
             "reserveLamports": "20000000", "maxSlippageBps": 1500 } }
 ```
 
