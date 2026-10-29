@@ -17,8 +17,10 @@
 	<string>/dev/null</string>
 	<key>StandardOutPath</key>
 	<string>/dev/null</string>
-	<key>StartInterval</key>
-	<integer>30</integer>
+	<key>KeepAlive</key>
+	<true/>
+	<key>ThrottleInterval</key>
+	<integer>10</integer>
 	<key>WorkingDirectory</key>
 	<string>__REPO__</string>
 </dict>

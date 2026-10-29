@@ -328,7 +328,7 @@ available or prove continuously fresh frames while the window is hidden.
 
 ## Phone guardian
 
-`scripts/phone-guardian.mjs` runs every 30 seconds (launchd `fun.grokgrid.phone-guardian`). It keeps the phone on and following the house. It acts only on the pinned Chrome window (`chromeWindowId` from the video config).
+`scripts/phone-guardian.mjs` stays running under launchd (`fun.grokgrid.phone-guardian`, KeepAlive). It does a full check every 30 seconds and re-applies the scrollbar style within about 2 seconds of a page reload. It keeps the phone on and following the house. It acts only on the pinned Chrome window (`chromeWindowId` from the video config).
 
 - **Follows the house.** It writes `runtime/phone-follow.json` (`{ mints, updatedAt }`): the coins the house holds or traded in the last 3 minutes. It then shows the newest one's `https://pump.fun/coin/<mint>` page. When the house is idle it shows the profile (`browserUrl`). It only moves between pump.fun pages; a window on another site is left alone.
 - **Pinned pages.** The screenshot feed and the video capture accept a page only if it is the profile, or a coin on a follow list less than 2 minutes old. The window title must be the pinned title or a pump.fun page title (`… | Pump`). Window identity (window id, owner pid, bundle, layer, unique bounds) is pinned exactly as before. The video keeps capturing across a page change only when the viewport and scale are unchanged.

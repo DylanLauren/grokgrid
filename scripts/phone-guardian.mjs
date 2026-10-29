@@ -2,8 +2,9 @@
 // Keeps the site's phone on and following the house: the pinned pump.fun Chrome window shows the
 // coin the house is trading (or its profile when idle), stays phone size and out of full screen,
 // has no scrollbar, and the feed resumes if it stopped for a window problem.
-// Touches only that one window and never reads page contents. launchd runs it every 30 seconds.
-//   node scripts/phone-guardian.mjs
+// Touches only that one window and never reads page contents. launchd keeps it running: a full
+// check every 30 seconds, and the scrollbar style re-applied within about 2 seconds of a reload.
+//   node scripts/phone-guardian.mjs [--once]
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFile, writeFile, rename, unlink, access } from 'node:fs/promises';
@@ -62,4 +63,20 @@ async function tick() {
   console.log(JSON.stringify(status));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) tick().catch(e => { console.error(`phone guardian: ${String(e?.message || e).slice(0, 120)}`); process.exit(1); });
+// Cheap check between full ticks: only re-applies the style when a reload dropped it.
+async function keepScrollbarHidden() {
+  const video = await read('local-phone-video-config.json', {});
+  if (!Number.isSafeInteger(video.chromeWindowId)) return;
+  const js = `(()=>document.getElementById('gg-noscroll')?'ok':${HIDE_SCROLLBAR_JS})()`;
+  try { await osa(`tell application "Google Chrome" to execute active tab of window id ${video.chromeWindowId} javascript ${q(js)}`); } catch {}
+}
+
+async function main() {
+  if (process.argv.includes('--once')) return tick();
+  for (let next = 0; ; await new Promise(r => setTimeout(r, 1500))) {
+    if (Date.now() >= next) { next = Date.now() + 30_000; await tick().catch(e => console.error(`phone guardian: ${String(e?.message || e).slice(0, 120)}`)); }
+    else await keepScrollbarHidden();
+  }
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) main().catch(e => { console.error(`phone guardian: ${String(e?.message || e).slice(0, 120)}`); process.exit(1); });
