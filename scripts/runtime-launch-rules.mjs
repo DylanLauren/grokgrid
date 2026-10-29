@@ -12,7 +12,7 @@ function decimal(value,places,min,max){
   return (BigInt(match[1])*10n**BigInt(places)+BigInt((match[2]??'').padEnd(places,'0'))).toString();
 }
 function identity(row,now){
-  if(!row||!id(row.id)||!address(row.wallet)||!address(row.mint)||!Number.isSafeInteger(row.ts)||row.ts<1||row.ts>now)throw Error('launch-identity-invalid');
+  if(!row||!id(row.id)||!address(row.wallet)||!address(row.mint)||!Number.isSafeInteger(row.ts)||row.ts<1||row.ts>now+300_000)throw Error('launch-identity-invalid');
   return {id:row.id,wallet:row.wallet,mint:row.mint,queuedAt:row.ts};
 }
 export function normalizeLaunchPolicy(entry,agent){

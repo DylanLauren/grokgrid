@@ -36,3 +36,15 @@ test('screen credential reaches JPEG validation without gaining full scope', asy
   assert.equal(response.status, 400)
   assert.deepEqual(await response.json(), { error: 'jpeg' })
 })
+test('even full ingestion credentials cannot bypass verified launch registration', async () => {
+  const original = globalThis.fetch
+  globalThis.fetch = async () => { throw new Error('retired registration must not mutate storage') }
+  try {
+    for (const type of ['agent', 'wallets']) {
+      const response = await POST(new Request('https://example.test/api/ingest', {
+        method: 'POST', headers: { authorization: `Bearer ${secret}` }, body: JSON.stringify({ type }),
+      }))
+      assert.equal(response.status, 410)
+    }
+  } finally { globalThis.fetch = original }
+})

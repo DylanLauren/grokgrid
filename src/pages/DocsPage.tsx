@@ -21,7 +21,7 @@ const SECTIONS: [string, string, ReactNode][] = [
     <Fragment key="b">
       <FlowDiagram />
       <p>The intended ${MAIN_TICKER} fee allocation is 80% to the treasury and 20% to the burn wallet. The official mint must be configured and verified before its buy-and-burn route can be activated. Automatic buying and burning are not active yet.</p>
-      <p>The prepared grid-bot launch flow sets 80% of creator fees to the bot’s trading wallet and 20% to the burn wallet. It checks the on-chain recipients and locked fee split before registering the bot. Fee allocation alone does not start a trading worker or execute a burn.</p>
+      <p>The prepared grid-bot launch flow sets 80% of creator fees to the connected launcher wallet, which is also that bot’s trading wallet, and 20% to the burn wallet. It checks the on-chain recipients and locked fee split before registering the bot. Fee allocation alone does not start a trading worker or execute a burn.</p>
     </Fragment>,
   ],
   [
@@ -29,12 +29,12 @@ const SECTIONS: [string, string, ReactNode][] = [
     'Launching a bot',
     <Fragment key="b">
       <p>Public launches are paused until agent execution and recovery are ready. The prepared flow lets you choose a look, name, strategy and limits, then review a coin-launch transaction in your wallet. It includes the 80/20 creator-fee allocation and can include an optional first buy.</p>
-      <p>Wallet assignment, confirmed coin creation, worker startup and enforced trading limits must all be verified before launches reopen. Showing a coin in the matrix does not by itself prove that its bot is trading. Trading-wallet keys stay outside the website.</p>
+      <p>Each wallet can launch one agent; there is no fixed platform-wide agent limit. Your connected wallet is the launcher, developer wallet and trading wallet for that agent. Confirmed coin creation, authorized execution, recovery and enforced trading limits must all be verified before launches reopen. Showing a coin in the matrix does not by itself prove that its bot is trading. Trading-wallet keys stay outside the website.</p>
     </Fragment>,
   ],
   ['example', 'A worked example', <p key="b">For an illustration of the planned allocation, 1 SOL of creator fees would assign 0.8 SOL to the trading wallet and 0.2 SOL to the burn wallet. That allocation is separate from trading volume. A buy or burn occurs only after its worker is implemented, configured and activated; this example is not a completed transaction.</p>],
   ['cost', 'What it costs', <CostTable key="b" />],
-  ['trust', 'Wallet control', <p key="b">You review and approve any launch transaction in your own wallet. House and agent trading-wallet keys are kept off the website in the operator-controlled runtime. The current worker cannot sign or spend. Public addresses below let you inspect on-chain balances; they do not prove that execution is enabled.</p>],
+  ['trust', 'Wallet control', <p key="b">You review and approve any launch transaction in your own wallet. Your connected wallet keeps its own keys. Connecting it or approving a coin launch does not authorize unattended trading. Any future automatic trading needs a separate, explicit authorization path with enforced limits. The house worker currently cannot sign or spend. Public addresses below let you inspect on-chain balances; they do not prove that execution is enabled.</p>],
   ['down', 'If this site goes down', <p key="b">The coins, the fee split and every trade live on Solana, not here. The site is a window. If it closes, the chain still has all of it.</p>],
   [
     'hood',

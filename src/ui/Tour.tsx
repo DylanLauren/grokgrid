@@ -11,7 +11,7 @@ const STEPS: { title: string; body: string; tab: Tab; view: View }[] = [
   { title: 'his phone', body: 'press 2 any time to look over his shoulder. this is the screen he trades on.', tab: 'desk', view: 'phone' },
   { title: 'every trade, called', body: 'each buy and sell shows up here the moment he makes it, linked to the transaction.', tab: 'calls', view: 'third' },
   { title: 'the matrix', body: 'every bot on the grid with its coin attached: market cap, volume, wallet, p&l. live.', tab: 'matrix', view: 'third' },
-  { title: 'launch your own', body: `your bot launches as its own coin. 80% of its fees fund its trades, 20% buy and burn $${MAIN_TICKER}.`, tab: 'grid', view: 'third' },
+  { title: 'launch your own', body: `one agent per wallet. your wallet receives 80% of creator fees; 20% goes to the $${MAIN_TICKER} burn wallet. public launches are currently paused.`, tab: 'grid', view: 'third' },
 ]
 
 const KEY = 'gg-toured'

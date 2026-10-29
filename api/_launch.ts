@@ -148,29 +148,28 @@ export async function addWallets(list: string[]) {
 }
 
 // ---- launch status ----
-export async function launchStatus(): Promise<{ open: boolean; reason: string | null; free: number }> {
-  // Wallet inventory alone cannot promise an operating agent. The executor is
-  // still observe-only; activation must add a verified worker readiness check.
-  if (!executorReady()) return { open: false, reason: 'Agent trading is not ready yet. Coin launches are paused.', free: 0 }
-  if (!isAddress(BURN_WALLET)) return { open: false, reason: 'Launching opens once the burn wallet is set.', free: 0 }
-  const free = await freeWallets().catch(() => -1)
-  if (free < 0) return { open: false, reason: 'The launchpad is offline for a moment, try again soon.', free: 0 }
-  if (free === 0) return { open: false, reason: 'No trading wallets are available. Coin launches are paused.', free: 0 }
-  return { open: true, reason: null, free }
+export async function launchStatus(): Promise<{ open: boolean; reason: string | null; free: number; walletModel: 'launcher'; oneAgentPerWallet: true }> {
+  const model = { free: 0, walletModel: 'launcher' as const, oneAgentPerWallet: true as const }
+  // Wallet connection supplies identity only. It cannot authorize an unattended signer.
+  if (!executorReady()) return { ...model, open: false, reason: 'Agent trading is not ready yet. Coin launches are paused.' }
+  if (!isAddress(BURN_WALLET)) return { ...model, open: false, reason: 'Launching opens once the burn wallet is set.' }
+  return { ...model, open: true, reason: null }
 }
 
 export const executorReady = (): boolean => false
 
 // ---- per-IP limits ----
 // Fixed one-minute windows in Redis. If Redis is down the request goes through.
-export async function limited(req: Request, name: string, perMinute: number) {
+export async function limited(req: Request, name: string, perMinute: number, failClosed = false) {
   const ip = (req.headers.get('x-real-ip') || req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown').trim().slice(0, 64)
   const k = `gg:lim:${name}:${ip}:${Math.floor(Date.now() / 60_000)}`
   try {
     const [n] = await redis(['INCR', k], ['EXPIRE', k, 90])
+    if(failClosed&&(!Number.isSafeInteger(Number(n))||Number(n)<1))throw Error('Limiter unavailable')
     if (Number(n) > perMinute) return new Response(JSON.stringify({ error: 'Too many tries. Wait a minute.' }), { status: 429, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
   } catch {
-    /* never lock people out over a limiter */
+    if(failClosed)return new Response(JSON.stringify({error:'Status is unavailable. Try again shortly.'}),{status:503,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}})
+    /* legacy launch limits remain advisory */
   }
   return null
 }
