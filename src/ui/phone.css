@@ -94,7 +94,7 @@
   .ph-video { transition: none; }
 }
 
-/* every real bot trade pops over the screen like a pump.fun trade alert (PhoneTrades.tsx) */
+/* every real house-bot trade pops over the screen like a pump.fun trade alert (PhoneTrades.tsx) */
 .pt { position: absolute; left: 12px; right: 12px; top: 18px; z-index: 3; display: grid; gap: 6px; pointer-events: none; }
 .pt-row {
   display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 12px;

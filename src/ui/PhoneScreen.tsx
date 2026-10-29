@@ -36,7 +36,7 @@ export function PhoneScreen({ feed, live, watching }: { feed: Feed; live: Live; 
           <span className="ph-live mono"><i aria-hidden="true" />live video</span>
         </div>
       )}
-      <PhoneTrades feed={feed} watching={watching} />
+      <PhoneTrades feed={feed} />
     </div>
   )
 }
