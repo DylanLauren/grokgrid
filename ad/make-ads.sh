@@ -5,6 +5,7 @@
 #   SKIP_CLIPS=1 ./make-ads.sh            reuse the 3D clips already in clips/
 # Output: out/grokgrid-ad-{16x9,9x16}.mp4 (launch ad) and out/grokgrid-<feature>-{16x9,9x16}.mp4
 #   CUTS="main calls" ./make-ads.sh    only some videos
+#   WIDE_ONLY=1 ./make-ads.sh          16:9 only
 set -e
 cd "$(dirname "$0")"
 BLENDER=${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender}
@@ -14,6 +15,8 @@ RES=${RES:-1080}
 SECS=40
 mkdir -p ui ui-dom clips out assets
 DSF=${DSF:-2}
+# WIDE_ONLY=1 skips the 9:16 cuts
+SIZES=("1920 1080 16x9"); [ -n "$WIDE_ONLY" ] || SIZES+=("1080 1920 9x16")
 
 echo "== 1/6 tools and assets"
 [ -d node_modules/playwright ] || npm i --no-save --no-audit --no-fund playwright@1.49.1
@@ -28,7 +31,7 @@ BASE=${BASE:-https://grokgrid.fun/} ONLY=m-matrix-full node scripts/capture.js "
 
 if [ -z "$SKIP_CLIPS" ]; then
   echo "== 3/6 3D clips in Blender"
-  for c in hero phone lineup lineup_v family_run; do
+  for c in hero phone face lineup lineup_v family_run; do
     "$BLENDER" -b --python scripts/chars.py -- --clip $c --res $RES --samples $SAMPLES --gpu $GPU \
       --phone-tex "$PWD/ui/m-matrix-full.png" --out "$PWD/clips/$c" > "clips/$c.log" 2>&1
     echo "   $c: $(ls clips/$c | wc -l | tr -d ' ') frames"
@@ -48,7 +51,7 @@ for c in $CUTS; do CUT=$c node scripts/audio.js "out/$c.wav" "$(dur $c)" > /dev/
 echo "== 5/6 motion design frames (drawn at ${DSF}x, two halves at once)"
 for c in $CUTS; do
   D=$(dur $c); H=$(awk "BEGIN{print int($D/2)}")
-  for cut in "1920 1080 16x9" "1080 1920 9x16"; do
+  for cut in "${SIZES[@]}"; do
     set -- $cut
     DSF=$DSF QS="&ui=../ui&clips=../clips&cut=$c" node scripts/render.js $1 $2 "out/frames-$c-$3" 0 $H > "out/$c-$3-a.log" 2>&1 &
     DSF=$DSF QS="&ui=../ui&clips=../clips&cut=$c" node scripts/render.js $1 $2 "out/frames-$c-$3" $H $D > "out/$c-$3-b.log" 2>&1 &
@@ -60,7 +63,7 @@ done
 echo "== 6/6 encode (supersampled down to full HD, so type and UI stay razor sharp)"
 for c in $CUTS; do
   name=$([ $c = main ] && echo grokgrid-ad || echo grokgrid-$c)
-  for cut in "1920 1080 16x9" "1080 1920 9x16"; do
+  for cut in "${SIZES[@]}"; do
     set -- $cut
     ffmpeg -y -loglevel error -framerate 30 -i "out/frames-$c-$3/f_%05d.png" -i "out/$c.wav" \
       -vf "scale=$1:$2:flags=lanczos" -c:v libx264 -preset slow -crf 14 -pix_fmt yuv420p \
