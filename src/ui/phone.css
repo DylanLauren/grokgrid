@@ -84,6 +84,12 @@
 }
 .pt-row b { color: #fff; font-weight: 600; }
 .pt-row.out { opacity: 0; transform: translateY(-6px); }
+.pt-row.two { border-radius: 12px; padding: 5px 9px 5px 6px; align-items: center; }
+.pt-main { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.pt-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.pt-sub { display: flex; gap: 8px; font-size: 8.5px; color: #ffffff80; white-space: nowrap; overflow: hidden; }
+.pt-row.sell .pt-sol.up, .pt-sub .up { color: var(--gain); }
+.pt-row.sell .pt-sol.down, .pt-sub .down { color: var(--loss); }
 .pt-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pt-sol { flex: none; font-size: 9px; }
 .pt-row.buy .pt-sol { color: var(--gain); }
