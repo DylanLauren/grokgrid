@@ -9,7 +9,8 @@ import './pages.css'
 export function Page({ n, label, title, sub, side, say, children }: { n: number; label: string; title: string; sub: ReactNode; side?: ReactNode; say: string; children: ReactNode }) {
   return (
     <main
-      className="page"
+      // each page has its own entrance (pages.css): stats, matrix, grid, docs
+      className={`page fx-${label.split(' ').pop()}`}
       onPointerMove={(e) => {
         // cards light their edge where the pointer is
         const card = (e.target as HTMLElement).closest<HTMLElement>('.card')

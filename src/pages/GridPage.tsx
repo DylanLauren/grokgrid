@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { MAIN_TICKER } from '../config'
 import { STEPS, launchBot, svgToImage, toImage } from '../data/launch'
 import { fetchLaunchStatus, unavailableLaunchStatus, type LaunchStatus } from '../data/launchStatus'
@@ -156,12 +156,13 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             role="radio"
             aria-checked={i === d.look}
             className={`gd-pick gd-${CAST[i].trick} ${i === d.look ? 'on' : ''}`}
+            style={{ '--in': `${0.25 + i * 0.07}s` } as CSSProperties}
             onClick={() => {
               set('look', i)
               setCheer((n) => n + 1)
             }}
           >
-            <LiveBot color={f.color} shape={f.shape} habit={CAST[i].habit} say={CAST[i].say} size={120} delay={i * -0.37} flow={i} />
+            <LiveBot color={f.color} shape={f.shape} habit={CAST[i].habit} say={CAST[i].say} size={120} delay={i * -0.37} />
             <span className="gd-name">{f.name}</span>
           </button>
         ))}
@@ -170,7 +171,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
       <div className="gd-build">
         <div className="gd-side">
           <div className="card gd-preview">
-            <LiveBot key={`${d.look}-${cheer}`} color={look.color} shape={look.shape} habit={CAST[d.look].habit} size={170} selected flow={d.look} />
+            <LiveBot key={`${d.look}-${cheer}`} color={look.color} shape={look.shape} habit={CAST[d.look].habit} size={170} selected />
             <b>{d.name || 'your bot'}</b>
             <span>{d.strategy || 'one line on how it trades'}</span>
           </div>

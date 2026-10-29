@@ -3,9 +3,9 @@ import { BODY, type Shape } from './BotMark'
 import { eyeInk, eyePaths, watch, type Face } from './eyes'
 import './livebot.css'
 
-// One of the bot family, alive, the way the official Grok Bots are: a flat matte body,
-// pill eyes painted on a ball that glance around on their own, watch the pointer, and
-// turn to face you when you hover. Each keeps a gentle idle habit of its own.
+// One of the bot family, alive, the way the official Grok Bots are: a flat matte body that
+// pops in and then keeps still, pill eyes painted on a ball that glance around on their own,
+// watch the pointer when it comes close, and turn to face you when you hover.
 export type Habit = 'look' | 'bounce' | 'float' | 'sway' | 'tilt' | 'flip' | 'hop' | 'squish' | 'doze'
 
 interface Props {
@@ -20,18 +20,17 @@ interface Props {
   shout?: boolean // keep the speech bubble out without a hover
   hoverFace?: Face // the face it pulls while you hover it
   still?: boolean // eyes stay put: no glancing or following the pointer
-  flow?: number // eyes trace this bot's own slow loop, and watch the pointer while it moves
 }
 
-export const LiveBot = forwardRef<HTMLDivElement, Props>(function LiveBot({ color, shape, habit, size, say, delay = 0, selected, eye, shout, hoverFace, still, flow }, ref) {
+export const LiveBot = forwardRef<HTMLDivElement, Props>(function LiveBot({ color, shape, habit, size, say, delay = 0, selected, eye, shout, hoverFace, still }, ref) {
   const root = useRef<HTMLDivElement | null>(null)
   const e1 = useRef<SVGPathElement>(null)
   const e2 = useRef<SVGPathElement>(null)
   useEffect(() => {
     if (still || !root.current || !e1.current || !e2.current) return
-    return watch(root.current, [e1.current, e2.current], shape, habit === 'doze', flow)
-  }, [shape, habit, still, flow])
-  const doze = habit === 'doze' && flow === undefined
+    return watch(root.current, [e1.current, e2.current], shape, habit === 'doze')
+  }, [shape, habit, still])
+  const doze = habit === 'doze'
   const house = color === 'house'
   const [d1, d2] = eyePaths(shape, 0, 0, 1, doze ? 0.22 : 1)
   const ink = eye ?? (house ? '#1a1a1a' : eyeInk(color))

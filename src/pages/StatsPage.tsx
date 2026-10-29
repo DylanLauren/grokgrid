@@ -4,7 +4,7 @@ import type { Feed } from '../data/types'
 import { stats } from '../data/useFeed'
 import { useToken, type GridToken } from '../data/useToken'
 import { useWorkers, type WorkerName, type Workers } from '../data/useWorkers'
-import { ago, mc, pct, signedUsd, usd } from '../lib/format'
+import { ago, compact, mc, pct, signedUsd, usd } from '../lib/format'
 import { CoinChip } from '../ui/CoinChip'
 import { Addresses } from '../ui/Panels'
 import { Page, Section } from './Page'
@@ -218,4 +218,3 @@ function WalletChart({ feed }: { feed: Feed }) {
   )
 }
 
-const compact = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${Math.round(n)}`)

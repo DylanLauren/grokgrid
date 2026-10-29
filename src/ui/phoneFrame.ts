@@ -1,4 +1,4 @@
-export const FRAME_FRESH_MS = 12_000
+const FRAME_FRESH_MS = 12_000
 
 export function freshFrameTimestamp(value: string | null, now: number): number | null {
   if (!value || !/^\d+$/.test(value)) return null
