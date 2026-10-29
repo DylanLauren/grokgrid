@@ -1,4 +1,4 @@
-// node audio.js <out.wav> [seconds]  renders the soundtrack offline in Chromium
+// node audio.js <out.wav> [seconds]  renders the soundtrack offline in Chromium (env CUT picks the track)
 const { chromium } = require('playwright')
 const fs = require('fs')
 ;(async () => {
@@ -6,7 +6,7 @@ const fs = require('fs')
   const b = await chromium.launch()
   const p = await b.newPage()
   p.on('pageerror', (e) => console.log('pageerror', e.message))
-  await p.goto('http://127.0.0.1:8811/comp/audio.html')
+  await p.goto('http://127.0.0.1:8811/comp/audio.html?cut=' + (process.env.CUT || 'main'))
   const b64 = await p.evaluate((s) => window.renderAudio(s), secs)
   const pcm = Buffer.from(b64, 'base64')
   const h = Buffer.alloc(44)

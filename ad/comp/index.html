@@ -88,6 +88,7 @@ html, body { background: var(--ink); overflow: hidden; }
 <body>
 <div id="stage"></div>
 <script src="ui.js"></script>
-<script src="comp.js"></script>
+<script src="core.js"></script>
+<script>document.write(`<script src="cuts/${new URLSearchParams(location.search).get('cut') || 'main'}.js"><\/script><script src="end.js"><\/script>`)</script>
 </body>
 </html>

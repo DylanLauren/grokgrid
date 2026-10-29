@@ -7,6 +7,7 @@ const BASE = process.env.BASE || 'https://grokgrid.fun/'
 const OUT = process.argv[2] || '../ui-dom'
 const PAGES = [
   ['calls', '#calls', 1600, 1000], ['stats', '#stats', 1600, 1000], ['grid', '#grid', 1600, 1000], ['matrix', '#matrix', 1600, 1000],
+  ['desk', '', 1600, 1000], ['docs', '#docs', 1600, 1000], ['m-desk', '', 430, 932], ['m-docs', '#docs', 430, 932],
   ['m-calls', '#calls', 430, 932], ['m-stats', '#stats', 430, 932], ['m-grid', '#grid', 430, 932], ['m-matrix', '#matrix', 430, 932],
 ].filter((s) => !process.env.ONLY || process.env.ONLY.split(',').includes(s[0]))
 ;(async () => {
