@@ -36,7 +36,7 @@ export async function marketMetrics(mints, fetchImpl = fetch) {
       const m = { chainId: p.chainId, mint, symbol: p.baseToken.symbol, dexId: p.dexId, pairAddress: p.pairAddress, image: p.info?.imageUrl ?? null,
         pairCreatedAt: p.pairCreatedAt, liquidityUsd: p.liquidity?.usd,
         marketCapUsd: p.marketCap ?? p.fdv, volume5mUsd: p.volume?.m5, volume24hUsd: p.volume?.h24,
-        buys5m: p.txns?.m5?.buys, sells5m: p.txns?.m5?.sells, priceSol: Number(p.priceNative), solUsd: Number(p.priceUsd) / Number(p.priceNative) };
+        buys5m: p.txns?.m5?.buys, sells5m: p.txns?.m5?.sells, change5m: p.priceChange?.m5, change1h: p.priceChange?.h1, priceSol: Number(p.priceNative), solUsd: Number(p.priceUsd) / Number(p.priceNative) };
       const prev = out.get(mint);
       if (!prev || (m.liquidityUsd ?? 0) > (prev.liquidityUsd ?? 0)) out.set(mint, m);
     }

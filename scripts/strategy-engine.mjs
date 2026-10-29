@@ -13,10 +13,10 @@ const lamports = sol => BigInt(Math.max(0, Math.floor(sol * 1e9)));
 const log = (s, now, line) => { s.log = [...s.log, { at: now, line }].slice(-LOG_LIMIT); };
 
 /** Rank screened coins: most 5m buy pressure per unit of liquidity first. */
-function entries(market, c, now, held) {
+function entries(market, c, now, held, cooling = new Set()) {
   const picks = [];
   for (const [mint, m] of market.metrics) {
-    if (held.has(mint)) continue;
+    if (held.has(mint) || cooling.has(mint)) continue;
     const facts = market.facts.get(mint);
     const merged = { ...m, ...(facts || {}) };
     const verdict = facts ? screen(merged, c, now) : { ok: false, reasons: ['chain-facts-unavailable'] };
@@ -42,7 +42,8 @@ export function paperTick(prev, c, market, now, liquidating = false) {
     log(s, now, `sold ${p.symbol} (${reason}) ${Number(pnl) >= 0 ? '+' : ''}${(Number(pnl) / 1e9).toFixed(4)} SOL`);
   }
   if (!liquidating && s.positions.length < c.maxOpenPositions && BigInt(s.cashLamports) >= BigInt(c.tradeLamports)) {
-    const [pick] = entries(market, c, now, new Set(s.positions.map(p => p.mint)));
+    const cooling = new Set(s.closed.filter(x => now - x.closedAt < c.reentryCooldownMinutes * 60000).map(x => x.mint));
+    const [pick] = entries(market, c, now, new Set(s.positions.map(p => p.mint)), cooling);
     if (pick) {
       s.allowlist = approve(s.allowlist, pick.mint, c, now, { liquidityUsd: pick.m.liquidityUsd, holders: pick.m.holders, top10Share: pick.m.top10Share });
       const spend = Number(BigInt(c.tradeLamports)) / 1e9, fill = pick.m.priceSol * (1 + c.paperSlippage);
@@ -108,7 +109,8 @@ export function livePlan({ tradingState, policy, c, peaks, positions, market, no
   let allowlist = pruneAllowlist(tradingState.allowlist, now);
   const held = new Set([...(positions.positions || []).filter(p => BigInt(p.tokenUnits) > 0n).map(p => p.mint), ...busy]);
   if (!liquidating && held.size < c.maxOpenPositions) {
-    const [pick] = entries(market, c, now, held);
+    const cooling = new Set(tradingState.intents.filter(i => i.side === 'sell' && ['reconciled-confirmed', 'held-ambiguous'].includes(i.state) && now - i.createdAt < c.reentryCooldownMinutes * 60000).map(i => i.mint));
+    const [pick] = entries(market, c, now, held, cooling);
     if (pick) {
       allowlist = approve(allowlist, pick.mint, c, now, {});
       const spend = BigInt(c.tradeLamports) < BigInt(policy.maxTradeLamports) ? c.tradeLamports : policy.maxTradeLamports;
