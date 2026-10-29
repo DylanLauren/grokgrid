@@ -7,7 +7,7 @@ import type { WalletLike } from '../data/wallet'
 import type { AgentWalletSetupProps } from './AgentWalletSetup'
 
 export default function PrivyAgentWallet({ appId, ...props }: AgentWalletSetupProps & { appId: string }) {
-  return <PrivyProvider appId={appId} config={{ loginMethods: ['email'], appearance: { theme: 'dark', accentColor: '#40bda6', walletChainType: 'solana-only' }, embeddedWallets: { ethereum: { createOnLogin: 'off' }, solana: { createOnLogin: 'off' } }, plugins: [defaultSolanaRpcsPlugin()] }}><WalletControls {...props} /></PrivyProvider>
+  return <PrivyProvider appId={appId} config={{ loginMethods: ['email', 'google'], appearance: { theme: 'dark', accentColor: '#40bda6', walletChainType: 'solana-only' }, embeddedWallets: { ethereum: { createOnLogin: 'off' }, solana: { createOnLogin: 'off' } }, plugins: [defaultSolanaRpcsPlugin()] }}><WalletControls {...props} /></PrivyProvider>
 }
 function WalletControls({ onWalletChange }: AgentWalletSetupProps) {
   const { ready, authenticated, user, login, logout, getAccessToken } = usePrivy()
