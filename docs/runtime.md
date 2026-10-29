@@ -81,3 +81,20 @@ It backs up the old plists and prints the revert command (`ops/install-launchd.s
 - `--apply-limits` writes the placeholder trading limits, still observe-only. It sets aside the trading journal only if the journal has no history.
 
 The phone helper and keep-awake jobs are left as they are.
+
+## Going live (dlao only)
+
+`npx tsx ops/go-live.mjs <command>` from `~/coding/grokgrid-main`. Every command checks first, asks for a typed phrase, changes only its own config and prints the resulting state. It never runs by itself and never moves funds.
+
+| Command | What it does | Refuses when |
+|---|---|---|
+| `status` | Shows every switch | — |
+| `house` | Strategy `live` + house trading `execute` (dynamic allowlist, STOP file, house key) | The key isn't 0600 or doesn't match; the wallet holds less than one trade + reserve |
+| `buyback <mint>` | Buy-and-burn on for the official mint (burn key) | The mint has a mint/freeze authority, is wrapped SOL, or the key doesn't match |
+| `runner` | User agents sign through Privy | The Privy files aren't saved (0600), or `privy-setup` hasn't run |
+| `callouts on\|off`, `x on\|off` | pump.fun Callouts / X posts | — |
+| `stop` / `resume` | Freeze / unfreeze all signing | — |
+| `exit` / `unexit` | Sell everything and stop buying | — |
+| `off` | Everything back to observe-only / paper. It creates STOP first; a house with trade history stays frozen by STOP | — |
+
+To add new launchd jobs later, re-run `ops/install-launchd.sh` **without** `--apply-limits` once the journal has history.
