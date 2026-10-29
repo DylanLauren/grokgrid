@@ -67,8 +67,8 @@ export async function svgToImage(svgUrl: string): Promise<string> {
   return canvas.toDataURL('image/png')
 }
 
-export async function launchBot(o: { wallet: WalletLike; launcher: string; draft: LaunchDraft; image: string; onStep: (i: number) => void }): Promise<{ id: string; mint: string }> {
-  const { wallet, launcher, draft, image, onStep } = o
+export async function launchBot(o: { wallet: WalletLike; launcher: string; walletId: string; accessToken: () => Promise<string | null>; draft: LaunchDraft; image: string; onStep: (i: number) => void }): Promise<{ id: string; mint: string }> {
+  const { wallet, launcher, walletId, accessToken, draft, image, onStep } = o
   if (!wallet.signTransaction) throw new Error("This wallet can't sign transactions. Try Phantom, Solflare or Backpack.")
   const { Keypair, PublicKey, VersionedTransaction } = await import('@solana/web3.js')
   // The mint key is made here and never leaves this tab. It signs once, then it's gone.
@@ -78,7 +78,7 @@ export async function launchBot(o: { wallet: WalletLike; launcher: string; draft
   onStep(0)
   await post('/api/launch/asset', { mint: mintAddr, image })
   onStep(1)
-  const prepared = await post<{ tx: string; setup: string[] | null }>('/api/launch/prepare', { mint: mintAddr, launcher, draft })
+  const prepared = await post<{ tx: string; setup: string[] | null }>('/api/launch/prepare', { mint: mintAddr, launcher, walletId, draft }, (await accessToken()) ?? undefined)
   const tx = VersionedTransaction.deserialize(fromB64(prepared.tx))
   const keys = tx.message.staticAccountKeys
   const programs = tx.message.compiledInstructions.map((ix) => keys[ix.programIdIndex].toBase58())

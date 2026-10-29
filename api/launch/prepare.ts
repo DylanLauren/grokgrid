@@ -6,6 +6,8 @@ import { balances, HOUSE_WALLET, hasStore, isAddress, parse, redis } from '../_l
 import { BURN_WALLET, DRAFT_TTL, LEASE_TTL, cleanDraft, friendly, keys, launchStatus, limited, metadataJson, noStore, readJson, SITE_URL } from '../_launch.js'
 import { launchOwnerState, releasePreparation, savePrepared } from '../_launch-owner.js'
 import { prepareLaunch } from '../_pump.js'
+import { privyReadinessConfig, privyReadinessProvider, sdkReads } from '../_privy-provider.js'
+import { verifyPrivyWalletReadiness } from '../_privy-readiness.js'
 const MIN_LAUNCHER_SOL = 0.03
 
 export async function POST(req: Request) {
@@ -14,10 +16,14 @@ export async function POST(req: Request) {
   if (slow) return slow
   const status = await launchStatus()
   if (!status.open) return noStore({ error: status.reason }, 503)
-  const b = await readJson<{ mint?: unknown; launcher?: unknown; draft?: unknown }>(req, 8_000)
+  const b = await readJson<{ mint?: unknown; launcher?: unknown; draft?: unknown; walletId?: unknown }>(req, 8_000)
   if (!b || !isAddress(b.mint) || !isAddress(b.launcher)) return noStore({ error: 'bad request' }, 400)
   const mint=b.mint, launcher=b.launcher
   if(launcher===BURN_WALLET||launcher===HOUSE_WALLET)return noStore({error:'The house and burn wallets are reserved for the platform.'},400)
+  // The agent runner signs only from the Privy wallet proven here: owned by this user,
+  // addressed to the launcher, with our policy-scoped signer attached.
+  const privyWalletId=await verifiedWalletId(req,b.walletId,launcher)
+  if(!privyWalletId)return noStore({error:'Verify your agent wallet setup again before launching.'},403)
   let draft
   try { draft=cleanDraft(b.draft) } catch(e){return noStore({error:friendly(e)??'Check the form.'},400)}
   // Advisory only. The authoritative, atomic owner claim occurs after a verified signature.
@@ -39,7 +45,7 @@ export async function POST(req: Request) {
   try{
     await redis(['SET',keys.meta(mint),JSON.stringify(metadataJson(draft,mint)),'EX',DRAFT_TTL])
     const prepared=await prepareLaunch({launcher,mint,name:draft.name,ticker:draft.ticker,uri:`${SITE_URL}/m/${mint}`,firstBuy:draft.firstBuy,bot:launcher,burn:BURN_WALLET})
-    const record={routingVersion:2,draft,launcher,bot:launcher,burn:BURN_WALLET,tx:prepared.tx,message:prepared.message,lastValidBlockHeight:prepared.lastValidBlockHeight,
+    const record={routingVersion:2,draft,launcher,bot:launcher,burn:BURN_WALLET,privyWalletId,tx:prepared.tx,message:prepared.message,lastValidBlockHeight:prepared.lastValidBlockHeight,
       setup:prepared.setup?{table:prepared.setup.table,expected:prepared.setup.expected,messages:prepared.setup.messages,txs:prepared.setup.txs}:null,signature:null}
     if(!await savePrepared(mint,reservation,JSON.stringify(record),LEASE_TTL))return noStore({error:'This preparation expired before it completed. Try again.'},409)
     return noStore({tx:prepared.tx,setup:prepared.setup?.txs??null,bot:launcher,burn:BURN_WALLET})
@@ -48,4 +54,13 @@ export async function POST(req: Request) {
     const msg=friendly(e);if(!msg)console.error('Launch preparation failed.')
     return noStore({error:msg??'Something broke building the launch. Nothing was spent, try again.'},msg?400:500)
   }
+}
+
+export async function verifiedWalletId(req: Request, walletId: unknown, launcher: string): Promise<string | null> {
+  const config = privyReadinessConfig()
+  if (!config) return null
+  const auth = req.headers.get('authorization') || ''
+  const accessToken = auth.startsWith('Bearer ') ? auth.slice(7).trim() : ''
+  const r = await verifyPrivyWalletReadiness({ accessToken, walletId, address: launcher }, config, privyReadinessProvider(sdkReads()))
+  return r.canAuthorize && r.walletAuthorizationReady && r.address === launcher && r.walletId === walletId ? r.walletId : null
 }

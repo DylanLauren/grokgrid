@@ -125,6 +125,8 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
       const r = await launchBot({
         wallet: w,
         launcher: addr,
+        walletId: agentWallet.walletId,
+        accessToken: agentWallet.accessToken,
         image: picture,
         onStep: setStep,
         draft: { ...d, maxSol: Number(d.maxSol || 0.25), takeProfit: Number(d.takeProfit || 100), stopLoss: Number(d.stopLoss || 30) },

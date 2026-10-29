@@ -13,6 +13,7 @@ export interface AgentRecord {
   owner?: string // the wallet that launched it
   rules?: { maxSol: number; takeProfit: number; stopLoss: number } // how its owner asked it to trade
   coin: { mint: string; symbol: string; name: string; image?: string; hue: string }
+  privyWalletId?: string // the verified Privy wallet the agent runner signs from
 }
 
 interface CallLite { mint?: string; image?: string; hue?: string; side: 'buy' | 'sell'; symbol: string; spentSol: number; pnlUsd: number; ts: number; sig?: string }

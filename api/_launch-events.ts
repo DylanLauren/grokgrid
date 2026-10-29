@@ -8,7 +8,7 @@ export const launchEventKeys = {
 
 export const launchEventCoverage = 'confirmed-launches-after-outbox-deployment' as const
 
-export type LaunchEvent = { cursor: string; id: string; mint: string; wallet: string; ts: number }
+export type LaunchEvent = { cursor: string; id: string; mint: string; wallet: string; ts: number; privyWalletId?: string }
 
 export function isLaunchCursor(value: unknown): value is string {
   return typeof value === 'string' && /^(0|[1-9][0-9]{0,15})$/.test(value) && Number.isSafeInteger(Number(value))
@@ -31,10 +31,12 @@ export function decodeLaunchEvents(raw: unknown, after: string, limit: number) {
     const event = JSON.parse(row[2]) as Record<string, unknown> | null
     if (!event || typeof event !== 'object' || Array.isArray(event) || typeof event.id !== 'string' || !/^[a-z0-9-]{2,32}$/.test(event.id)
       || !isAddress(event.mint) || !isAddress(event.wallet) || event.mint !== row[1] || mints.has(event.mint)
-      || !Number.isSafeInteger(event.ts) || Number(event.ts) <= 0) throw new Error('invalid-outbox')
+      || !Number.isSafeInteger(event.ts) || Number(event.ts) <= 0
+      || (event.privyWalletId !== undefined && (typeof event.privyWalletId !== 'string' || !/^[a-zA-Z0-9:_-]{1,128}$/.test(event.privyWalletId)))) throw new Error('invalid-outbox')
     previous = cursor
     mints.add(event.mint)
-    return { cursor: row[0], id: event.id, mint: event.mint, wallet: event.wallet, ts: event.ts as number }
+    return { cursor: row[0], id: event.id, mint: event.mint, wallet: event.wallet, ts: event.ts as number,
+      ...(typeof event.privyWalletId === 'string' ? { privyWalletId: event.privyWalletId } : {}) }
   })
   const hasMore = events.length > limit
   const page = events.slice(0, limit)

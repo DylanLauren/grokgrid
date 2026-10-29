@@ -32,8 +32,10 @@ export function walletLinks() {
   ]
 }
 
-export async function post<T>(url: string, data: unknown): Promise<T> {
-  const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) })
+export async function post<T>(url: string, data: unknown, token?: string): Promise<T> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' }
+  if (token) headers.authorization = `Bearer ${token}`
+  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data) })
   const json = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(json.error ?? 'something broke, try again')
   return json as T

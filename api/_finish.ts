@@ -8,7 +8,7 @@ import { ownerKeys } from './_launch-owner.js'
 import { FINALIZE_OWNER_LUA } from './_launch-finalize.js'
 import { launchProgress, verifyLaunch } from './_pump.js'
 
-type Pending = { routingVersion?: number; phase?: string; draft: Draft; launcher: string; bot: string; burn: string; signature: string | null; raw?: string; lastValidBlockHeight?: number }
+type Pending = { routingVersion?: number; phase?: string; privyWalletId?: string; draft: Draft; launcher: string; bot: string; burn: string; signature: string | null; raw?: string; lastValidBlockHeight?: number }
 type Result = { status: number; body: Record<string, unknown> }
 
 export const OPEN = 'gg:launch:open'
@@ -48,13 +48,14 @@ export async function finishLaunch(mint: string): Promise<Result> {
     owner: p.launcher,
     rules: { maxSol: d.maxSol, takeProfit: d.takeProfit, stopLoss: d.stopLoss },
     coin: { mint, symbol: d.ticker, name: d.name, image: `/i/${mint}`, hue: color },
+    ...(p.privyWalletId ? { privyWalletId: p.privyWalletId } : {}),
   }
   // All state changes, including the queue entry, happen once in one Redis call.
   const [saved] = await redis(['EVAL', FINALIZE_OWNER_LUA, 12,
     `gg:mint:${mint}`, ownerKeys.hold(p.launcher), ownerKeys.agent(p.launcher), 'gg:agents', keys.pending(mint),
     keys.image(mint), keys.meta(mint), 'gg:launches', OPEN,
     'gg:launch:event-payloads', 'gg:launch:event-order', 'gg:launch:event-sequence',
-    mint, p.launcher, id, JSON.stringify(rec), JSON.stringify({id,mint,wallet:p.bot,ts:Date.now()}), raw as string])
+    mint, p.launcher, id, JSON.stringify(rec), JSON.stringify({id,mint,wallet:p.bot,ts:Date.now(),...(p.privyWalletId?{privyWalletId:p.privyWalletId}:{})}), raw as string])
   if (typeof saved !== 'string' || saved.startsWith('!')) return out({ error: 'The owner wallet reservation or launch record needs review.' }, 409)
   return out({ id }, 200)
 }
