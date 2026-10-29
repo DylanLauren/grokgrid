@@ -41,7 +41,7 @@ export function planPosts({ journals, buyback, launches, registry, ledger, now, 
     || (buyback?.cycles || []).some(c => c.state === 'burned' && onDay(c.createdAt, day));
   if (!done[key] && active) items.push({ key, kind: 'recap', day, at: now, text: () => {
     const s = recapStats(journals, buyback, day);
-    return [`daily recap ${day}: ${s.trades} trades${s.winRate === null ? '' : `, ${Math.round(s.winRate * 100)}% wins`}, net ${(s.solIn - s.solOut).toFixed(3)} SOL, ${s.burned.toLocaleString('en-US')} $GRID burned`, 'strategy unvalidated · not financial advice', 'grokgrid-alpha.vercel.app'].join('\n');
+    return [`daily recap ${day}: ${s.trades} trades${s.winRate === null ? '' : `, ${Math.round(s.winRate * 100)}% wins`}, net ${(s.solIn - s.solOut).toFixed(3)} SOL, ${s.burned.toLocaleString('en-US')} $GRID burned`, 'strategy unvalidated · not financial advice', 'grokgrid.fun'].join('\n');
   } });
   return items.sort((a, b) => a.at - b.at);
 }

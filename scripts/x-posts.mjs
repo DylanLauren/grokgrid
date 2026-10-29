@@ -3,7 +3,7 @@
 // this process and are never logged.
 import { createHmac, randomBytes } from 'node:crypto';
 
-export const DEFAULT_X = { xPostsEnabled: false, maxPerDay: 15, site: 'https://grokgrid-alpha.vercel.app' };
+export const DEFAULT_X = { xPostsEnabled: false, maxPerDay: 15, site: 'https://www.grokgrid.fun' };
 const TWEETS = 'https://api.x.com/2/tweets';
 
 const enc = s => encodeURIComponent(s).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());

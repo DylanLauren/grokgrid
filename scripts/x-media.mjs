@@ -64,7 +64,7 @@ export function tradeHtml(d, size = { width: 1200, height: 675 }) {
   return shell(`<div class="frame"><div class="top">${MASCOT}grok grid<small>${esc(d.agent === 'house' ? 'house bot' : d.agent)}</small></div>
 <div class="card" data-slide>${img}<div><span class="side ${d.side}">${d.side === 'buy' ? 'bought' : 'sold'}</span>
 <div class="tick">$${esc(d.symbol || '???')}</div><div class="amt"><b data-count="${sol(d.lamports)}">${sol(d.lamports)}</b> SOL${pnl}</div></div></div>
-<div class="meta"><span>tx ${esc(d.signature.slice(0, 6))}…${esc(d.signature.slice(-6))}</span><span>grokgrid-alpha.vercel.app</span></div></div>`, size);
+<div class="meta"><span>tx ${esc(d.signature.slice(0, 6))}…${esc(d.signature.slice(-6))}</span><span>grokgrid.fun</span></div></div>`, size);
 }
 
 /** A $GRID burn or a new bot launch. */
@@ -74,7 +74,7 @@ export function eventHtml(d, size = { width: 1080, height: 1080 }) {
   const img = d.image ? `<img class="coin" src="${esc(d.image)}">` : `<div class="coin"></div>`;
   return shell(`<div class="frame"><div class="top">${MASCOT}grok grid<small>${d.kind}</small></div>
 <div class="card" data-slide>${img}<div><span class="side neutral">${d.kind}</span><div class="tick" style="font-size:54px">${title}</div><div class="amt" style="font-size:28px;color:var(--p70)">${sub}</div></div></div>
-<div class="meta"><span>${d.signature ? `tx ${esc(d.signature.slice(0, 6))}…${esc(d.signature.slice(-6))}` : ''}</span><span>grokgrid-alpha.vercel.app</span></div></div>`, size);
+<div class="meta"><span>${d.signature ? `tx ${esc(d.signature.slice(0, 6))}…${esc(d.signature.slice(-6))}` : ''}</span><span>grokgrid.fun</span></div></div>`, size);
 }
 
 /** The 00:00 UTC recap. d: { day, trades, winRate, solIn, solOut, burned, workersOnline, workersTotal } */
@@ -84,7 +84,7 @@ export function recapHtml(d, size = { width: 1200, height: 675 }) {
   return shell(`<div class="frame"><div class="top">${MASCOT}grok grid · daily recap<small>${esc(d.day)} UTC</small></div><div class="grid">
 ${stat('trades', d.trades)}${stat('win rate', d.winRate === null ? '—' : `${Math.round(d.winRate * 100)}%`)}${stat('net SOL', `${net >= 0 ? '+' : ''}${net.toFixed(3)}`, net >= 0 ? 'gain' : 'loss')}
 ${stat('SOL in', d.solIn.toFixed(3))}${stat('$GRID burned', Number(d.burned).toLocaleString('en-US'))}${stat('workers online', `${d.workersOnline}/${d.workersTotal}`)}
-</div><div class="meta"><span>strategy unvalidated · not financial advice</span><span>grokgrid-alpha.vercel.app</span></div></div>`, size);
+</div><div class="meta"><span>strategy unvalidated · not financial advice</span><span>grokgrid.fun</span></div></div>`, size);
 }
 
 async function browser(launcher) {
