@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { agentId, cleanDraft, metadataJson } from '../api/_launch'
 import { firstBuyLamports } from '../api/_pump'
 
-const good = { look: 3, name: 'Night Shift', ticker: '$night', description: 'trades while you sleep', x: 'https://x.com/nightbot', telegram: '', strategy: 'buys dips under 30k', maxSol: '0.25', takeProfit: 100, stopLoss: 30, firstBuy: '' }
+const good = { look: 3, name: 'Night Shift', ticker: '$night', description: 'trades while you sleep', x: 'https://x.com/nightbot', telegram: '', strategy: 'buys dips under 30k', maxSol: '0.25', takeProfit: 60, stopLoss: 25, firstBuy: '' }
 
 test('a launch draft is cleaned and checked before anything is built', () => {
   const d = cleanDraft(good)
@@ -14,7 +14,8 @@ test('a launch draft is cleaned and checked before anything is built', () => {
   assert.throws(() => cleanDraft({ ...good, x: 'https://evil.com/a' }), /x\.com/)
   assert.throws(() => cleanDraft({ ...good, telegram: 'javascript:alert(1)' }), /https/)
   assert.equal('website' in cleanDraft({ ...good, website: 'https://evil.example' }), false) // launchers can't set a website
-  assert.throws(() => cleanDraft({ ...good, stopLoss: 99 }), /Stop loss/)
+  assert.throws(() => cleanDraft({ ...good, stopLoss: 30 }), /Stop loss/)
+  assert.throws(() => cleanDraft({ ...good, takeProfit: 100 }), /Take profit/) // looser than the house exits would never apply
   assert.equal(cleanDraft({ ...good, look: 99 }).look, 0)
 })
 

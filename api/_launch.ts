@@ -79,8 +79,8 @@ export function cleanDraft(value: unknown): Draft {
     telegram: link(str('telegram'), ['t.me'], 'Telegram'),
     strategy: str('strategy'),
     maxSol: number(v.maxSol, 0.01, 10, 'Max per trade'),
-    takeProfit: number(v.takeProfit, 5, 10_000, 'Take profit'),
-    stopLoss: number(v.stopLoss, 1, 95, 'Stop loss'),
+    takeProfit: number(v.takeProfit, 5, 60, 'Take profit'), // the house exits are the loosest a bot may run
+    stopLoss: number(v.stopLoss, 1, 25, 'Stop loss'),
     firstBuy: str('firstBuy'),
   }
   if (!d.name || bytes(d.name) > 32 || CONTROL.test(d.name)) throw Error('Name needs 1 to 32 characters.')
