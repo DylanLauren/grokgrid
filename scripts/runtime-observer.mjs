@@ -25,9 +25,9 @@ async function run(){
   async function intake(token,afterCursor){
     try {
       const batch=validateLaunchEvents(await get(`/api/launch/events?after=${afterCursor}&limit=50`,token),afterCursor);
-      return {queue:{free:null,launches:batch.events.map(({cursor:_cursor,...row})=>row)},launchEvents:{state:'durable',afterCursor,batch,historyComplete:false,coverage:LAUNCH_COVERAGE,executionEnabled:false,acknowledged:false}};
+      return {queue:{launches:batch.events.map(({cursor:_cursor,...row})=>row)},launchEvents:{state:'durable',afterCursor,batch,historyComplete:false,coverage:LAUNCH_COVERAGE,executionEnabled:false,acknowledged:false}};
     } catch {
-      let queue={free:null,launches:null};try{queue=await get('/api/ingest',token);}catch{}
+      let queue={launches:null};try{queue=await get('/api/ingest',token);}catch{}
       return {queue,launchEvents:{state:'degraded-legacy',afterCursor,reason:'durable-events-unavailable-or-invalid',historyComplete:false,coverage:'legacy-latest-window-only',executionEnabled:false,acknowledged:false}};
     }
   }
@@ -53,7 +53,7 @@ async function run(){
     const observation={observedAt:new Date().toISOString(),status:'observing',mode:'observe-only',signingEnabled:false,executionEnabled:false,
       balanceSlot:snapshot.context.slot,balanceCommitment:'finalized',previousSuccessfulAt:previous?.observedAt??null,
       house:{wallet:config.houseWallet,balanceLamports:safeBalance(accounts[0])},burn:{wallet:config.burnWallet,...burn},officialMint:config.officialMint||null,mintVerified,
-      launchEvents,freeWallets:queue.free,pendingLaunches:Array.isArray(queue.launches)?queue.launches:null,strategy:'unvalidated-no-orders'};
+      launchEvents,pendingLaunches:Array.isArray(queue.launches)?queue.launches:null,strategy:'unvalidated-no-orders'};
     assertSnapshotProgress(previous,observation);
     try{observation.launchRules=await captureLaunchRuleSnapshots(root,{houseWallet:cfg.houseWallet,burnWallet:cfg.burnWallet},queue.launches,()=>get('/api/agents'));}
     catch{observation.launchRules={state:'unavailable',historyComplete:false,activePolicy:null,acknowledged:false,executionEnabled:false};}

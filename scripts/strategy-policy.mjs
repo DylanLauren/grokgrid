@@ -1,5 +1,5 @@
 // Strategy rules: pure functions over observed metrics. UNVALIDATED. The research in
-// research/2026-10-28 picked no thresholds; these defaults encode its one testable
+// docs/research/2026-10-28-report.md picked no thresholds; these defaults encode its one testable
 // hypothesis (small entries in liquid coins with rising genuine buyer activity) and are
 // meant to be judged in paper mode first. Amounts in lamports are integer strings.
 const num = x => typeof x === 'number' && Number.isFinite(x);

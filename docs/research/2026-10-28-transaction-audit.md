@@ -27,7 +27,7 @@ Window: September 28, 2026 19:02:53 UTC through October 28, 2026 19:02:53 UTC. T
 
 ## Classification and limitations
 
-transaction-evidence.csv retains wallet, signature, timestamp, exact mint, exact decimal token balance change, provider type/source, quote balance changes and transaction fee payer. A provider-swap classification requires the provider SWAP label, one nonquote asset and an opposite quote flow; it remains a classification, not independent instruction-level verification. Opposite flows without that label are unverified candidates. Inflows without observed payment are kept separate. Complex trades and failed transactions are not silently counted as ordinary purchases.
+The working evidence file (not kept in the repository) retained wallet, signature, timestamp, exact mint, exact decimal token balance change, provider type/source, quote balance changes and transaction fee payer. A provider-swap classification requires the provider SWAP label, one nonquote asset and an opposite quote flow; it remains a classification, not independent instruction-level verification. Opposite flows without that label are unverified candidates. Inflows without observed payment are kept separate. Complex trades and failed transactions are not silently counted as ordinary purchases.
 
 SOL balance changes can include rent, account closure, tips and fees. Wrapped SOL and native SOL movements need reconciliation; net quote flows are not execution-price measurements. Transfers and opening inventory require tracing before realized returns can be computed. The 30-day retrieval does not reconstruct lifetime cost basis. USD market values in current metadata are not used as historical prices.
 
@@ -35,10 +35,6 @@ Historical volume and liquidity columns are deliberately empty. These must be jo
 
 ## Reproducibility
 
-- collect-helius.mjs: bounded, resumable collection; credentials read internally from existing local configuration, never serialized into records. Default maximum is 25 additional pages per incomplete selected wallet per invocation.
-- transactions/: raw public provider records and coverage cursors.
-- audit-transactions.py: deterministic balance-flow classification.
-- transaction-audit.json and transaction-evidence.csv: coverage and classified evidence.
-- dominant-mint-metadata.json and exacttalltakin-si-flows.json: SI identity and flow audit.
+The raw provider records, coverage cursors and collection scripts were working data and are not kept in the repository.
 
 The sample is the top five wallets on each captured board, not every wallet above $5,000. Remaining high-activity wallets and additional qualifying wallets need further bounded retrieval, plus historical market-state access.

@@ -35,10 +35,9 @@ PRIVY_AGENT_POLICY_ID
 PRIVY_AGENT_POLICY_SHA256
 PRIVY_AGENT_POLICY_SUMMARY
 PRIVY_AGENT_SIGNER_PUBLIC_KEY
-PRIVY_AUTHORIZATION_PRIVATE_KEY
 ```
 
-The authorization key is a separate P-256 request-authorization key, not the user's Solana wallet private key. Store it only in protected server/local worker secret storage. Reuse neither another project's app credentials nor its signer. The app secret and authorization key must never use a `VITE_` prefix.
+The authorization key is not an environment variable anywhere: it lives only in `runtime/privy-authorization.key` (0600) on the Mac, and the agent runner reads it through `privyAuthorizationKeyFile` in `agent-runner-config.json`. The site never signs. The authorization key is a separate P-256 request-authorization key, not the user's Solana wallet private key. Store it only in protected server/local worker secret storage. Reuse neither another project's app credentials nor its signer. The app secret and authorization key must never use a `VITE_` prefix.
 
 ## Read-only server readiness
 
@@ -135,7 +134,7 @@ The house bot signs locally and is unaffected.
 
 **Remaining limits if the authorization key were stolen.** The 0.05 SOL cap applies per instruction, not per transaction, so one transaction could hold several capped buys. Token-account creation is paid by the agent and its owner can't be pinned. The protections are:
 - the key lives only in a 0600 file on the Mac;
-- each agent's funds are its owner's deposit;
+- each agent's funds are its own wallet's money: 80% of its coin's creator fees plus its owner's deposits;
 - the runner's own per-trade, exposure and daily-loss caps and the stop file.
 
 **The real fix is per-wallet override policies**: pin the token-account owner, the WSOL account and the close destination to each agent's wallet, created when the agent authorizes the signer. That's a follow-up. Once it exists, pool buys and unwrapping can come back.

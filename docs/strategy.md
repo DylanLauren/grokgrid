@@ -19,7 +19,7 @@ pump.fun's own APIs are behind a Cloudflare bot check. The engine does not use t
 
 ## Defaults (hypotheses, not findings)
 
-The 2026-10-28 research ([REPORT.md](../research/2026-10-28/REPORT.md)) selected **no** thresholds. It warns about single-winner dependence and that win rate alone means little. Its one testable hypothesis is "limited-size entries in independently verified, liquid tokens with increasing genuine buyer activity". The defaults encode that hypothesis. Tune them in paper mode first.
+The 2026-10-28 research ([report](research/2026-10-28-report.md)) selected **no** thresholds. It warns about single-winner dependence and that win rate alone means little. Its one testable hypothesis is "limited-size entries in independently verified, liquid tokens with increasing genuine buyer activity". The defaults encode that hypothesis. Tune them in paper mode first.
 
 | Setting | Default | Why |
 |---|---|---|

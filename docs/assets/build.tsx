@@ -84,7 +84,7 @@ async function render(html: string, file: string, w: number, h: number, b: Await
 async function shots(b: Awaited<ReturnType<typeof chromium.launch>>) {
   mkdirSync(`${OUT}screens`, { recursive: true })
   const site = 'https://grokgrid-alpha.vercel.app'
-  for (const [name, path, wait] of [['room', '/', 9000], ['grid', '/#grid', 6000], ['matrix', '/#matrix', 6000], ['stats', '/#stats', 6000], ['docs', '/#docs', 5000]] as const) {
+  for (const [name, path, wait] of [['room', '/', 9000], ['grid', '/#grid', 6000], ['matrix', '/#matrix', 6000], ['stats', '/#stats', 6000]] as const) {
     const p = await b.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 })
     await p.goto(site + path, { waitUntil: 'domcontentloaded', timeout: 45000 }); await p.waitForTimeout(wait)
     await p.getByText('skip', { exact: true }).click({ timeout: 1500 }).catch(() => {}); await p.waitForTimeout(800)
