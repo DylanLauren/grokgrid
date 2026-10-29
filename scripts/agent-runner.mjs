@@ -149,7 +149,11 @@ async function tick() {
   const conn = connect(rpc.rpcUrl), now = Date.now();
   const stateFile = join(root, 'agent-runner-state.json');
   let state; try { state = await json(stateFile); } catch { state = { version: 1, cursor: '0', agents: {} }; }
-  await syncAgents(state, token, now);
+  // The site's launch outbox can be slow for a moment (a cold start). Known bots keep trading
+  // and new launches are picked up next tick; one slow read must not mark the runner down,
+  // because that pauses launches site-wide.
+  let syncError = null;
+  try { await syncAgents(state, token, now); } catch (e) { syncError = String(e?.name === 'TimeoutError' ? 'launch outbox timed out' : e?.message || e).slice(0, 80); }
   await savePrivate(stateFile, state);
 
   let global = { ...DEFAULT_STRATEGY }; try { global = await json(join(root, 'strategy-config.json')); } catch {}
@@ -188,8 +192,8 @@ async function tick() {
   });
   const healthy = Object.values(report).every(r => r.status !== 'error');
   await savePrivate(join(root, 'agent-runner-status.json'), { observedAt: new Date(now).toISOString(), mode: c.mode, strategyValidated: false, liquidating, stopFilePresent,
-    known: Object.keys(state.agents).length, running: ready.length, cursor: state.cursor, agents: report });
-  await heartbeat(root, 'agent-runner', { mode: c.mode === 'execute' ? 'execute' : 'paper', healthy, agents: ready.length, note: `${ready.length} agents, ${c.mode}` });
+    known: Object.keys(state.agents).length, running: ready.length, cursor: state.cursor, agents: report, ...(syncError ? { syncError } : {}) });
+  await heartbeat(root, 'agent-runner', { mode: c.mode === 'execute' ? 'execute' : 'paper', healthy, agents: ready.length, note: syncError ? `${ready.length} agents, outbox retry` : `${ready.length} agents, ${c.mode}` });
   console.log(JSON.stringify({ mode: c.mode, known: Object.keys(state.agents).length, running: ready.length, healthy }));
 }
 
