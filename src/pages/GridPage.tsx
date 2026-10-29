@@ -316,7 +316,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             <p className="gd-note">Your Phantom only signs the launch and holds your dev buy. Your bot’s own wallet collects its fees and does all the trading, only inside its fixed limits. You can stop it at any time.</p>
             <p className="gd-note mono">one bot per Phantom · 80/20 split locked at creation · your wallet shows the exact total before you sign</p>
             <button type="submit" className="btn" disabled={!ready}>
-              <Roll>{step !== null ? STEPS[step] : status === null ? 'Checking launchpad…' : !status.open ? 'Launches paused' : !owner ? 'Connect Phantom' : !agentWallet ? 'Sign the message in Phantom' : !(agentWallet.authorizationReady || agentWallet.authorize) ? 'Checking your wallet…' : 'Launch bot'}</Roll>
+              <Roll>{step !== null ? STEPS[step] : connecting ? 'Setting up your bot’s trading permission…' : status === null ? 'Checking launchpad…' : !status.open ? 'Launches paused' : !owner ? 'Connect Phantom' : !agentWallet ? 'Sign the message in Phantom' : !(agentWallet.authorizationReady || agentWallet.authorize) ? 'Checking your wallet…' : 'Launch bot'}</Roll>
             </button>
             {me && agentWallet && <p className="gd-note mono">launches from <span style={{ overflowWrap: 'anywhere' }}>{me}</span> · trades from <span style={{ overflowWrap: 'anywhere' }}>{agentWallet.address}</span></p>}
             {step !== null && (
