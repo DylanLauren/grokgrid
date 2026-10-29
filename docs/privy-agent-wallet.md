@@ -89,3 +89,9 @@ Local verifier tests use injected public fixtures only. They cover wrong app/iss
 - [Privy pricing](https://www.privy.io/pricing)
 - [Phantom agent-account separation](https://docs.phantom.com/phantom-mcp-server/account-types)
 - [SPL delegation scope](https://solana.com/docs/tokens/basics/approve-delegate)
+
+## Server adapter (wired)
+
+`api/agent-wallet/readiness.ts` serves the readiness route. `api/_privy-provider.ts` maps raw `@privy-io/node` resources onto the verifier contract: `utils().auth().verifyAccessToken`, `users()._get`, `wallets().get`, `policies().get`. Privy's wallet `owner_id` is a key quorum, not a user DID, so ownership means an embedded, non-imported Solana account linked to the verified user plus a non-null owner quorum on the wallet. A policy with no owner fails as `policy-not-approved`. With any server value missing, the route answers `configuration-missing` and makes no Privy calls.
+
+Still open: create the GrokGrid Privy app, the agent signer key quorum and the policy (built from the approved limits in the protected config), then set the env names above in Vercel.
