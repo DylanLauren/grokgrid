@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useRef, type CSSProperties } from 'react'
 import { BODY, type Shape } from './BotMark'
-import { eyeInk, eyePaths, watch } from './eyes'
+import { eyeInk, eyePaths, watch, type Face } from './eyes'
 import './livebot.css'
 
 // One of the bot family, alive, the way the official Grok Bots are: a flat matte body,
@@ -18,9 +18,10 @@ interface Props {
   selected?: boolean
   eye?: string
   shout?: boolean // keep the speech bubble out without a hover
+  hoverFace?: Face // the face it pulls while you hover it
 }
 
-export const LiveBot = forwardRef<HTMLDivElement, Props>(function LiveBot({ color, shape, habit, size, say, delay = 0, selected, eye, shout }, ref) {
+export const LiveBot = forwardRef<HTMLDivElement, Props>(function LiveBot({ color, shape, habit, size, say, delay = 0, selected, eye, shout, hoverFace }, ref) {
   const root = useRef<HTMLDivElement | null>(null)
   const e1 = useRef<SVGPathElement>(null)
   const e2 = useRef<SVGPathElement>(null)
@@ -40,6 +41,7 @@ export const LiveBot = forwardRef<HTMLDivElement, Props>(function LiveBot({ colo
       }}
       className={`lb lb-${habit} ${selected ? 'sel' : ''} ${shout ? 'shout' : ''}`}
       style={{ width: size, height: size, '--d': `${delay}s` } as CSSProperties}
+      data-hover-face={hoverFace}
     >
       <span className="lb-shadow" />
       <div className="lb-body">
