@@ -29,7 +29,6 @@
 .win-chart { grid-row: 1 / 3; }
 .wc-head { display: flex; align-items: center; gap: 9px; padding: 9px 12px 2px; font-size: 13px; }
 .wc-head b { font-weight: 560; }
-.wc-chip { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; font: 600 10px var(--mono); color: #0a0a0a; }
 .wc-tf { margin-left: auto; display: flex; gap: 4px; font-size: 10px; }
 .wc-tf i { font-style: normal; padding: 2px 6px; border-radius: 5px; color: #ffffff80; }
 .wc-tf i.on { background: #ffffff1a; color: #fff; }

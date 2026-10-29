@@ -20,18 +20,6 @@ export async function connectWallet(p: WalletLike, o?: { onlyIfTrusted?: boolean
   return key.toString()
 }
 
-export const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-
-// Phone browsers have no wallet extension: these open this page inside the wallet app's browser.
-export function walletLinks() {
-  const url = encodeURIComponent(window.location.href)
-  const ref = encodeURIComponent(window.location.origin)
-  return [
-    { name: 'Phantom', href: `https://phantom.app/ul/browse/${url}?ref=${ref}` },
-    { name: 'Solflare', href: `https://solflare.com/ul/v1/browse/${url}?ref=${ref}` },
-  ]
-}
-
 export async function post<T>(url: string, data: unknown, token?: string): Promise<T> {
   const headers: Record<string, string> = { 'content-type': 'application/json' }
   if (token) headers.authorization = `Bearer ${token}`

@@ -76,7 +76,7 @@ export async function launchBot(o: { wallet: WalletLike; launcher: string; walle
   const mintAddr = mint.publicKey.toBase58()
 
   onStep(0)
-  await post('/api/launch/asset', { mint: mintAddr, image })
+  await post('/api/launch/asset', { mint: mintAddr, image, launcher, walletId }, (await accessToken()) ?? undefined)
   onStep(1)
   const prepared = await post<{ tx: string; setup: string[] | null }>('/api/launch/prepare', { mint: mintAddr, launcher, walletId, draft }, (await accessToken()) ?? undefined)
   const tx = VersionedTransaction.deserialize(fromB64(prepared.tx))

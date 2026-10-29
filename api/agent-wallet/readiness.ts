@@ -1,5 +1,6 @@
 import { privyReadinessConfig, privyReadinessProvider, sdkReads } from '../_privy-provider.js'
 import { verifyPrivyWalletReadiness } from '../_privy-readiness.js'
+import { limited, readJson } from '../_launch.js'
 
 const headers = { 'Cache-Control': 'no-store' }
 
@@ -9,11 +10,10 @@ export async function POST(req: Request) {
   if (!config) return Response.json({ canAuthorize: false, walletAuthorizationReady: false, executionEnabled: false, reason: 'configuration-missing' }, { headers })
   const auth = req.headers.get('authorization') || ''
   const accessToken = auth.startsWith('Bearer ') ? auth.slice(7).trim() : ''
-  let body: Record<string, unknown> = {}
-  try {
-    if (Number(req.headers.get('content-length') || 0) > 4096) throw Error('too large')
-    body = await req.json() as Record<string, unknown>
-  } catch {
+  const slow = await limited(req, 'readiness', 10)
+  if (slow) return slow
+  const body = await readJson<Record<string, unknown>>(req, 4096)
+  if (!body || typeof body !== 'object') {
     return Response.json({ canAuthorize: false, walletAuthorizationReady: false, executionEnabled: false, reason: 'invalid-request' }, { status: 400, headers })
   }
   const result = await verifyPrivyWalletReadiness({ accessToken, walletId: body?.walletId, address: body?.address },
