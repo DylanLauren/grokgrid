@@ -2,6 +2,7 @@ import { RoundedBox, useGLTF } from '@react-three/drei'
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { Sky } from './Sky'
+import { BOT_POS, BOT_YAW } from './cameraGeometry'
 import { cityTexture, familyPoster, stickyNote } from './textures'
 
 const DESK_Y = 0.75
@@ -22,20 +23,43 @@ const mat = {
 export function RoomBaked({ onReady }: { onReady?: (colliders: THREE.Object3D[]) => void }) {
   const { scene } = useGLTF('/room.glb')
   const room = useMemo(() => {
-    scene.traverse((o) => {
+    const clone = scene.clone(true)
+    clone.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
-      const map = (m.material as THREE.MeshStandardMaterial).map
-      if (map) map.colorSpace = THREE.SRGBColorSpace
-      m.material = new THREE.MeshBasicMaterial({ map, toneMapped: false })
+      const unlit = (source: THREE.Material) => {
+        const original = source as THREE.MeshStandardMaterial
+        return new THREE.MeshBasicMaterial({
+          map: original.map ?? null,
+          color: original.color ?? 0xffffff,
+          side: original.side,
+          transparent: original.transparent,
+          opacity: original.opacity,
+          alphaTest: original.alphaTest,
+          depthWrite: original.depthWrite,
+          depthTest: original.depthTest,
+          toneMapped: false,
+        })
+      }
+      m.material = Array.isArray(m.material) ? m.material.map(unlit) : unlit(m.material)
     })
-    return scene
+    return clone
   }, [scene])
+  useEffect(() => () => {
+    // The clone owns its unlit materials; cached GLTF geometry and textures stay shared.
+    room.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (mesh.isMesh) {
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+        materials.forEach((material) => material.dispose())
+      }
+    })
+  }, [room])
   useEffect(() => {
     // the floor and desk sit under the camera's reach anyway, the rest can block the view
     onReady?.(['room', 'chair', 'shelf', 'desk'].map((n) => room.getObjectByName(n)).filter((o): o is THREE.Object3D => !!o))
   }, [room, onReady])
-  return <primitive object={room} />
+  return <primitive object={room} dispose={null} />
 }
 
 // What stays live on top of either room: the city, the poster print and the sticky note.
@@ -50,6 +74,12 @@ export function RoomLive() {
         <meshBasicMaterial map={city} toneMapped={false} />
       </mesh>
       <Sky position={[-0.98, 1.5, -0.894]} size={[0.95, 1.05]} />
+      {/* The baked mug has a closed ceramic cap. Cover its centre with coffee,
+          leaving a ceramic rim and a small depth offset to avoid coplanar flicker. */}
+      <mesh position={[0.62, DESK_Y + 0.1008, 0.12]} rotation-x={-Math.PI / 2}>
+        <circleGeometry args={[0.031, 40]} />
+        <meshStandardMaterial color="#25140c" roughness={0.3} />
+      </mesh>
       <mesh position={[0.98, 1.58, -0.874]}>
         <planeGeometry args={[0.74, 0.52]} />
         <meshBasicMaterial map={poster} toneMapped={false} color="#8a8a8a" />
@@ -101,8 +131,8 @@ export function Room() {
       {/* desk */}
       <RoundedBox args={[1.7, 0.045, 0.8]} radius={0.012} position={[0, DESK_Y - 0.0225, -0.07]} material={mat.desk} castShadow receiveShadow />
       {[[-0.8, -0.42], [0.8, -0.42], [-0.8, 0.28], [0.8, 0.28]].map(([x, z], i) => (
-        <mesh key={i} position={[x, DESK_Y / 2, z]} material={mat.metal} castShadow>
-          <boxGeometry args={[0.035, DESK_Y - 0.04, 0.035]} />
+        <mesh key={i} position={[x, (DESK_Y - 0.045) / 2, z]} material={mat.metal} castShadow>
+          <boxGeometry args={[0.035, DESK_Y - 0.045, 0.035]} />
         </mesh>
       ))}
 
@@ -140,7 +170,7 @@ export function Room() {
       {/* mug */}
       <group position={[0.62, DESK_Y, 0.12]}>
         <mesh position={[0, 0.05, 0]} material={mat.ceramic} castShadow>
-          <cylinderGeometry args={[0.04, 0.036, 0.1, 40]} />
+          <cylinderGeometry args={[0.036, 0.04, 0.1, 40]} />
         </mesh>
         <mesh position={[0.045, 0.055, 0]} material={mat.ceramic}>
           <torusGeometry args={[0.022, 0.007, 12, 24]} />
@@ -149,17 +179,19 @@ export function Room() {
 
 
       {/* chair */}
-      <group position={[0, 0, 0.8]}>
-        <RoundedBox args={[0.56, 0.07, 0.52]} radius={0.03} position={[0, 0.5, 0]} material={mat.fabric} castShadow receiveShadow />
-        <RoundedBox args={[0.54, 0.62, 0.06]} radius={0.03} position={[0, 0.88, 0.32]} rotation-x={-0.08} material={mat.fabric} castShadow />
-        <mesh position={[0, 0.25, 0]} material={mat.metal}>
-          <cylinderGeometry args={[0.025, 0.025, 0.45, 16]} />
-        </mesh>
-        {[0, 1, 2, 3, 4].map((i) => (
-          <mesh key={i} position={[Math.cos((i / 5) * Math.PI * 2) * 0.16, 0.04, Math.sin((i / 5) * Math.PI * 2) * 0.16]} rotation-y={-(i / 5) * Math.PI * 2} material={mat.metal}>
-            <boxGeometry args={[0.32, 0.025, 0.04]} />
-          </mesh>
-        ))}
+      <group position={[BOT_POS[0], 0, BOT_POS[2]]} rotation-y={BOT_YAW}>
+        <group position={[0, 0, 0.8 - BOT_POS[2]]}>
+            <RoundedBox args={[0.56, 0.07, 0.52]} radius={0.03} position={[0, 0.5, 0]} material={mat.fabric} castShadow receiveShadow />
+            <RoundedBox args={[0.54, 0.62, 0.06]} radius={0.03} position={[0, 0.88, 0.32]} rotation-x={0.08} material={mat.fabric} castShadow />
+            <mesh position={[0, 0.25, 0]} material={mat.metal}>
+              <cylinderGeometry args={[0.025, 0.025, 0.45, 16]} />
+            </mesh>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <mesh key={i} position={[Math.cos((i / 5) * Math.PI * 2) * 0.16, 0.04, Math.sin((i / 5) * Math.PI * 2) * 0.16]} rotation-y={-(i / 5) * Math.PI * 2} material={mat.metal}>
+                <boxGeometry args={[0.32, 0.025, 0.04]} />
+              </mesh>
+            ))}
+        </group>
       </group>
     </group>
   )

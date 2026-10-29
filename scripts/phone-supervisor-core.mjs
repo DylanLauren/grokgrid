@@ -1,5 +1,5 @@
 // Pure restart/recovery policy. No capture, credentials, process signals or file IO.
-const terminal = new Set(['credential-rejected', 'request-rejected', 'window-identity-mismatch', 'browser-url-mismatch', 'phone-window-geometry-invalid', 'window-changed-during-capture'])
+const terminal = new Set(['credential-rejected', 'request-rejected', 'window-identity-mismatch', 'browser-url-mismatch', 'phone-window-geometry-invalid', 'browser-viewport-invalid', 'window-changed-during-capture'])
 export function decidePhoneRestart({ exitCode, signal, status, restarts = 0 }) {
   if (!Number.isSafeInteger(restarts) || restarts < 0) return { action: 'stop', reason: 'invalid-restart-state' }
   if (signal === 'SIGTERM' || signal === 'SIGINT' || status?.state === 'stopped') return { action: 'stop', reason: 'publisher-stopped' }

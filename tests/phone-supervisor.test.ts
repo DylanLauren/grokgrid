@@ -14,7 +14,7 @@ test('restart decision is bounded and never retries auth rejection, source misma
  assert.deepEqual(decidePhoneRestart({exitCode:1,restarts:0}),{action:'restart',reason:'publisher-unavailable',delayMs:60000})
  assert.equal(decidePhoneRestart({exitCode:1,restarts:4}).delayMs,300000)
  assert.equal(decidePhoneRestart({exitCode:1,restarts:5}).action,'stop')
- for(const reason of ['credential-rejected','request-rejected','window-identity-mismatch','browser-url-mismatch','phone-window-geometry-invalid'])assert.equal(decidePhoneRestart({exitCode:1,status:{reason}}).action,'stop')
+ for(const reason of ['credential-rejected','request-rejected','window-identity-mismatch','browser-url-mismatch','phone-window-geometry-invalid','browser-viewport-invalid'])assert.equal(decidePhoneRestart({exitCode:1,status:{reason}}).action,'stop')
  assert.equal(decidePhoneRestart({exitCode:1,status:{reason:'screen-credential-invalid-or-expiring'}}).action,'wait-renewal')
  assert.equal(decidePhoneRestart({exitCode:null,signal:'SIGTERM'}).action,'stop')
  assert.equal(decidePhoneRestart({exitCode:0}).action,'stop')
@@ -128,4 +128,10 @@ test('an already missing parent never starts a publisher',async()=>{
    assert.equal(launches,0);assert.equal(JSON.parse(await readFile(join(root,'local-phone-supervisor-status.json'),'utf8')).reason,'parent-exited')
   }
  }finally{await rm(root,{recursive:true,force:true})}
+})
+
+test('a crash while waiting for the pinned window uses normal bounded restart, not source-mismatch stop', () => {
+ assert.equal(decidePhoneRestart({exitCode:null,signal:'SIGKILL',status:{state:'waiting-for-window',reason:'window-temporarily-unavailable'},restarts:0}).action,'restart')
+ assert.equal(decidePhoneRestart({exitCode:null,signal:'SIGKILL',status:{state:'waiting-for-window',reason:'window-temporarily-unavailable'},restarts:5}).action,'stop')
+ assert.equal(decidePhoneRestart({exitCode:1,status:{reason:'browser-url-mismatch'},restarts:0}).action,'stop')
 })

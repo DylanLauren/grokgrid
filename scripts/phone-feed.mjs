@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { capabilityExpiry, validateConfig, verifyWindow, captureAndSend, retryPolicy, safeFailure } from './phone-feed-core.mjs'
+import { capabilityExpiry, validateConfig, verifyWindow, browserViewportCrop, encodePhoneCapture, captureAndSend, captureFailureState, safeFailure } from './phone-feed-core.mjs'
 const run = promisify(execFile)
 const args = process.argv.slice(2)
 const help = 'Usage: node scripts/phone-feed.mjs --config /absolute/private/config.json [--check | --once]. Requires a screen-only token and pinned actual bot window; rectangle capture is unsupported.'
@@ -40,8 +40,11 @@ async function main() {
       if (snapshot && config.bundleId === 'com.google.Chrome') {
         // Find the selected Chrome window by matching its exact title and bounds.
         // Never activate, navigate, or read unrelated tab contents.
-        const js = `const app=Application('Google Chrome'); const windows=app.windows(); const matches=windows.filter(w=>{const b=w.bounds();return w.name()===${JSON.stringify(config.title)}&&Math.abs(b.x-${snapshot.bounds.x})<2&&Math.abs(b.y-${snapshot.bounds.y})<2&&Math.abs(b.width-${snapshot.bounds.width})<2&&Math.abs(b.height-${snapshot.bounds.height})<2}); matches.length===1 ? matches[0].activeTab().url() : ''`
-        snapshot.browserUrl = (await run('/usr/bin/osascript', ['-l', 'JavaScript', '-e', js], { timeout: 5000, maxBuffer: 8192 })).stdout.trim()
+        const pageMetrics = 'JSON.stringify({innerWidth:window.innerWidth,innerHeight:window.innerHeight,outerWidth:window.outerWidth,outerHeight:window.outerHeight,devicePixelRatio:window.devicePixelRatio,href:window.location.href})'
+        const js = `const app=Application('Google Chrome'); const windows=app.windows(); const matches=windows.filter(w=>{const b=w.bounds();return w.name()===${JSON.stringify(config.title)}&&Math.abs(b.x-${snapshot.bounds.x})<2&&Math.abs(b.y-${snapshot.bounds.y})<2&&Math.abs(b.width-${snapshot.bounds.width})<2&&Math.abs(b.height-${snapshot.bounds.height})<2}); if(matches.length!==1){JSON.stringify({browserUrl:'',viewport:null})}else{const tab=matches[0].activeTab();JSON.stringify({browserUrl:tab.url(),viewport:${snapshot.onScreen === true ? `JSON.parse(tab.execute({javascript:${JSON.stringify(pageMetrics)}}))` : 'null'}})}`
+        const details = JSON.parse((await run('/usr/bin/osascript', ['-l', 'JavaScript', '-e', js], { timeout: 5000, maxBuffer: 8192 })).stdout.trim())
+        snapshot.browserUrl = details.browserUrl
+        snapshot.viewport = details.viewport
       }
       return snapshot
     } catch { throw Error('capture-unavailable') }
@@ -62,7 +65,7 @@ async function main() {
   const parentPid = process.ppid
   const parentWatch = parentPid > 1 ? setInterval(() => { if (process.ppid !== parentPid) stop = true }, 1000) : null
   parentWatch?.unref()
-  let temp, failures = 0, lastSentAt = null
+  let temp, failures = 0, lastSentAt = null, lastFailureReason = null
   const status = async (state, extra = {}) => {
     const dest = config.statusFile + '.tmp'
     await writeFile(dest, JSON.stringify({ version: 1, state, observedAt: new Date().toISOString(), lastSentAt, windowId: config.windowId, credentialExpiresAt: expiresAt === null ? null : new Date(expiresAt).toISOString(), failures, ...extra }) + '\n', { mode: 0o600 })
@@ -70,14 +73,37 @@ async function main() {
   }
   try {
     temp = await mkdtemp(join(tmpdir(), 'grokgrid-phone-'))
+    const raw = join(temp, 'frame.png')
     const shot = join(temp, 'frame.jpg')
-    async function capture() {
+    const page = join(temp, 'page.png')
+    const padded = join(temp, 'padded.png')
+    async function capture(snapshot) {
       try {
-        await run('/usr/sbin/screencapture', ['-x', '-o', '-t', 'jpg', '-l', String(config.windowId), shot], { timeout: 8000, maxBuffer: 4096 })
-        await run('/usr/bin/sips', ['--resampleWidth', '390', '-s', 'formatOptions', '70', shot], { timeout: 5000, maxBuffer: 4096 })
-        return await readFile(shot)
-      } catch { throw Error('capture-unavailable') }
-      finally { await rm(shot, { force: true }) }
+        await run('/usr/sbin/screencapture', ['-x', '-o', '-t', 'png', '-l', String(config.windowId), raw], { timeout: 8000, maxBuffer: 4096 })
+        const { stdout } = await run('/usr/bin/sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', raw], { timeout: 5000, maxBuffer: 4096 })
+        const sourceWidth = Number(/^\s*pixelWidth:\s*(\d+)\s*$/m.exec(stdout)?.[1])
+        const sourceHeight = Number(/^\s*pixelHeight:\s*(\d+)\s*$/m.exec(stdout)?.[1])
+        let content = raw
+        if (config.bundleId === 'com.google.Chrome') {
+          const crop = browserViewportCrop(snapshot, sourceWidth, sourceHeight)
+          // sips silently skips crops touching the bottom boundary. Pad one row on
+          // each end, then discard both padding rows with the verified crop.
+          await run('/usr/bin/sips', ['--padToHeightWidth', String(sourceHeight + 2), String(sourceWidth), raw, '--out', padded], { timeout: 5000, maxBuffer: 4096 })
+          await run('/usr/bin/sips', ['--cropToHeightWidth', String(crop.height), String(crop.width), '--cropOffset', String(crop.top + 1), String(crop.left), padded, '--out', page], { timeout: 5000, maxBuffer: 4096 })
+          const measured = (await run('/usr/bin/sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', page], { timeout: 5000, maxBuffer: 4096 })).stdout
+          if (Number(/^\s*pixelWidth:\s*(\d+)\s*$/m.exec(measured)?.[1]) !== crop.width || Number(/^\s*pixelHeight:\s*(\d+)\s*$/m.exec(measured)?.[1]) !== crop.height) throw Error('browser-viewport-invalid')
+          content = page
+        }
+        return await encodePhoneCapture(sourceWidth, async width => {
+          const resize = width < sourceWidth ? ['--resampleWidth', String(width)] : []
+          await run('/usr/bin/sips', [...resize, '-s', 'format', 'jpeg', '-s', 'formatOptions', '70', content, '--out', shot], { timeout: 5000, maxBuffer: 4096 })
+          return readFile(shot)
+        })
+      } catch (error) {
+        if (['capture-invalid', 'browser-viewport-invalid'].includes(error?.message)) throw error
+        throw Error('capture-unavailable')
+      }
+      finally { await Promise.all([rm(raw, { force: true }), rm(page, { force: true }), rm(padded, { force: true }), rm(shot, { force: true })]) }
     }
     async function send(bytes) {
       if (stop) throw Error('feed-stopped')
@@ -99,15 +125,16 @@ async function main() {
         token = (await privateFile(config.tokenFile)).trim()
         expiresAt = capabilityExpiry(token)
         await captureAndSend(config, { token, now: Date.now, inspect, capture, send })
-        lastSentAt = new Date().toISOString(); failures = 0
+        lastSentAt = new Date().toISOString(); failures = 0; lastFailureReason = null
         await status(args.includes('--once') ? 'sent-once' : 'sending')
         if (args.includes('--once')) break
         await sleep(Math.max(0, config.everyMs - (Date.now() - started)))
       } catch (error) {
-        failures++
-        const code = safeFailure(error), retry = retryPolicy(failures, code)
-        await status(retry.stop ? 'stopped-error' : 'retrying', { reason: code, nextRetryAt: retry.stop ? null : new Date(Date.now() + retry.delayMs).toISOString() })
-        console.error(code)
+        const code = safeFailure(error), retry = captureFailureState(failures, code)
+        failures = retry.failures
+        await status(retry.state, { reason: code, nextRetryAt: retry.stop ? null : new Date(Date.now() + retry.delayMs).toISOString() })
+        if (code !== lastFailureReason) console.error(code)
+        lastFailureReason = code
         if (retry.stop || args.includes('--once')) { process.exitCode = 1; break }
         await sleep(retry.delayMs)
       }

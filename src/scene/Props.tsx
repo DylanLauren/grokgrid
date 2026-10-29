@@ -147,10 +147,14 @@ function MiniBot({ position, color, squircle, phase }: { position: [number, numb
   const eyes = useRef<THREE.Group>(null!)
   const st = useRef({ blink: 0, next: 2 + phase, look: 0, nextLook: 4 + phase * 2 })
   const s = 0.055
+  const halfHeight = squircle ? s * 0.9 : s
   useFrame((_, dt) => {
     const t = performance.now() / 1000 + phase * 3
     const k = st.current
-    root.current.position.y = position[1] + s + Math.abs(Math.sin(t * 1.3)) * 0.004
+    // Breathe around the resting height so neither shape floats above the desk.
+    const breath = 1 + Math.sin(t * 1.3) * 0.025
+    root.current.scale.y = breath
+    root.current.position.y = position[1] + halfHeight * breath
     k.next -= dt
     if (k.next < 0) {
       k.blink = 0.15
@@ -167,7 +171,7 @@ function MiniBot({ position, color, squircle, phase }: { position: [number, numb
     root.current.rotation.y = THREE.MathUtils.damp(root.current.rotation.y, k.look ? 1.1 : 0.4, 4, dt)
   })
   return (
-    <group ref={root} position={[position[0], position[1] + s, position[2]]} rotation-y={0.4}>
+    <group ref={root} position={[position[0], position[1] + halfHeight, position[2]]} rotation-y={0.4}>
       {squircle ? (
         <RoundedBox args={[s * 1.9, s * 1.8, s * 1.7]} radius={s * 0.6} smoothness={6} material={m} castShadow />
       ) : (

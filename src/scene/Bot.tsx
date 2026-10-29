@@ -29,10 +29,12 @@ interface Props {
   mood: Mood
   position: [number, number, number]
   yaw?: number
+  steady?: boolean // keep the held phone on its fixed camera target while watching
   children?: ReactNode // what he holds, placed between the hands
 }
 
-export const Bot = forwardRef<THREE.Group, Props>(function Bot({ mood, position, yaw = 0, children }, ref) {
+export const Bot = forwardRef<THREE.Group, Props>(function Bot({ mood, position, yaw = 0, steady = false, children }, ref) {
+  const motion = useRef<THREE.Group>(null!)
   const body = useRef<THREE.Group>(null!)
   const look = useRef<THREE.Group>(null!)
   const eyes = useRef<THREE.Group>(null!)
@@ -92,20 +94,19 @@ export const Bot = forwardRef<THREE.Group, Props>(function Bot({ mood, position,
     look.current.rotation.x = THREE.MathUtils.damp(look.current.rotation.x, targetX, 5, dt)
     look.current.rotation.y = THREE.MathUtils.damp(look.current.rotation.y, targetY, 5, dt)
 
-    // breathing, plus a hop for a win and a slump for a loss
-    let y = Math.sin(t * 1.6) * 0.008
+    // Body, hands and phone rise together; the resting pose never sinks into the seat.
+    let y = (1 + Math.sin(t * 1.6)) * 0.004
     let squash = 1
     if (mood === 'win') {
       const hop = Math.abs(Math.sin(s.moodT * 7)) * Math.exp(-s.moodT * 1.2)
       y += hop * 0.09
       squash = 1 - hop * 0.05
-    } else if (mood === 'loss') {
-      y -= Math.min(s.moodT * 0.2, 0.05)
-      squash = 1.03
     } else if (mood === 'buy') {
       y += Math.sin(s.moodT * 10) * Math.exp(-s.moodT * 3) * 0.02
     }
-    body.current.position.y = y
+    motion.current.position.y = steady ? 0 : Math.max(0, y)
+    // A disappointed head tilt replaces the old downward stretch through the chair.
+    body.current.rotation.z = THREE.MathUtils.damp(body.current.rotation.z, mood === 'loss' ? -0.08 : 0, 5, dt)
     body.current.scale.set(1 / Math.sqrt(squash), squash, 1 / Math.sqrt(squash))
 
     // eyes: blink every few seconds, narrow on a loss, widen on a win
@@ -129,30 +130,33 @@ export const Bot = forwardRef<THREE.Group, Props>(function Bot({ mood, position,
 
   return (
     <group ref={ref} position={position} rotation-y={yaw}>
-      <group ref={body}>
-        <mesh material={skin} castShadow receiveShadow>
-          <sphereGeometry args={[R, 96, 64]} />
-        </mesh>
-        <group ref={look}>
-          {/* face the desk (-z), where the phone and monitor are */}
-          <group rotation-y={Math.PI}>
-            <group ref={eyes}>
-              <mesh geometry={eyeGeo} material={ink} position={left.pos} quaternion={left.q} />
-              <mesh geometry={eyeGeo} material={ink} position={right.pos} quaternion={right.q} />
+      <group ref={motion}>
+        {/* In phone view the camera represents his eyes, so his own head stays out of shot. */}
+        <group ref={body} visible={!steady}>
+          <mesh material={skin} castShadow receiveShadow>
+            <sphereGeometry args={[R, 96, 64]} />
+          </mesh>
+          <group ref={look}>
+            {/* face the desk (-z), where the phone and monitor are */}
+            <group rotation-y={Math.PI}>
+              <group ref={eyes}>
+                <mesh geometry={eyeGeo} material={ink} position={left.pos} quaternion={left.q} />
+                <mesh geometry={eyeGeo} material={ink} position={right.pos} quaternion={right.q} />
+              </group>
             </group>
           </group>
         </group>
+        {/* two floating pebble hands, the only addition to the mascot, so he can hold a phone */}
+        <group ref={hands}>
+          <mesh material={skin} position={[-0.07, -0.085, -0.37]} castShadow>
+            <sphereGeometry args={[0.03, 32, 24]} />
+          </mesh>
+          <mesh material={skin} position={[0.07, -0.075, -0.37]} castShadow>
+            <sphereGeometry args={[0.03, 32, 24]} />
+          </mesh>
+        </group>
+        {children}
       </group>
-      {/* two floating pebble hands, the only addition to the mascot, so he can hold a phone */}
-      <group ref={hands}>
-        <mesh material={skin} position={[-0.055, -0.085, -0.37]} castShadow>
-          <sphereGeometry args={[0.03, 32, 24]} />
-        </mesh>
-        <mesh material={skin} position={[0.055, -0.075, -0.37]} castShadow>
-          <sphereGeometry args={[0.03, 32, 24]} />
-        </mesh>
-      </group>
-      {children}
     </group>
   )
 })

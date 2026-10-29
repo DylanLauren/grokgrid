@@ -164,6 +164,8 @@
   .fine { display: none; }
 }
 
+/* Focused viewing keeps call previews clear of the handset and its controls. */
+.view-phone .calls-dock { display: none; }
 /* opening a callout from the dock: the panel slides in as one piece while the clicked
    card flies from the dock to its spot in the list (see morphOpen in App.tsx) */
 .vt-calls .panel { view-transition-name: calls-panel; transition: none; }

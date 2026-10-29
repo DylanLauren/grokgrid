@@ -1,5 +1,5 @@
-import { CameraControls, ContactShadows, Environment, Html, Lightformer, RoundedBox } from '@react-three/drei'
-import { Canvas } from '@react-three/fiber'
+import { CameraControls, CameraControlsImpl, ContactShadows, Environment, Html, Lightformer, RoundedBox } from '@react-three/drei'
+import { Canvas, useThree } from '@react-three/fiber'
 import { Component, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
 import type { Feed, Live } from '../data/types'
@@ -8,26 +8,9 @@ import { Bot, type Mood } from './Bot'
 import { MON, Room, RoomBaked, RoomLive } from './Room'
 import { Props } from './Props'
 import { MonitorScreen } from '../ui/MonitorScreen'
+import { BOT_POS, BOT_YAW, PHONE, ROOM_ORBIT, ROOM_VIEW, phoneView } from './cameraGeometry'
 
 export type View = 'third' | 'phone'
-
-const BOT_POS: [number, number, number] = [0, 0.86, 0.64]
-const PHONE = { pos: [0, -0.04, -0.42] as [number, number, number], tilt: -1.05, w: 0.074, h: 0.158 }
-
-// he sits turned a little toward the room so the default view catches his face
-const BOT_YAW = -0.45
-
-// a point given relative to the bot, in world space
-function fromBot(x: number, y: number, z: number): [number, number, number] {
-  const c = Math.cos(BOT_YAW)
-  const s = Math.sin(BOT_YAW)
-  return [BOT_POS[0] + x * c + z * s, BOT_POS[1] + y, BOT_POS[2] - x * s + z * c]
-}
-
-const VIEWS: Record<View, [number, number, number, number, number, number]> = {
-  third: [2.0, 1.75, -0.35, -0.12, 0.9, 0.12],
-  phone: [...fromBot(0.02, 0.28, -0.28), ...fromBot(0, -0.04, -0.42)],
-}
 
 const reduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -61,36 +44,45 @@ function Later({ children }: { children: ReactNode }) {
   return ready ? <>{children}</> : null
 }
 
-// Anything in the room between the camera and him pushes the camera in front of it,
-// so looking around never ends behind a chair, a shelf or a wall.
-function Rig({ view, colliders }: { view: View; colliders: THREE.Object3D[] }) {
+// A fixed target and bounded orbit avoid crossing the shell or furniture without
+// four expensive raycasts through baked geometry on every animation frame.
+function Rig({ view }: { view: View }) {
   const ref = useRef<CameraControls>(null)
+  const previous = useRef<View | null>(null)
+  const { width, height } = useThree((state) => state.size)
   useEffect(() => {
     const c = ref.current
     if (!c) return
-    c.colliderMeshes = colliders
-  }, [colliders])
-  useEffect(() => {
-    const c = ref.current
-    if (!c) return
-    const [px, py, pz, tx, ty, tz] = VIEWS[view]
-    c.setLookAt(px, py, pz, tx, ty, tz, !reduced)
-    // a phone held up close fills a narrow screen sooner
-    c.zoomTo(view === 'phone' ? (innerWidth < 700 ? 0.85 : 1.3) : 1, !reduced)
+    if (view === 'third' && previous.current === view) return
+    const wasPhone = previous.current === 'phone'
+    previous.current = view
+    c.stop()
+    c.colliderMeshes = []
+    Object.assign(c, view === 'third' ? ROOM_ORBIT : {
+      minDistance: 0.05, maxDistance: 4, minPolarAngle: 0.01,
+      maxPolarAngle: Math.PI - 0.01, minAzimuthAngle: -Infinity, maxAzimuthAngle: Infinity,
+    })
     c.enabled = view === 'third'
-  }, [view])
+    // Resize only reframes the phone, preserving a visitor's chosen room angle.
+    const pose = view === 'phone' ? phoneView(width, height) : ROOM_VIEW
+    void c.zoomTo(1, false)
+    void c.setLookAt(...pose, !reduced && (view === 'phone' || wasPhone))
+  }, [view, width, height])
+  const action = CameraControlsImpl.ACTION
   return (
     <CameraControls
       ref={ref}
       makeDefault
-      minDistance={0.7}
-      maxDistance={3.2}
-      minPolarAngle={0.35}
-      maxPolarAngle={1.52}
-      minAzimuthAngle={-1.05}
-      maxAzimuthAngle={2.2}
-      smoothTime={0.6}
-      dollySpeed={0.4}
+      {...ROOM_ORBIT}
+      mouseButtons={{ left: action.ROTATE, middle: action.NONE, right: action.NONE, wheel: action.DOLLY }}
+      touches={{ one: action.TOUCH_ROTATE, two: action.TOUCH_DOLLY, three: action.NONE }}
+      dollyToCursor={false}
+      infinityDolly={false}
+      smoothTime={0.32}
+      draggingSmoothTime={0.12}
+      dollySpeed={0.35}
+      azimuthRotateSpeed={0.65}
+      polarRotateSpeed={0.65}
     />
   )
 }
@@ -106,7 +98,6 @@ interface SceneProps {
 export function Scene({ feed, live, view, paused, onPhone }: SceneProps) {
   const mood = useMood(feed)
   const bot = useRef<THREE.Group>(null!)
-  const [colliders, setColliders] = useState<THREE.Object3D[]>([])
   const [hover, setHover] = useState(false)
   useEffect(() => {
     document.body.style.cursor = hover && view === 'third' ? 'pointer' : ''
@@ -117,11 +108,12 @@ export function Scene({ feed, live, view, paused, onPhone }: SceneProps) {
       frameloop={paused ? 'never' : 'always'}
       shadows
       dpr={[1, 2]}
-      camera={{ position: VIEWS.third.slice(0, 3) as [number, number, number], fov: 38, near: 0.02, far: 30 }}
+      camera={{ position: ROOM_VIEW.slice(0, 3) as [number, number, number], fov: 38, near: 0.02, far: 30 }}
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
       onCreated={({ scene }) => {
         scene.background = new THREE.Color('#0a0a0a')
         scene.fog = new THREE.Fog('#0a0a0a', 3.5, 7.5)
+
       }}
     >
       <ambientLight intensity={0.12} />
@@ -155,7 +147,7 @@ export function Scene({ feed, live, view, paused, onPhone }: SceneProps) {
 
       <KeepFallback fallback={<Room />}>
         <Suspense fallback={<Room />}>
-          <RoomBaked onReady={setColliders} />
+          <RoomBaked />
         </Suspense>
       </KeepFallback>
       <RoomLive />
@@ -175,7 +167,7 @@ export function Scene({ feed, live, view, paused, onPhone }: SceneProps) {
         </Later>
       </group>
 
-      <Bot ref={bot} mood={mood} position={BOT_POS} yaw={BOT_YAW}>
+      <Bot ref={bot} mood={mood} position={BOT_POS} yaw={BOT_YAW} steady={view === 'phone'}>
         <group
           position={PHONE.pos}
           rotation-x={PHONE.tilt}
@@ -194,7 +186,7 @@ export function Scene({ feed, live, view, paused, onPhone }: SceneProps) {
             transform
             distanceFactor={(PHONE.w * 400) / 300}
             position={[0, 0, 0.0052]}
-            occlude={[bot]}
+            occlude={view === 'phone' ? false : [bot]}
             zIndexRange={[20, 10]}
             pointerEvents="none"
           >
@@ -207,14 +199,14 @@ export function Scene({ feed, live, view, paused, onPhone }: SceneProps) {
           <Html position={[-0.06, 0.03, -0.42]} center zIndexRange={[30, 20]}>
             <button className={`watch ${hover ? 'hot' : ''} ${view === 'third' && !paused ? '' : 'gone'}`} onClick={onPhone} tabIndex={view === 'third' ? 0 : -1}>
               <span className="watch-line" />
-              <span className="watch-pill">Watch my screen</span>
+              <span className="watch-pill">Watch me trade!</span>
             </button>
           </Html>
         </Later>
       </Bot>
 
       <ContactShadows position={[0, 0.001, 0.3]} opacity={0.55} scale={4} blur={2.6} far={1.2} />
-      <Rig view={view} colliders={colliders} />
+      <Rig view={view} />
     </Canvas>
   )
 }

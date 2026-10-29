@@ -70,8 +70,23 @@ these files to the repository.
 
 Window capture uses `screencapture -l` rather than a desktop rectangle. Temporary
 images are held in a unique private directory and removed after capture. The
-output is resized to 390 pixels wide, JPEG encoded, and limited to 330 KB before
-base64 encoding. Capture/conversion/upload have timeouts. Status writes are atomic
+source is captured as a lossless PNG. For Chrome, read-only page JavaScript
+measures the active page viewport, outer window, device pixel ratio and URL.
+Those values must remain identical before and after capture. Only the full-width
+page viewport is retained: tabs and the address bar are removed from the feed,
+without hiding or modifying the actual browser UI. Invalid metrics, inconsistent
+Retina/zoom scale, or a browser-chrome crop exceeding 35% of the image fail closed.
+Chrome must allow JavaScript from Apple Events for this read-only measurement.
+The crop uses temporary one-pixel padding above and below to avoid a macOS `sips`
+boundary bug, removes that padding, and verifies the resulting dimensions before
+encoding. Native 1x and Retina 2x fixture checks confirmed both the top browser
+strip is removed and the final bottom viewport pixel is preserved.
+
+The cropped page is encoded as JPEG at quality 70 with a
+preferred width of 780 pixels. If that encoding exceeds 330 KB, the publisher
+tries 520 pixels, then 390 pixels, always encoding again from the lossless cropped page PNG.
+It never upscales a narrower source, and rejects a frame still above 330 KB at
+the smallest allowed size. The 330 KB limit is applied before base64 encoding. Capture/conversion/upload have timeouts. Status writes are atomic
 and contain no credential, image, browser URL or window title.
 
 `phone-status.json` records `state`, `observedAt`, `lastSentAt`, failure count,
@@ -80,8 +95,17 @@ window ID and credential expiry. The server response must succeed before
 seconds without success; a `sending` string alone never proves liveness. The
 website's own frame freshness is authoritative for what viewers receive.
 
-Transient failures use exponential backoff up to 60 seconds. Eight consecutive
-failures stop the publisher. HTTP 401/403, other non-rate-limit 4xx responses, or an
+When the exact pinned source is minimized or temporarily offscreen on another
+macOS Space, the publisher reports `waiting-for-window` and retries every five
+seconds. Its ID, owner PID, bundle, title, geometry and Chrome URL must still
+validate before the temporary classification is allowed. No screenshot is taken
+while offscreen; a frame becoming offscreen during capture is discarded. These
+availability waits do not consume or reset the genuine-failure budget. Returning
+the same window to view resumes capture automatically, without changing any pin.
+A missing window or changed identity/URL remains a genuine source failure.
+
+Other transient failures use exponential backoff up to 60 seconds. Eight
+consecutive genuine failures stop the publisher. HTTP 401/403, other non-rate-limit 4xx responses, or an
 expired capability stop immediately. Errors are reduced to fixed codes, never
 raw tool/network exceptions or credential-bearing URLs. SIGINT/SIGTERM stop
 publishing and remove the process lock. A lock prevents competing publishers
@@ -120,7 +144,8 @@ Continuous operation must be tested after establishing a real active source.
 
 ## Crash cleanup review
 
-Normal capture completion and capture/conversion errors remove `frame.jpg` in a
+Normal capture completion and capture/conversion errors remove `frame.png`, `padded.png`, `page.png` and
+`frame.jpg` in a
 `finally` block. Normal process exit, including handled SIGINT/SIGTERM after the
 bounded in-flight operation finishes, removes that process's unique temporary
 directory and lock. The directory is created with `mkdtemp` under a restrictive
@@ -138,7 +163,7 @@ PID, process start identity, and exact temporary-directory path, written before
 capture. Recovery should require verifying the process is no longer that exact
 running instance, checking ownership and permissions with `lstat`, rejecting
 symlinks or paths outside the expected temporary parent, and deleting only the
-known `frame.jpg` and manifest before removing an empty directory. PID reuse or
+known `frame.png`, `frame.jpg` and manifest before removing an empty directory. PID reuse or
 any uncertain ownership should leave files untouched for operator review. That
 recovery mechanism is a proposal, not an implemented startup behavior.
 
@@ -290,3 +315,13 @@ Production then returned404 while the local guarded publisher was stopped.
 The local near-expiry credential was renewed successfully through the configured
 issuer. An exclusive-source live recovery repeat remains required after other
 desktop automation stops changing the dedicated browser window.
+
+
+A minimized window can disappear entirely from CoreGraphics metadata. A literal
+missing result now reports `window-unavailable` and waits five seconds without
+capturing or spending the transient-failure budget. Returning the same pinned
+window still requires every identity, URL, geometry and viewport check. Closing
+the window also leaves this waiting state; a newly opened window with a new ID
+is never substituted automatically and requires an explicit operator repin.
+This handles temporary absence; it does not make background/off-Space capture
+available or prove continuously fresh frames while the window is hidden.
