@@ -32,7 +32,7 @@
 }
 .mini.on { opacity: 1; transform: none; pointer-events: auto; transition-delay: 0.12s; }
 .mini:hover { border-color: var(--paper-50); }
-.mb { position: relative; width: 32px; height: 32px; display: block; margin-top: -2px; }
+.mb { position: relative; width: 32px; height: 32px; display: block; }
 /* the logo bot brings its own eyes; the box only floats it */
 .mb .logo-bot { position: absolute; inset: -1px; animation: mb-float 5.6s ease-in-out infinite; transition: rotate 0.7s cubic-bezier(.2,.8,.2,1), scale 0.7s cubic-bezier(.2,.8,.2,1); }
 .mb-shadow { position: absolute; left: 50%; bottom: -5px; width: 20px; height: 4px; margin-left: -10px; border-radius: 50%; background: #000; filter: blur(2px); opacity: 0.55; animation: mb-shade 5.6s ease-in-out infinite; }

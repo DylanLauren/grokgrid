@@ -1,12 +1,10 @@
-/* the logo bot breathes and bobs; his hands rock the phone a little, as if he's scrolling */
-.logo-bot { overflow: visible; }
-.logo-bot .lg-float, .logo-bot .lg-body, .logo-bot .lg-hands, .logo-bot .lg-hand { transform-box: fill-box; transform-origin: 50% 100%; }
-.logo-bot.alive .lg-float { animation: lg-float 4.6s cubic-bezier(.45, 0, .55, 1) infinite; }
-.logo-bot.alive .lg-body { animation: lg-breathe 4.6s cubic-bezier(.45, 0, .55, 1) infinite; }
-.logo-bot.alive .lg-hands { transform-origin: 70% 60%; animation: lg-rock 3.8s cubic-bezier(.45, 0, .55, 1) infinite; }
-.logo-bot.alive .lg-hand-r { animation: lg-thumb 1.9s cubic-bezier(.45, 0, .55, 1) infinite; }
-@keyframes lg-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -2.5px; } }
-@keyframes lg-breathe { 0%, 100% { scale: 1 1; } 50% { scale: 1.012 0.99; } }
-@keyframes lg-rock { 0%, 100% { rotate: 0deg; } 50% { rotate: -3deg; } }
-@keyframes lg-thumb { 0%, 100% { translate: 0 0; } 50% { translate: 0 -1px; } }
+/* the logo bot bobs and breathes; his hands rock the phone a little, as if he's scrolling */
+.logo-bot { overflow: visible; shape-rendering: geometricPrecision; }
+.logo-bot .lg-float, .logo-bot .lg-body, .logo-bot .lg-hands { transform-box: view-box; will-change: transform; }
+.logo-bot.alive .lg-float { animation: lg-float 5.2s cubic-bezier(.37, 0, .63, 1) infinite; }
+.logo-bot.alive .lg-body { transform-origin: 45px 77px; animation: lg-breathe 5.2s cubic-bezier(.37, 0, .63, 1) infinite; }
+.logo-bot.alive .lg-hands { transform-origin: 62px 80px; animation: lg-rock 4.4s cubic-bezier(.37, 0, .63, 1) infinite; }
+@keyframes lg-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.4px); } }
+@keyframes lg-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.012, 0.992); } }
+@keyframes lg-rock { 0%, 100% { transform: rotate(0deg) translateY(0); } 50% { transform: rotate(-2.2deg) translateY(-0.6px); } }
 @media (prefers-reduced-motion: reduce) { .logo-bot * { animation: none !important; } }

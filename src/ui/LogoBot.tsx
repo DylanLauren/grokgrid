@@ -16,7 +16,6 @@ const LOOKS: [number, number, number][] = [
   [0.7, 0.36, 1800], // phone, reading further down
   [0.15, -0.05, 1100], // up at you
   [0.58, 0.24, 2400],
-  [-0.35, -0.2, 900], // a glance away
 ]
 
 const still = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -46,8 +45,8 @@ export function LogoBot({ size = 30, animate = true }: { size?: number; animate?
       }
       // a slow drift on top of the target keeps the eyes moving like they're reading
       const drift = Math.sin(now / 900) * 0.04
-      lx += (tx + drift - lx) * 0.07
-      ly += (ty + Math.cos(now / 1300) * 0.03 - ly) * 0.07
+      lx += (tx + drift - lx) * 0.05
+      ly += (ty + Math.cos(now / 1300) * 0.03 - ly) * 0.05
       open += ((now < blinkEnd ? 0.08 : 1) - open) * (now < blinkEnd ? 0.45 : 0.25)
       const [a, b] = eyePaths('sphere', lx, ly, 1, open)
       e1.current!.setAttribute('d', a)
@@ -58,58 +57,54 @@ export function LogoBot({ size = 30, animate = true }: { size?: number; animate?
   }, [animate])
 
   return (
-    <svg className={`logo-bot ${animate ? 'alive' : ''}`} width={size} height={size} viewBox="0 0 100 100" aria-hidden="true" style={{ flex: 'none' }}>
+    <svg className={`logo-bot ${animate ? 'alive' : ''}`} width={size} height={size} viewBox="9 9 82 82" aria-hidden="true" style={{ flex: 'none' }}>
       <defs>
-        {/* cool on the left, warm on the right, as in the artwork */}
-        <linearGradient id={`${id}-rim`} x1="0" y1="0.2" x2="1" y2="0.8">
-          <stop offset="0" stopColor="#3d6bff" />
-          <stop offset="0.45" stopColor="#a04dff" />
-          <stop offset="1" stopColor="#ff8a2e" />
+        {/* cool on the left, warm on the right, as in the artwork; a soft white core sits on top */}
+        <linearGradient id={`${id}-rim`} x1="0.05" y1="0.35" x2="0.95" y2="0.75">
+          <stop offset="0" stopColor="#4a6dff" />
+          <stop offset="0.5" stopColor="#b25cff" />
+          <stop offset="1" stopColor="#ff9142" />
         </linearGradient>
-        <radialGradient id={`${id}-fade`} gradientUnits="userSpaceOnUse" cx={BX + 5} cy={BY - 9} r={BR + 8}>
-          <stop offset="0.55" stopColor="#fff" stopOpacity="0" />
-          <stop offset="1" stopColor="#fff" stopOpacity="1" />
+        <radialGradient id={`${id}-core`} cx="0.56" cy="0.4" r="0.62">
+          <stop offset="0" stopColor="#fff" />
+          <stop offset="0.62" stopColor="#fbfbff" />
+          <stop offset="0.86" stopColor="#fbfbff" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#fbfbff" stopOpacity="0" />
         </radialGradient>
-        <mask id={`${id}-edge`}>
-          <rect width="100" height="100" fill={`url(#${id}-fade)`} />
-        </mask>
-        <radialGradient id={`${id}-hand`} gradientUnits="userSpaceOnUse" cx="-1" cy="-4" r="15">
-          <stop offset="0.45" stopColor="#fff" stopOpacity="0" />
-          <stop offset="1" stopColor="#fff" stopOpacity="1" />
+        <radialGradient id={`${id}-hcore`} cx="0.5" cy="0.32" r="0.68">
+          <stop offset="0" stopColor="#fff" />
+          <stop offset="0.55" stopColor="#fbfbff" />
+          <stop offset="0.9" stopColor="#fbfbff" stopOpacity="0.35" />
+          <stop offset="1" stopColor="#fbfbff" stopOpacity="0" />
         </radialGradient>
-        <mask id={`${id}-hedge`}>
-          <rect x="-50" y="-50" width="100" height="100" fill={`url(#${id}-hand)`} />
-        </mask>
+        <linearGradient id={`${id}-glass`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#2a2f3b" />
+          <stop offset="1" stopColor="#0d0f14" />
+        </linearGradient>
       </defs>
       <g className="lg-float">
         <g className="lg-body">
-          <circle cx={BX} cy={BY} r={BR} fill="#fbfbfd" />
-          <circle cx={BX} cy={BY} r={BR} fill={`url(#${id}-rim)`} mask={`url(#${id}-edge)`} opacity="0.85" />
+          <circle cx={BX} cy={BY} r={BR} fill={`url(#${id}-rim)`} />
+          <circle cx={BX} cy={BY} r={BR + 0.2} fill={`url(#${id}-core)`} />
           {/* his eyes lean the way his head turns toward the phone, as in the artwork */}
-          <g transform={`rotate(-22 ${BX + 9} ${BY + 2}) ${EYE}`}>
-            <path ref={e1} d={d1} fill="#111" />
-            <path ref={e2} d={d2} fill="#111" />
+          <g transform={`rotate(-20 ${BX + 9} ${BY + 2}) ${EYE}`}>
+            <path ref={e1} d={d1} fill="#0e0e12" />
+            <path ref={e2} d={d2} fill="#0e0e12" />
           </g>
         </g>
         <g className="lg-hands">
           {/* the phone, tucked between his hands */}
-          <g className="lg-phone">
-            <g transform="rotate(30 68 66)">
-              <rect x="60" y="50" width="16" height="31" rx="3.6" fill="#16181d" />
-              <rect x="60.7" y="50.7" width="14.6" height="29.6" rx="3" fill="none" stroke="#3b4256" strokeWidth="0.9" />
-              <rect x="63" y="53" width="7.4" height="7.4" rx="2" fill="#0b0c10" />
-              <circle cx="65" cy="55" r="1.3" fill="#05060a" stroke="#2f3546" strokeWidth="0.45" />
-              <circle cx="65" cy="58.4" r="1.3" fill="#05060a" stroke="#2f3546" strokeWidth="0.45" />
-              <circle cx="68.3" cy="56.7" r="1.3" fill="#05060a" stroke="#2f3546" strokeWidth="0.45" />
-            </g>
+          <g transform="rotate(30 68 66)">
+            <rect x="60.5" y="50" width="15" height="30" rx="4" fill={`url(#${id}-glass)`} />
+            <rect x="63" y="52.8" width="6.4" height="6.4" rx="2" fill="#07080b" />
           </g>
-          <g className="lg-hand lg-hand-l" transform="translate(52 79) rotate(-18)">
-            <ellipse rx="13" ry="10.5" fill="#fbfbfd" />
-            <ellipse rx="13" ry="10.5" fill={`url(#${id}-rim)`} mask={`url(#${id}-hedge)`} opacity="0.9" />
+          <g className="lg-hand lg-hand-l" transform="translate(52.5 79.5) rotate(-16)">
+            <ellipse rx="12.5" ry="10.2" fill={`url(#${id}-rim)`} />
+            <ellipse rx="12.7" ry="10.4" fill={`url(#${id}-hcore)`} />
           </g>
-          <g className="lg-hand lg-hand-r" transform="translate(73 76) rotate(-24)">
-            <ellipse rx="11.5" ry="10" fill="#fbfbfd" />
-            <ellipse rx="11.5" ry="10" fill={`url(#${id}-rim)`} mask={`url(#${id}-hedge)`} opacity="0.9" />
+          <g className="lg-hand lg-hand-r" transform="translate(72.5 76.5) rotate(-22)">
+            <ellipse rx="11" ry="9.6" fill={`url(#${id}-rim)`} />
+            <ellipse rx="11.2" ry="9.8" fill={`url(#${id}-hcore)`} />
           </g>
         </g>
       </g>

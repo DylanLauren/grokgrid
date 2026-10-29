@@ -20,7 +20,7 @@ interface Props {
   shout?: boolean // keep the speech bubble out without a hover
   hoverFace?: Face // the face it pulls while you hover it
   still?: boolean // eyes stay put: no glancing or following the pointer
-  flow?: number // eyes trace this bot's own slow loop instead of watching the pointer
+  flow?: number // eyes trace this bot's own slow loop, and watch the pointer while it moves
 }
 
 export const LiveBot = forwardRef<HTMLDivElement, Props>(function LiveBot({ color, shape, habit, size, say, delay = 0, selected, eye, shout, hoverFace, still, flow }, ref) {
