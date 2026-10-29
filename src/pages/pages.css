@@ -82,13 +82,14 @@
 .st-tiles-5 { grid-template-columns: repeat(5, 1fr); }
 .st-tile b.st-up { color: var(--gain); }
 .st-tile b.st-down { color: var(--paper-50); }
-.st-trades { display: grid; }
+.st-trades { display: grid; background: #0f0f10; border: 1px solid var(--hair); border-radius: var(--r-card); padding: 4px 14px; overflow: hidden; }
+.st-trades > .st-tr:last-child { border-bottom: 0; }
 .st-tr { display: grid; grid-template-columns: 44px 1.2fr 70px 1fr 1fr 1fr 90px 28px; gap: 12px; align-items: center; padding: 12px 6px; border-bottom: 1px solid var(--hair); font-size: 14px; transition: background 0.2s, padding 0.3s cubic-bezier(.2,.8,.2,1); }
-.st-tr:hover { background: #ffffff06; padding-left: 12px; }
-.st-tr.th { font-size: 11px; color: var(--paper-50); text-transform: uppercase; letter-spacing: 0.06em; padding-top: 0; }
+.st-tr:hover { background: #ffffff06; padding-left: 12px; border-radius: 10px; }
+.st-tr.th { font-size: 11px; color: var(--paper-50); text-transform: uppercase; letter-spacing: 0.06em; padding-top: 14px; }
 .st-tr.th:hover { background: none; padding-left: 6px; }
 .st-tr .r { text-align: right; }
-.st-tr em { font-style: normal; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 6px; justify-self: start; }
+.st-tr em { font-style: normal; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 6px; justify-self: start; align-self: center; line-height: 1.5; }
 .st-tr em.buy { color: var(--gain); background: #4ade801a; }
 .st-tr em.sell { color: var(--loss); background: #f871711a; }
 .st-tr a { color: var(--paper-50); }

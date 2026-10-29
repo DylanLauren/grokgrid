@@ -3,7 +3,7 @@ import { BODY, FAMILY, type Shape } from './BotMark'
 import { eyeInk, eyePaths } from './eyes'
 import './intro.css'
 
-// The opening: the whole bot family flies across the screen like Superman, capes out,
+// The opening: the whole bot family flies across the screen like Superman, leaning in,
 // swoops back and circles up around Grok Bot, then the ring bursts and the room shows.
 // About 2.4 seconds, once per browser session. A click or any key skips it.
 const KEY = 'gg-intro'
@@ -18,8 +18,6 @@ const BOTS: { color: string; shape: Shape }[] = [
   { color: '#13b8a6', shape: 'cone' },
   { color: '#9b5cff', shape: 'sphere' },
   { color: '#1683ff', shape: 'drop' },
-  { color: '#ff2e9a', shape: 'tile' },
-  { color: '#ff9a00', shape: 'sphere' },
 ]
 
 export function introDue() {
@@ -59,7 +57,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
     canvas.height = Math.round(h * dpr)
     const cx = w / 2, cy = h / 2
     const unit = Math.min(w, h)
-    const ringR = unit * 0.26
+    const ringR = unit * 0.28
     const n = BOTS.length
     const paths = Object.fromEntries(Object.entries(BODY).map(([k, d]) => [k, new Path2D(d)])) as Record<Shape, Path2D>
 
@@ -67,7 +65,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
     const bots = BOTS.map((b, i) => {
       const fromLeft = i % 2 === 0
       const y0 = h * (0.12 + ((i * 0.37) % 0.76))
-      const size = unit * (0.07 + ((i * 0.13) % 0.035))
+      const size = unit * (0.088 + ((i * 0.13) % 0.03))
       return {
         ...b,
         size,
@@ -97,21 +95,6 @@ export function Intro({ onDone }: { onDone: () => void }) {
       ctx.restore()
     }
 
-    // a little cape off the bot's back, longer and wavier the faster it goes; it tucks away once he's in the ring
-    const drawCape = (size: number, speed: number, now: number, color: string, out: number) => {
-      const len = size * (0.3 + Math.min(0.9, speed * 0.55)) * out
-      if (len < 1) return
-      const wave = Math.sin(now * 0.03) * size * 0.06
-      ctx.fillStyle = color === '#ff2e9a' || color === '#ff6a00' || color === '#ff9a00' ? '#1f4fd8' : '#e3262f'
-      ctx.beginPath()
-      ctx.moveTo(-size * 0.2, -size * 0.3)
-      ctx.quadraticCurveTo(-size * 0.2 - len * 0.5, -size * 0.28 + wave, -size * 0.2 - len, -size * 0.16 - wave)
-      ctx.lineTo(-size * 0.2 - len * 0.85, -size * 0.02 + wave)
-      ctx.quadraticCurveTo(-size * 0.2 - len * 0.4, -size * 0.06 - wave, -size * 0.24, -size * 0.08)
-      ctx.closePath()
-      ctx.fill()
-    }
-
     let raf = 0
     let t0 = 0
     let left = false
@@ -128,7 +111,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
       // speed lines while they cross
       const streak = clamp(1 - Math.abs(now - 500) / 600)
       if (streak > 0) {
-        ctx.strokeStyle = `rgba(255,255,255,${0.07 * streak})`
+        ctx.strokeStyle = `rgba(255,255,255,${0.035 * streak})`
         ctx.lineWidth = 1
         for (let i = 0; i < 18; i++) {
           const y = ((i * 97) % 100) / 100 * h
@@ -146,7 +129,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
         ctx.save()
         ctx.globalAlpha = alpha
         ctx.translate(cx, cy + Math.sin(now * 0.006) * 4)
-        drawBot('sphere', 'house', unit * 0.16 * (hub + burst * 0.5), true, Math.sin(now * 0.004) * 0.45, -0.1)
+        drawBot('sphere', 'house', unit * 0.2 * (hub + burst * 0.5), true, Math.sin(now * 0.004) * 0.45, -0.1)
         ctx.restore()
       }
 
@@ -159,7 +142,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
         const vx = pos[0] - prev[0], vy = pos[1] - prev[1]
         const speed = Math.hypot(vx, vy) / Math.max(1, unit * 0.01)
         b.trail.push(pos)
-        if (b.trail.length > 16) b.trail.shift()
+        if (b.trail.length > 10) b.trail.shift()
         if (Math.abs(vx) > 0.5) b.face += (Math.sign(vx) - b.face) * 0.25
 
         // the trail: one tapered ribbon, thinning out behind
@@ -170,14 +153,14 @@ export function Intro({ onDone }: { onDone: () => void }) {
             const a = b.trail[Math.max(0, k - 1)], c = b.trail[Math.min(b.trail.length - 1, k + 1)]
             const nx = -(c[1] - a[1]), ny = c[0] - a[0]
             const d = Math.hypot(nx, ny) || 1
-            const half = (b.size * 0.22 * k) / b.trail.length
+            const half = (b.size * 0.12 * k) / b.trail.length
             left.push([b.trail[k][0] + (nx / d) * half, b.trail[k][1] + (ny / d) * half])
             right.push([b.trail[k][0] - (nx / d) * half, b.trail[k][1] - (ny / d) * half])
           }
           const tail = b.trail[0], head = b.trail[b.trail.length - 1]
           const g = ctx.createLinearGradient(tail[0], tail[1], head[0], head[1])
           g.addColorStop(0, b.color + '00')
-          g.addColorStop(1, b.color + '66')
+          g.addColorStop(1, b.color + '30')
           ctx.fillStyle = g
           ctx.globalAlpha = alpha
           ctx.beginPath()
@@ -192,8 +175,10 @@ export function Intro({ onDone }: { onDone: () => void }) {
         const tilt = clamp(Math.atan2(vy, Math.abs(vx) + 0.001), -0.7, 0.7)
         ctx.translate(pos[0], pos[1])
         ctx.scale(b.face, 1)
-        ctx.rotate(tilt + 0.18 * Math.min(1, speed))
-        drawCape(b.size, speed, now + i * 40, b.color, 1 - clamp((t - 0.8) / 0.2))
+        ctx.rotate(tilt + 0.14 * Math.min(1, speed))
+        // a little stretch along the flight, settling round in the ring
+        const st = Math.min(1, speed) * 0.1
+        ctx.scale(1 + st, 1 - st * 0.7)
         // eyes ahead while flying, then they all turn to Grok Bot in the middle
         const k = clamp((t - 0.85) / 0.15)
         const dx = cx - pos[0], dy = cy - pos[1], dd = Math.hypot(dx, dy) || 1

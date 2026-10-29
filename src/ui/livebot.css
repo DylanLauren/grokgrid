@@ -47,3 +47,24 @@
 @keyframes lb-drift { 0%, 100% { transform: translate(0, 0) rotate(-1.5deg); } 50% { transform: translate(4px, -5px) rotate(1.5deg); } }
 .lb-wave { display: inline-block; animation: lb-wave 2.6s ease-in-out infinite; animation-delay: calc(var(--i) * 70ms); }
 @keyframes lb-wave { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-3px); } }
+
+/* the crew by the logo keeps its old tricks: bounces, sways, hops and flips */
+.crew .lb-bounce .lb-habit { animation: lb-bounce-big 1.6s cubic-bezier(.3,0,.4,1) infinite var(--d); }
+.crew .lb-sway .lb-habit { animation: lb-sway-big 2.8s ease-in-out infinite var(--d); }
+.crew .lb-tilt .lb-habit { animation: lb-tilt-big 5s ease-in-out infinite var(--d); }
+.crew .lb-flip .lb-habit { animation: lb-flip-big 6s cubic-bezier(.5,0,.2,1) infinite var(--d); transform-origin: 50% 55%; }
+.crew .lb-hop .lb-habit { animation: lb-hop-big 2.4s cubic-bezier(.3,0,.4,1) infinite var(--d); }
+.crew .lb:hover .lb-body { animation: lb-jump 0.65s cubic-bezier(.3,0,.3,1); }
+@keyframes lb-bounce-big { 0%, 100% { transform: translateY(0) scale(1.06, 0.94); } 15% { transform: translateY(0) scale(0.96, 1.05); } 45% { transform: translateY(-14%) scale(1); } 75% { transform: translateY(0) scale(1.04, 0.96); } }
+@keyframes lb-sway-big { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+@keyframes lb-tilt-big { 0%, 40%, 100% { transform: rotate(0); } 50%, 70% { transform: rotate(-14deg) translateX(-3%); } }
+@keyframes lb-flip-big { 0%, 70% { transform: rotate(0); } 78% { transform: translateY(-16%) rotate(180deg); } 86%, 100% { transform: translateY(0) rotate(360deg); } }
+@keyframes lb-hop-big { 0%, 55%, 100% { transform: translateY(0) scale(1); } 60% { transform: scale(1.08, 0.9); } 72% { transform: translateY(-20%) scale(0.95, 1.06); } 86% { transform: translateY(0) scale(1.06, 0.94); } }
+@keyframes lb-jump {
+  0% { transform: scale(1); }
+  18% { transform: scale(1.12, 0.86); }
+  45% { transform: translateY(-22%) scale(0.92, 1.1); }
+  75% { transform: translateY(0) scale(1.1, 0.9); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) { .crew .lb .lb-habit, .crew .lb .lb-body { animation: none !important; } }
