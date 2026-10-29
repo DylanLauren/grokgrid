@@ -8,7 +8,7 @@ import './panels.css'
 export function CallsPanel({ feed, focus }: { feed: Feed; focus?: string }) {
   return (
     <>
-      <PanelHead title="Calls" sub={`every trade he makes, called out as it happens. ${feed.mode === 'demo' ? 'sample calls until his wallet goes live.' : 'each one links to its transaction.'}`} />
+      <PanelHead title="Calls" sub={`every trade he makes, called out as it happens. each one links to its transaction.`} />
       <div className="pn-list">
         {!feed.calls.length && <p className="pn-none mono">no calls yet. his first trade shows up here, linked to its transaction.</p>}
         {feed.calls.slice(0, 40).map((c, i) => (

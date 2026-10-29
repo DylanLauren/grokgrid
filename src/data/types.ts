@@ -18,17 +18,18 @@ export interface Call {
   pnlUsd: number | null
   entryMc: number | null
   nowMc: number | null
-  sample?: boolean
   sig?: string // transaction signature, links to solscan
   verification?: 'wallet-balance-movements'
   verified?: boolean // receipt checks only the wallet token/SOL flows, not profit
 }
 
+// loading: no answer yet. empty: answered, nothing traded yet. error: the API could not be reached.
+export type DataMode = 'loading' | 'live' | 'empty' | 'error'
+
 export interface WalletPoint { ts: number; sol: number }
 
 export interface Feed {
-  mode: 'live' | 'demo'
-  marketUpdatedAt?: number
+  mode: DataMode
   wallet: string | null
   solUsd: number
   calls: Call[] // newest first
@@ -58,7 +59,7 @@ export interface Agent {
     vol24hUsd: number
     change24h: number // percent
     feesSol: number // creator fees earned so far
-    real?: boolean // a real coin on chain (sample bots borrow real coins before launches start)
+    real?: boolean // false for a coin that was not launched here
   }
   walletSol: number
   pnlSol: number | null // since launch, realised + open
@@ -69,8 +70,7 @@ export interface Agent {
 }
 
 export interface AgentsFeed {
-  mode: 'live' | 'demo'
-  marketUpdatedAt?: number
+  mode: DataMode
   updatedAt: number
   solUsd: number
   agents: Agent[]
@@ -79,10 +79,8 @@ export interface AgentsFeed {
 // What he is doing this second, for the phone view. screenTs is the time of his
 // latest phone frame (0 when he is not streaming one).
 export interface Live {
-  mode: 'live' | 'demo'
+  mode: 'live' | 'idle'
   actions: { ts: number; text: string }[] // newest first
   screenTs: number
 }
 
-// A real coin from /api/coins, used by the sample grid.
-export interface RealCoin { mint: string; symbol: string; name: string; image?: string; mcUsd: number; vol24hUsd: number; change24h: number }

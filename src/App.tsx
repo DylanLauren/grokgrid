@@ -69,7 +69,7 @@ export default function App() {
   const s = stats(feed)
   const onPage = !ROOM.includes(tab)
   const grid = useAgents(tab === 'matrix' || tab === 'grid')
-  const live = useLive(!onPage, view === 'phone', feed)
+  const live = useLive(!onPage, view === 'phone')
   // the first-visit tour only starts on his desk, never over a page someone linked to
   const [touring, setTouring] = useState(() => !seenTour() && !location.hash.slice(1))
   const [intro, setIntro] = useState(introDue)
@@ -180,7 +180,7 @@ export default function App() {
               live
             </span>
           ) : (
-            <span className="status mono" title="sample trades until his first real trade">sample data</span>
+            feed.mode === 'empty' && <span className="status mono" title="live once his first trade lands">no trades yet</span>
           )}
           {X_HANDLE && (
             <a className="chip mono" href={`https://x.com/${X_HANDLE}`} target="_blank" rel="noreferrer">@{X_HANDLE}</a>

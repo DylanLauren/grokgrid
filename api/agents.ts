@@ -21,7 +21,7 @@ interface CallLite { mint?: string; image?: string; hue?: string; side: 'buy' | 
 // Every bot on the grid with its coin attached: registry from the store,
 // balances from the chain, market data from DexScreener.
 export async function GET() {
-  if (!hasStore()) return json({ mode: 'demo' })
+  if (!hasStore()) return json({ error: 'store unavailable' }, 503)
   const [reg] = await redis(['HGETALL', 'gg:agents'])
   const records = Object.values(toHash(reg))
     .map((v) => parse<AgentRecord>(v))
@@ -79,5 +79,5 @@ export async function GET() {
   })
 
   const live = records.length > 0 || Number(toHash(perAgent[0]).trades ?? 0) > 0
-  return json({ mode: live ? 'live' : 'demo', updatedAt: Date.now(), solUsd: price, agents })
+  return json({ mode: live ? 'live' : 'empty', updatedAt: Date.now(), solUsd: price, agents })
 }

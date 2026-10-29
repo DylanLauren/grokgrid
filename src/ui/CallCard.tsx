@@ -67,10 +67,9 @@ function Body({ call, compact }: { call: Call; compact?: boolean }) {
             {call.entryMc !== null && call.nowMc !== null && <span><i>Avg entry</i>{mc(call.entryMc)} → {mc(call.nowMc)} MC</span>}
           </div>
         </div>
-        {(call.sample || (!compact && call.verified && call.verification === 'wallet-balance-movements')) && (
+        {!compact && call.verified && call.verification === 'wallet-balance-movements' && (
           <div className="cc-acts">
-            {call.sample && <span className="cc-tag">sample trade</span>}
-            {!compact && call.verified && call.verification === 'wallet-balance-movements' && <span className="cc-tag ok" title="Finalized wallet token and SOL movements checked; profit is not verified">wallet flows checked</span>}
+            <span className="cc-tag ok" title="Finalized wallet token and SOL movements checked; profit is not verified">wallet flows checked</span>
           </div>
         )}
       </div>

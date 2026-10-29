@@ -1,16 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
-import { demoAgents, driftAgents, withRealCoins } from './demoAgents'
-import { realCoins, coinUpdatedAt } from './realCoins'
+import { useEffect, useState } from 'react'
 import type { AgentsFeed } from './types'
 
 const POLL_MS = 10_000
-const DEMO_TICK_MS = 4_000
+
+const EMPTY: AgentsFeed = { mode: 'loading', updatedAt: 0, solUsd: 0, agents: [] }
 
 // Every agent on the grid with its coin's market data, refreshed every 10s.
-// Falls back to the labelled demo grid until the first agent launches.
 export function useAgents(active: boolean): AgentsFeed {
-  const [feed, setFeed] = useState<AgentsFeed>(() => demoAgents())
-  const mode = useRef<AgentsFeed['mode']>('demo')
+  const [feed, setFeed] = useState<AgentsFeed>(EMPTY)
 
   useEffect(() => {
     if (!active) return
@@ -21,37 +18,19 @@ export function useAgents(active: boolean): AgentsFeed {
       ctrl = new AbortController()
       try {
         const res = await fetch('/api/agents', { signal: ctrl.signal })
-        if (!res.ok) return
-        const live = (await res.json()) as AgentsFeed
-        if (alive && live.mode === 'live') {
-          mode.current = 'live'
-          setFeed(live)
-        }
-      } catch {
-        /* local dev without functions: stay on demo */
-      }
-    }
-    // until real bots launch, the sample bots carry real coins with live numbers
-    const coins = async () => {
-      if (mode.current !== 'demo') return
-      try {
-        const coins = await realCoins()
-        if (alive && mode.current === 'demo') setFeed((f) => ({ ...withRealCoins(f, coins), marketUpdatedAt: coinUpdatedAt() }))
-      } catch {
-        /* local dev without functions: keep the sample coins */
+        if (!res.ok) throw new Error(String(res.status))
+        const next = (await res.json()) as AgentsFeed
+        if (alive) setFeed({ ...EMPTY, ...next })
+      } catch (e) {
+        if (alive && (e as Error).name !== 'AbortError') setFeed((f) => (f.mode === 'loading' ? { ...f, mode: 'error' } : f))
       }
     }
     pull()
-    coins()
     const poll = setInterval(pull, POLL_MS)
-    const coinPoll = setInterval(coins, 60_000)
-    const demo = setInterval(() => mode.current === 'demo' && setFeed((f) => driftAgents(f)), DEMO_TICK_MS)
     return () => {
       alive = false
       ctrl?.abort()
       clearInterval(poll)
-      clearInterval(coinPoll)
-      clearInterval(demo)
     }
   }, [active])
 

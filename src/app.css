@@ -179,5 +179,5 @@
 /* the closed panel still holds the same cards, so only its new picture is drawn while it slides */
 ::view-transition-old(calls-panel) { animation: none; opacity: 0; }
 ::view-transition-new(calls-panel) { animation: none; }
-/* phones: the sample pill would push the buy button off the bar; cards and pages carry their own sample tags */
+/* phones: the status pill would push the buy button off the bar; pages carry their own status */
 @media (max-width: 600px) { .bar-right .status:not(.live) { display: none; } }

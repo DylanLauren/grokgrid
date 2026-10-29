@@ -54,7 +54,7 @@ export function MonitorScreen({ feed, live }: { feed: Feed; live: Live }) {
                 <span className="mono">{mc(call.nowMc)}</span>
                 <span className="mono">{call.nowMc !== null && call.entryMc !== null && call.entryMc > 0 ? pct(((call.nowMc - call.entryMc) / call.entryMc) * 100) : '–'}</span>
               </div>
-              <span className="mono dim">illustrative chart{feed.mode === 'demo' ? ' · sample trades' : ''}</span>
+              <span className="mono dim">illustrative chart</span>
               {call.entryMc !== null && call.nowMc !== null ? <Candles call={{ ...call, entryMc: call.entryMc, nowMc: call.nowMc }} /> : <p className="dim">Historical chart data unavailable.</p>}
             </>
           )}
@@ -76,7 +76,7 @@ export function MonitorScreen({ feed, live }: { feed: Feed; live: Live }) {
         </section>
 
         <section className="win win-log">
-          <WinBar title={live.mode === 'demo' ? 'sample activity' : 'agent log'} />
+          <WinBar title="agent log" />
           <div className="wl mono">
             {live.actions.length === 0 && <div className="dim">No activity reported.</div>}
             {live.actions.slice(0, 7).reverse().map((a, i, arr) => (
