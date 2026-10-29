@@ -24,22 +24,29 @@ npm run build
   - `GET /api/agents` every bot on the grid with its coin (DexScreener), balances (chain), stats.
   - `GET /api/live` his latest actions and the time of his latest phone frame (polled every 2.5s while someone watches his phone).
   - `GET /api/screen?t=<ts>` his latest phone frame as a JPEG.
-  - `POST /api/ingest` where Grok Bot posts what it just did (`Authorization: Bearer $INGEST_TOKEN`). Trade signatures are checked on chain. Event types: `trade`, `agent`, `fees`, `wallet`, plus
+  - `POST /api/ingest` where Grok Bot posts what it just did (`Authorization: Bearer $INGEST_TOKEN`). Trade signatures are checked on chain. Event types: `trade`, `fees`, `wallet`, plus
     - `{ "type": "action", "text": "reading the trader list" }` one line per step he takes; shows on his phone and in the monitor's agent log.
     - `{ "type": "screen", "jpeg": "<base64>" }` a screenshot of his phone (about 390x844, JPEG quality 70, under 330 KB), every 2 to 3 seconds while he trades. While frames keep coming, the phone in the room shows them; when they stop for 12 seconds it shows Screen offline.
 
 ## Launching a grid bot
 
-Anyone can launch a bot from the grid page in one wallet approval (Phantom, Solflare or Backpack):
+Public launches remain paused until authorized execution and recovery are implemented and verified. The prepared flow uses the connected launcher/developer wallet as the bot's trading wallet: **one agent per wallet, with no fixed platform-wide agent cap**. There is no spare-wallet requirement for new launches.
 
 1. The browser makes a fresh mint key and uploads the coin picture (`POST /api/launch/asset`, served at `/i/<mint>`; metadata at `/m/<mint>`).
-2. `POST /api/launch/prepare` builds one transaction with pump.fun's SDK: create the coin, open fee sharing, set 80% to the bot's trading wallet and 20% to `VITE_BURN_WALLET`, revoke the admin so the split is permanent, plus an optional first buy. It is simulated before it is returned.
-3. The wallet and the mint key sign. `POST /api/launch/send` refuses anything the wallet changed beyond its own priority fee.
-4. `POST /api/launch/confirm` reads the coin back off chain and only then adds the bot to the registry (`/api/agents`), with its owner and trading rules.
+2. `POST /api/launch/prepare` builds a pump.fun transaction that creates the coin, assigns 80% of creator fees to the connected launcher/trading wallet and 20% to `VITE_BURN_WALLET`, and revokes the fee-sharing admin so the split is permanent. An optional first buy can be included. The transaction is simulated before it is returned.
+3. The connected wallet approves the transaction and the mint key signs. `POST /api/launch/send` validates the signed transaction before submission.
+4. `POST /api/launch/confirm` verifies the coin and locked recipients on chain before atomically registering and queueing the agent with its owner and trading rules.
 
-Trading wallets come from Grok Bot, which makes them and keeps their keys. It posts spare public addresses:
-`{ "type": "wallets", "wallets": ["<address>", ...] }` to `/api/ingest`, and polls `GET /api/ingest` (same token) for `free` (spare wallets left) and `launches` (new bots to start trading; their rules are in `/api/agents`).
-Launching is open while `VITE_BURN_WALLET` is set and at least one spare wallet is left.
+Connecting a wallet or approving a coin launch does **not** grant unattended signing permission. User keys stay in their wallet. Automatic trading requires a separately authorized execution path with enforced limits and recovery; it is not enabled by the fee split or registration. The operator's house wallet remains a separate runtime concern.
+
+
+### Durable launch observation
+
+`GET /api/launch/events?after=0&limit=50` requires the full `INGEST_TOKEN` and returns an uncached, ordered outbox: `version`, `events`, `nextCursor`, `headCursor`, `hasMore`, `coverage` and `executionEnabled: false`. Each event contains a decimal-string `cursor`, `id`, `mint`, `wallet` and `ts`. The server retains these events; 50 is a page size, not a launch limit. Coverage starts with confirmed launches after outbox deployment, not the project's complete historical activity. Direct `agent` and `wallets` ingest writes are retired; verified launch confirmation is the registration path.
+
+The observer validates each strictly ordered batch (sequence gaps are allowed), stores every event in its private checksum-chained observation journal, fsyncs it, then writes `launch-events-checkpoint.json`. Restart recovery uses the journal's cursor if the checkpoint is missing or behind; a checkpoint ahead of the journal fails closed. Failed or malformed responses never advance the cursor. Failed rule-evidence persistence or a local review-storage capacity limit keeps the full batch journaled but pending replay; retained server events are not skipped. Rule snapshots remain review evidence, not trading authorization.
+
+If the durable endpoint is unavailable, legacy `GET /api/ingest` is a visibly degraded, incomplete latest-window fallback and cannot advance the durable cursor. Intake sends no execution acknowledgement and cannot start trading, sign or broadcast. Neither a captured event nor reaching `headCursor` proves an agent has executed anything.
 
 ## His phone, live
 
@@ -96,17 +103,10 @@ screen demonstrates capture only; it does not prove the bot is trading.
 ### Runtime and launch recovery
 
 `VITE_BOT_WALLET` is the house bot's public address; `VITE_BURN_WALLET` is the
-separate buy-and-burn public address. Neither belongs in the spare-wallet pool.
+separate buy-and-burn public address. New user agents use their own connected launcher wallet for trading.
 Private keys stay outside this repository and outside Vercel.
 
-Only add spare public wallets after a running bot can consume the launch queue
-and enforce the configured rules. Wallet inventory alone does not prove runtime
-readiness. Prepared launches reserve wallets for 15 minutes. Once an authorized
-send starts, the reservation is held until chain reconciliation completes; an
-ambiguous error must not recycle the wallet. If lookup-table setup fails before
-the launch is sent, the reservation stays held for operator review. Review the
-pending record and chain state before releasing it. Confirmation atomically
-registers and queues each mint once.
+Preparing a launch does not reserve a public wallet address. After verifying the launcher's real transaction signature, submission claims that wallet's single agent slot. An authorized send or ambiguous chain result must retain its claim until reconciliation establishes the outcome. Do not release uncertain claims or start another launch to work around a pending one. Confirmation atomically registers and queues each mint once. Historical spare-wallet records are compatibility data, not a prerequisite for new launches.
 
 Validation without a launch: `npm test`, `npm run build`, and
 `npx tsc -p api/tsconfig.json`. These do not prove a completed on-chain launch or
@@ -114,4 +114,4 @@ an active trading worker; those require separate operational verification.
 
 ## House worker readiness
 
-The [house worker](docs/trading-worker.md) reads the existing wallet observer and keeps a durable offline intent journal. It cannot sign or broadcast. Public launches stay paused until an executor is implemented and verified; adding spare wallets alone does not open them. Trade ingestion checks finalized wallet token/SOL balance movements, deduplicates receipts, and leaves historical USD profit unknown. See [the two-pillar acceptance checklist](docs/pillars-1-2-acceptance.md) for remaining operational checks.
+The [house worker](docs/trading-worker.md) reads the existing wallet observer and keeps a durable offline intent journal. It cannot sign or broadcast. Public launches stay paused until an executor is implemented and verified; wallet connection and fee allocation do not open them. Trade ingestion checks finalized wallet token/SOL balance movements, deduplicates receipts, and leaves historical USD profit unknown. See [the two-pillar acceptance checklist](docs/pillars-1-2-acceptance.md) for remaining operational checks.

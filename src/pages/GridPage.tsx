@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { MAIN_TICKER } from '../config'
 import { STEPS, launchBot, svgToImage, toImage } from '../data/launch'
+import { fetchLaunchStatus, unavailableLaunchStatus, type LaunchStatus } from '../data/launchStatus'
 import { connectWallet, isMobile, provider, rejected, walletLinks } from '../data/wallet'
 import type { AgentsFeed } from '../data/types'
 import { BODY, EYES, FAMILY, type Shape } from '../ui/BotMark'
@@ -79,8 +80,10 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
     }
   }, [d])
   const [image, setImage] = useState<{ url: string; name: string } | null>(null)
-  const status = useLaunchStatus()
   const [me, setMe] = useState('')
+  const [walletCheck, setWalletCheck] = useState(0)
+  const status = useLaunchStatus(me, walletCheck)
+  const [connecting, setConnecting] = useState(false)
   const [step, setStep] = useState<number | null>(null)
   const [fail, setFail] = useState('')
   const [made, setMade] = useState<{ mint: string; name: string } | null>(null)
@@ -94,12 +97,29 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
   const errs = check(d)
   const botPic = useMemo(() => botImage(d.look), [d.look])
   const pic = image?.url ?? botPic
-  const ready = !!status?.open && Object.keys(errs).length === 0 && step === null
+  const ready = !!status?.open && Object.keys(errs).length === 0 && step === null && !connecting && !made
   const mine = grid.mode === 'live' ? grid.agents.filter((a) => !a.house && a.coin.real !== false) : []
   const userBots = mine.length
   const err = (k: keyof Draft) => (touched[k] ? errs[k] : undefined)
 
   const noWallet = typeof window !== 'undefined' && !provider() && isMobile()
+
+  async function checkWallet() {
+    const w = provider()
+    if (!w) return setFail('no Solana wallet found. install Phantom, Solflare or Backpack, then reload.')
+    setConnecting(true)
+    setFail('')
+    try {
+      const address = await connectWallet(w)
+      if (address !== me) setMade(null)
+      setMe(address)
+      setWalletCheck(n => n + 1)
+    } catch (err) {
+      setFail(rejected(err) ? 'wallet connection cancelled.' : (err as Error).message)
+    } finally {
+      setConnecting(false)
+    }
+  }
 
   async function launch(e: FormEvent) {
     e.preventDefault()
@@ -109,9 +129,13 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
     setMade(null)
     const w = provider()
     if (!w) return setFail('no Solana wallet found. install Phantom, Solflare or Backpack, then reload.')
+    setConnecting(true)
     try {
-      const addr = me || (await connectWallet(w))
+      // Read the wallet's current account; a previously connected account may have changed.
+      const addr = await connectWallet(w)
       setMe(addr)
+      const current = await fetchLaunchStatus(addr, AbortSignal.timeout(8_000)).catch(() => unavailableLaunchStatus())
+      if (!current.open) throw Error(current.reason ?? 'Launching is paused.')
       const picture = image?.url ?? (await svgToImage(botPic))
       const r = await launchBot({
         wallet: w,
@@ -125,14 +149,15 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
       setImage(null)
       setTouched({})
     } catch (err) {
-      setFail(rejected(err) ? 'you cancelled in the wallet. nothing was spent.' : (err as Error).message)
+      setFail(rejected(err) ? 'wallet approval cancelled. if a transaction was already submitted, wait for its confirmation before trying again.' : (err as Error).message)
     } finally {
+      setConnecting(false)
       setStep(null)
     }
   }
 
   return (
-    <Page say="make me a sibling" n={5} label="the grid" title="Launch a bot" sub={`every bot is its own coin on pump.fun. 80% of its fees fund its trades, 20% buy and burn $${MAIN_TICKER}. pick one of the family to start.`}>
+    <Page say="make me a sibling" n={5} label="the grid" title="Launch a bot" sub={`one agent per wallet, with its own coin on pump.fun. your connected wallet is also its trading wallet. public launches are paused while execution is prepared.`}>
       <div className="gd-line" role="radiogroup" aria-label="pick a bot">
         {FAMILY.map((f, i) => (
           <button
@@ -260,20 +285,21 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
           </Group>
 
           <Group n="04" title="launch">
-            <Field label="first buy" unit="SOL" error={err('firstBuy')} hint="optional. you buy your own coin in the same transaction, before anyone else can.">
+            <Field label="first buy" unit="SOL" error={err('firstBuy')} hint="optional. included in the coin-launch transaction you review in your wallet.">
               <input inputMode="decimal" value={d.firstBuy} placeholder="0" onBlur={() => touch('firstBuy')} onChange={(e) => set('firstBuy', num(e.target.value))} />
             </Field>
             <div className="gd-split">
               <div>
                 <b>80%</b>
-                <span>of its creator fees go to its own trading wallet</span>
+                <span>of creator fees go to your connected wallet — also your bot’s trading wallet</span>
               </div>
               <div>
                 <b>20%</b>
-                <span>buy ${MAIN_TICKER} on the market and burn it</span>
+                <span>of creator fees go to the ${MAIN_TICKER} burn wallet</span>
               </div>
             </div>
-            <p className="gd-note mono">paired with SOL on pump.fun · fee split locked at creation · you pay network fees and pump.fun rent only · needs 0.03 SOL plus your first buy</p>
+            <p className="gd-note">Connecting your wallet does not give the bot permission to spend. Automatic trading and buying or burning ${MAIN_TICKER} remain disabled until their execution paths are ready.</p>
+            <p className="gd-note mono">one agent per wallet · 80/20 split locked at creation · review the exact network fees, rent and optional first buy before signing</p>
             {noWallet ? (
               <div className="gd-wallets">
                 {walletLinks().map((w) => (
@@ -283,10 +309,16 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
                 ))}
               </div>
             ) : (
-              <button type="submit" className="btn" disabled={!ready}>
-                <Roll>{step !== null ? STEPS[step] : me ? 'Launch bot' : 'Connect wallet and launch'}</Roll>
-              </button>
+              <>
+                <button type="button" className="btn ghost" disabled={connecting || step !== null} onClick={() => void checkWallet()}>
+                  <Roll>{connecting ? 'Checking wallet' : me ? 'Check connected wallet' : 'Connect wallet'}</Roll>
+                </button>
+                <button type="submit" className="btn" disabled={!ready}>
+                  <Roll>{step !== null ? STEPS[step] : connecting ? 'Checking wallet' : me ? 'Launch bot' : 'Connect wallet and launch'}</Roll>
+                </button>
+              </>
             )}
+            {me && <p className="gd-note mono">launcher + trading wallet: <span style={{ overflowWrap: 'anywhere' }}>{me}</span></p>}
             {step !== null && (
               <ol className="gd-steps mono" aria-live="polite">
                 {STEPS.map((t, i) => (
@@ -296,13 +328,13 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             )}
             {made && (
               <p className="gd-made">
-                {made.name} is live. <a href={`https://pump.fun/coin/${made.mint}`} target="_blank" rel="noreferrer">see it on pump.fun</a>. it shows up in the matrix within a minute, and Grok Bot starts trading it with its own wallet.
+                {made.name}’s coin is confirmed. <a href={`https://pump.fun/coin/${made.mint}`} target="_blank" rel="noreferrer">see it on pump.fun</a>. registration does not by itself start trading or grant spending permission.
               </p>
             )}
             <p className={`gd-note ${fail ? 'bad' : ''}`}>
               {fail ||
                 (made
-                  ? 'launch another one any time.'
+                  ? 'this wallet has its agent. its creator-fee allocation stays 80% to this wallet and 20% to the burn wallet.'
                   : status === null
                   ? 'checking the launchpad'
                   : !status.open
@@ -311,7 +343,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
                       ? 'open this page in your wallet app to launch from a phone.'
                       : Object.keys(errs).length
                         ? 'fill in the fields marked above to launch.'
-                        : 'one wallet approval. the coin, the bot and the fee split go live together.')}
+                        : 'review the launch and locked fee split in your wallet. trading requires separate execution readiness.')}
             </p>
           </Group>
         </form>
@@ -377,24 +409,26 @@ function botImage(look: number) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
-type Status = { open: boolean; reason: string | null; free: number }
-
-// Whether launching is open right now. Checked on load and every 20 seconds.
-function useLaunchStatus() {
-  const [s, setS] = useState<Status | null>(null)
+// Recheck after each completed request; account changes never reuse the previous result.
+function useLaunchStatus(launcher: string, walletCheck: number) {
+  const [result, setResult] = useState<{ launcher: string; walletCheck: number; status: LaunchStatus } | null>(null)
   useEffect(() => {
     let live = true
-    const load = () =>
-      fetch('/api/launch/status')
-        .then((r) => r.json() as Promise<Status>)
-        .then((j) => live && setS(j))
-        .catch(() => live && setS({ open: false, reason: 'the launchpad is offline for a moment.', free: 0 }))
-    load()
-    const t = setInterval(load, 20_000)
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const controller = new AbortController()
+    async function load() {
+      const status = await fetchLaunchStatus(launcher, AbortSignal.any([controller.signal, AbortSignal.timeout(8_000)]))
+        .catch(() => unavailableLaunchStatus())
+      if (!live) return
+      setResult({ launcher, walletCheck, status })
+      timer = setTimeout(load, 20_000)
+    }
+    void load()
     return () => {
       live = false
-      clearInterval(t)
+      controller.abort()
+      clearTimeout(timer)
     }
-  }, [])
-  return s
+  }, [launcher, walletCheck])
+  return result?.launcher === launcher && result.walletCheck === walletCheck ? result.status : null
 }

@@ -2,7 +2,6 @@ import { ingestScope } from './_ingest-auth.js'
 import type { AgentRecord } from './agents.js'
 import { HOUSE_WALLET, isAddress, isSig, json, parse, redis } from './_lib.js'
 import { verifyTradeReceipt } from './_trade-receipt.js'
-import { addWallets, freeWallets } from './_launch.js'
 
 // Grok Bot posts what it just did here, one event per request, with
 //   Authorization: Bearer <INGEST_TOKEN>
@@ -11,20 +10,18 @@ import { addWallets, freeWallets } from './_launch.js'
 //
 //   { "type": "trade",  "agent": "house", "side": "buy", "mint", "symbol", "name", "note",
 //     "sizeTokens", "spentSol", "positionUsd", "pnlUsd", "entryMc", "nowMc", "sig" }
-//   { "type": "agent",  "agent": { "id", "name", "color", "shape", "strategy", "wallet",
-//     "coin": { "mint", "symbol", "name", "image" } } }
 //   { "type": "fees",   "agent": "house", "feesSol": 1.2, "burnedMain": 350000 }   (running totals)
 //   { "type": "wallet", "agent": "house", "sol": 2.31 }
 //   { "type": "action", "text": "reading the trader list" }           (what he is doing right now)
 //   { "type": "screen", "jpeg": "<base64 jpeg of his phone screen>" }  (live view, about one every 2s)
-//   { "type": "wallets", "wallets": ["<public address>", ...] }       (spare trading wallets for new grid bots)
-//   GET /api/ingest  (same token)  -> how many spare wallets are left and the latest launches to start trading
+//   Agent registration happens only through verified launch confirmation.
+//   GET /api/launch/events (same token) delivers durable observation pages.
+//   GET /api/ingest is a legacy bounded launch list, not execution authorization.
 
 const TOKEN = process.env.INGEST_TOKEN || ''
 const MAX_BODY = 8_000
 const MAX_SCREEN = 450_000 // a 390x844 jpeg at quality 70 is about 60 KB, base64 adds a third
 const PER_MINUTE = 120
-const SHAPES = ['sphere', 'squircle', 'tile', 'cloud', 'cone', 'drop']
 const IMAGE_HOSTS = /^https:\/\/([a-z0-9-]+\.)*(ipfs\.io|pump\.fun|mypinata\.cloud|dexscreener\.com|arweave\.net|nftstorage\.link|irys\.xyz)\//i
 
 const text = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : '')
@@ -42,6 +39,9 @@ export async function POST(req: Request) {
   if (scope === 'screen' && ev.type !== 'screen') return json({ error: 'screen-only credential' }, 403)
   if (ev.type !== 'screen' && raw.length > MAX_BODY) return json({ error: 'too large' }, 413)
 
+  if (ev.type === 'agent') return json({ error: 'Agents must be registered through a verified launch.' }, 410)
+  if (ev.type === 'wallets') return json({ error: 'Spare-wallet registration is retired; new agents use their launcher wallet.' }, 410)
+
   const minute = Math.floor(Date.now() / 60_000)
   const [count] = await redis(['INCR', `gg:rate:${minute}`], ['EXPIRE', `gg:rate:${minute}`, 120])
   if (Number(count) > PER_MINUTE) return json({ error: 'slow down' }, 429)
@@ -49,8 +49,6 @@ export async function POST(req: Request) {
   switch (ev.type) {
     case 'trade':
       return trade(ev)
-    case 'agent':
-      return agent(ev.agent as Record<string, unknown>)
     case 'fees':
       return fees(ev)
     case 'wallet':
@@ -59,8 +57,6 @@ export async function POST(req: Request) {
       return action(ev)
     case 'screen':
       return screen(ev)
-    case 'wallets':
-      return wallets(ev)
     default:
       return json({ error: 'unknown type' }, 400)
   }
@@ -117,30 +113,6 @@ async function trade(ev: Record<string, unknown>) {
   return new Response(JSON.stringify({ ok: true, duplicate: saved === 0, verified: true, verification: receipt.verification, accountingVerified: false }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
 }
 
-async function agent(a: Record<string, unknown> | undefined) {
-  const coin = (a?.coin ?? {}) as Record<string, unknown>
-  if (!a || !isId(a.id) || a.id === 'house' || !isAddress(a.wallet) || !isAddress(coin.mint)) return json({ error: 'fields' }, 400)
-  const rec: AgentRecord = {
-    id: a.id,
-    name: text(a.name, 32) || a.id,
-    color: isHex(a.color) ? a.color : '#1683ff',
-    shape: SHAPES.includes(a.shape as string) ? (a.shape as string) : 'sphere',
-    strategy: text(a.strategy, 140),
-    launchedAt: Date.now(),
-    wallet: a.wallet,
-    coin: {
-      mint: coin.mint,
-      symbol: text(coin.symbol, 16),
-      name: text(coin.name, 48),
-      image: typeof coin.image === 'string' && IMAGE_HOSTS.test(coin.image) ? coin.image : undefined,
-      hue: isHex(a.color) ? a.color : '#1683ff',
-    },
-  }
-  // first write wins, so a later event cannot swap a bot's wallet or coin
-  const [added] = await redis(['HSETNX', 'gg:agents', rec.id, JSON.stringify(rec)])
-  return json({ ok: true, added: added === 1 })
-}
-
 async function fees(ev: Record<string, unknown>) {
   if (!isId(ev.agent)) return json({ error: 'agent' }, 400)
   const feesSol = num(ev.feesSol, 0, 1e7)
@@ -177,18 +149,11 @@ async function screen(ev: Record<string, unknown>) {
   return json({ ok: true, ts })
 }
 
-// Spare trading wallets Grok Bot made (it keeps their keys). Each new grid bot gets one.
-async function wallets(ev: Record<string, unknown>) {
-  const list = Array.isArray(ev.wallets) ? ev.wallets.slice(0, 50) : []
-  if (!list.length) return json({ error: 'fields' }, 400)
-  const added = await addWallets(list.filter((w) => w !== HOUSE_WALLET))
-  return json({ ok: true, added, free: await freeWallets() })
-}
-
-// What Grok Bot polls: spare wallets left, and launches it should start trading.
+// Legacy bounded display list. Durable workers use /api/launch/events.
 export async function GET(req: Request) {
   if (ingestScope(req.headers.get('authorization'), TOKEN) !== 'full') return json({ error: 'unauthorised' }, 401)
   const [list] = await redis(['LRANGE', 'gg:launches', 0, 49])
-  const launches = ((list as string[]) ?? []).map((l) => parse(l)).filter(Boolean)
-  return new Response(JSON.stringify({ free: await freeWallets(), launches }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
+  if (!Array.isArray(list)) return json({ error: 'Launch list unavailable.' }, 503)
+  const launches = list.map((l) => parse(l)).filter(Boolean)
+  return new Response(JSON.stringify({ free: null, walletModel: 'launcher', launches, historyComplete: false, executionEnabled: false }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
 }

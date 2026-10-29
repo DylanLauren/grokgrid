@@ -3,10 +3,12 @@
 // launching tab, and by /api/launch/status for launches whose tab was closed early.
 import type { AgentRecord } from './agents.js'
 import { parse, redis } from './_lib.js'
-import { LOOKS, agentId, releaseWallet, keys, type Draft } from './_launch.js'
+import { LOOKS, agentId, keys, type Draft } from './_launch.js'
+import { ownerKeys } from './_launch-owner.js'
+import { FINALIZE_OWNER_LUA } from './_launch-finalize.js'
 import { launchProgress, verifyLaunch } from './_pump.js'
 
-type Pending = { draft: Draft; launcher: string; bot: string; burn: string; signature: string | null; raw?: string; lastValidBlockHeight?: number }
+type Pending = { routingVersion?: number; phase?: string; draft: Draft; launcher: string; bot: string; burn: string; signature: string | null; raw?: string; lastValidBlockHeight?: number }
 type Result = { status: number; body: Record<string, unknown> }
 
 export const OPEN = 'gg:launch:open'
@@ -16,21 +18,17 @@ export async function finishLaunch(mint: string): Promise<Result> {
   if (typeof done === 'string') return out({ id: done })
   const p = parse<Pending>(raw)
   if (!p || !p.bot || !p.draft) {
-    await redis(['SREM', OPEN, mint])
-    return out({ error: 'No launch in progress for that coin.' }, 404)
+    return out({ error: 'This launch record is unavailable or incomplete. Its reservation has not been released and needs review.' }, 409)
   }
 
+  if(p.routingVersion!==2||p.bot!==p.launcher)return out({error:'This older launch requires review. Its wallet reservation has been retained.'},409)
   if (!p.signature) return out({ retry: true }, 202)
+  if(p.phase!=='launch-submitted')return out({error:'This signed launch setup requires review before reconciliation.'},409)
   const check = await verifyLaunch(mint, p.bot, p.burn)
   if (!check.ok && check.reason === 'not on chain yet') {
     if (p.signature && p.raw && p.lastValidBlockHeight) {
       const state = await launchProgress(p.raw, p.signature, p.lastValidBlockHeight)
-      if (state === 'failed' || state === 'expired') {
-        await releaseWallet(p.bot, mint)
-        await redis(['SREM', OPEN, mint])
-      }
-      if (state === 'failed') return out({ error: 'Solana rejected the launch, so no coin was made. Only the network fee was spent. Try again.' }, 400)
-      if (state === 'expired') return out({ error: "The launch didn't land on Solana in time, so no coin was made and nothing was spent. Try again." }, 410)
+      if (state === 'failed' || state === 'expired') return out({ error: 'This signed launch needs chain reconciliation before its wallet can be reused. The reservation remains held.' }, 409)
     }
     return out({ retry: true }, 202)
   }
@@ -52,25 +50,12 @@ export async function finishLaunch(mint: string): Promise<Result> {
     coin: { mint, symbol: d.ticker, name: d.name, image: `/i/${mint}`, hue: color },
   }
   // All state changes, including the queue entry, happen once in one Redis call.
-  const [saved] = await redis(['EVAL', `
-    local done = redis.call('GET', KEYS[1])
-    if done then return done end
-    if redis.call('GET', KEYS[2]) ~= ARGV[1] then return false end
-    redis.call('SREM', KEYS[3], ARGV[2])
-    redis.call('SADD', KEYS[4], ARGV[2])
-    redis.call('DEL', KEYS[2])
-    redis.call('HSET', KEYS[5], ARGV[3], ARGV[4])
-    redis.call('SET', KEYS[1], ARGV[3])
-    redis.call('PERSIST', KEYS[6])
-    redis.call('PERSIST', KEYS[7])
-    redis.call('LPUSH', KEYS[8], ARGV[5])
-    redis.call('LTRIM', KEYS[8], 0, 199)
-    redis.call('SREM', KEYS[9], ARGV[1])
-    return ARGV[3]
-  `, 9, `gg:mint:${mint}`, keys.lease(p.bot), keys.pool, keys.used, 'gg:agents',
-  keys.image(mint), keys.meta(mint), 'gg:launches', OPEN,
-  mint, p.bot, id, JSON.stringify(rec), JSON.stringify({ id, mint, wallet: p.bot, ts: Date.now() })])
-  if (typeof saved !== 'string') return out({ error: 'The trading wallet reservation needs review.' }, 409)
+  const [saved] = await redis(['EVAL', FINALIZE_OWNER_LUA, 12,
+    `gg:mint:${mint}`, ownerKeys.hold(p.launcher), ownerKeys.agent(p.launcher), 'gg:agents', keys.pending(mint),
+    keys.image(mint), keys.meta(mint), 'gg:launches', OPEN,
+    'gg:launch:event-payloads', 'gg:launch:event-order', 'gg:launch:event-sequence',
+    mint, p.launcher, id, JSON.stringify(rec), JSON.stringify({id,mint,wallet:p.bot,ts:Date.now()}), raw as string])
+  if (typeof saved !== 'string' || saved.startsWith('!')) return out({ error: 'The owner wallet reservation or launch record needs review.' }, 409)
   return out({ id }, 200)
 }
 

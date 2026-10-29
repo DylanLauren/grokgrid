@@ -3,6 +3,7 @@ import { constants } from 'node:fs';
 import { open, lstat, mkdir, rename, unlink } from 'node:fs/promises';
 import { dirname, resolve, isAbsolute, join } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
+import { launchCursor, validateLaunchEvents } from './runtime-launch-events.mjs';
 const LIMIT=128*1024;
 const privateOwned=s=>(!process.getuid||s.uid===process.getuid())&&(s.mode&0o077)===0;
 const checksum=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -38,6 +39,12 @@ export function assertSnapshotProgress(previous,current) {
 function validateRecord(record,pins) {
   const {hash,...body}=record;
   if(hash!==checksum(body)||record.version!==1||!Number.isSafeInteger(record.sequence)||record.sequence<1||record.houseWallet!==pins.houseWallet||record.burnWallet!==pins.burnWallet||record.observation?.executionEnabled!==false||record.observation?.signingEnabled!==false)throw Error('observation-journal-invalid');
+  const cursor=record.launchCursor??'0';launchCursor(cursor);
+  if(['durable','durable-pending-rules'].includes(record.observation?.launchEvents?.state)){
+    const intake=record.observation.launchEvents;
+    validateLaunchEvents(intake.batch,intake.afterCursor,Date.parse(record.observation.observedAt));
+    if((intake.state==='durable'?intake.batch.nextCursor:intake.afterCursor)!==cursor)throw Error('observation-launch-cursor-invalid');
+  }
   if(record.lastSuccessful){
     // Early v1 rows kept the finalized slot on the full observation only.
     // Recover that evidence in memory, without rewriting the immutable journal.
@@ -58,7 +65,7 @@ async function readTail(path,pins) {
     if(buf[buf.length-1]!==10)throw Error('observation-journal-incomplete');
     const text=buf.toString('utf8'),lines=text.slice(start?text.indexOf('\n')+1:0,-1).split('\n');
     const last=validateRecord(JSON.parse(lines.at(-1)),pins);
-    if(lines.length>1){const previous=validateRecord(JSON.parse(lines.at(-2)),pins);if(last.previousHash!==previous.hash||last.sequence!==previous.sequence+1)throw Error('observation-chain-invalid');}
+    if(lines.length>1){const previous=validateRecord(JSON.parse(lines.at(-2)),pins);if(last.previousHash!==previous.hash||last.sequence!==previous.sequence+1||launchCursor(last.launchCursor??'0')<launchCursor(previous.launchCursor??'0')||(['durable','durable-pending-rules'].includes(last.observation.launchEvents?.state)&&last.observation.launchEvents.afterCursor!==(previous.launchCursor??'0')))throw Error('observation-chain-invalid');}
     else if(start===0&&(last.sequence!==1||last.previousHash!==null))throw Error('observation-chain-invalid');
     return last;
   }finally{await f.close();}
@@ -81,10 +88,17 @@ export async function withObservationJournal(root,pins,fn) {
   const own=await lock.stat();await lock.writeFile(String(process.pid));await lock.sync();await lock.close();
   try{
     let previous=await readTail(path,pins);
-    return await fn({get lastSuccessful(){return previous?.lastSuccessful?structuredClone(previous.lastSuccessful):null;},get sequence(){return previous?.sequence??0;},async append(observation){
+    return await fn({get lastSuccessful(){return previous?.lastSuccessful?structuredClone(previous.lastSuccessful):null;},get sequence(){return previous?.sequence??0;},get launchCursor(){return previous?.launchCursor??'0';},async append(observation){
       if(observation.status==='observing'){validateSnapshot(observation,pins);assertSnapshotProgress(previous?.lastSuccessful,observation);}
       const lastSuccessful=observation.status==='observing'?{observedAt:observation.observedAt,balanceSlot:observation.balanceSlot,balanceCommitment:'finalized',house:{...observation.house},burn:{wallet:observation.burn.wallet,balanceLamports:observation.burn.balanceLamports},officialMint:observation.officialMint??null,mintVerified:observation.mintVerified===true}:previous?.lastSuccessful??null;
-      const body={version:1,sequence:(previous?.sequence??0)+1,...pins,previousHash:previous?.hash??null,observation,lastSuccessful};
+      let nextLaunchCursor=previous?.launchCursor??'0';
+      if(['durable','durable-pending-rules'].includes(observation.launchEvents?.state)){
+        const intake=observation.launchEvents;
+        if(intake.afterCursor!==nextLaunchCursor)throw Error('observation-launch-cursor-conflict');
+        const batch=validateLaunchEvents(intake.batch,intake.afterCursor,Date.parse(observation.observedAt));
+        if(intake.state==='durable')nextLaunchCursor=batch.nextCursor;
+      }
+      const body={launchCursor:nextLaunchCursor,version:1,sequence:(previous?.sequence??0)+1,...pins,previousHash:previous?.hash??null,observation,lastSuccessful};
       const record={...body,hash:checksum(body)};validateRecord(record,pins);const line=JSON.stringify(record)+'\n';if(Buffer.byteLength(line)>LIMIT)throw Error('observation-too-large');
       const f=await open(path,constants.O_WRONLY|constants.O_APPEND|constants.O_CREAT|constants.O_NOFOLLOW,0o600);
       try{validFile(await f.stat());await f.writeFile(line);await f.sync();}finally{await f.close();}

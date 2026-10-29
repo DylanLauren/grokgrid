@@ -74,3 +74,15 @@ test('registry freshness uses completion time, not the time before an asynchrono
     assert.equal(result.registryFresh,true);assert.equal(result.rulesObservedCount,1)
   }finally{await rm(root,{recursive:true,force:true})}
 })
+
+
+test('small queue clock skew preserves exact policy identity while excess future time is rejected',()=>{
+  const future={...row,ts:now+300_000}
+  const accepted=planLaunchRuleSnapshots(null,pins,[future],registry(),now)
+  assert.equal(accepted.entries[0].queuedAt,future.ts)
+  assert.equal(accepted.entries[0].versions[0].policy.identity.queuedAt,future.ts)
+  const replay=planLaunchRuleSnapshots(accepted,pins,[future],registry(),now+1000)
+  assert.equal(replay.entries[0].versions.length,1)
+  const rejected=planLaunchRuleSnapshots(null,pins,[{...future,ts:now+300_001}],registry(),now)
+  assert.equal(rejected.entries.length,0);assert.equal(rejected.diagnostics.rejectedCount,1)
+})
