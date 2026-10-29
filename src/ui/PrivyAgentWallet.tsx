@@ -76,11 +76,17 @@ function WalletControls({ onWalletChange, onSignedIn }: AgentWalletSetupProps & 
     await verify()
   }, [address, walletId, getAccessToken, signerId, policyId, addSigners, verify])
 
+  const stop = useCallback(async () => {
+    if (!address) return
+    await removeSigners({ address })
+    setChecked(null)
+  }, [address, removeSigners])
+
   // Privy hands back new function objects on many renders; the session reads the latest ones
   // through refs so it is only rebuilt when the wallet or its check actually changes.
   const hasWallet = !!connected
-  const fns = useRef({ signTransaction, getAccessToken, authorize })
-  useLayoutEffect(() => { fns.current = { signTransaction, getAccessToken, authorize } })
+  const fns = useRef({ signTransaction, getAccessToken, authorize, stop })
+  useLayoutEffect(() => { fns.current = { signTransaction, getAccessToken, authorize, stop } })
   useEffect(() => {
     const adapter: WalletLike | null = address && hasWallet ? privyWalletAdapter(address,
       () => current.current.authenticated && current.current.address === address && !!current.current.wallet,
@@ -91,6 +97,7 @@ function WalletControls({ onWalletChange, onSignedIn }: AgentWalletSetupProps & 
       authorizationReady: !!r?.walletAuthorizationReady,
       authorize: r?.canAuthorize ? () => fns.current.authorize() : undefined,
       policySummary: r?.canAuthorize ? r.policySummary : undefined,
+      stop: r?.walletAuthorizationReady ? () => fns.current.stop() : undefined,
     } : null)
     return () => onWalletChange(null)
   }, [address, walletId, hasWallet, checked, onWalletChange])

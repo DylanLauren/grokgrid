@@ -10,6 +10,7 @@ import { BODY, FAMILY, type Shape } from '../ui/BotMark'
 import { eyeInk, eyePaths } from '../ui/eyes'
 import { LiveBot, type Habit } from '../ui/LiveBot'
 import { Roll } from '../ui/Roll'
+import { YourBot } from '../ui/YourBot'
 import { Page, Section } from './Page'
 
 // What each one of the family does while it waits, and what it says when you point at it.
@@ -108,6 +109,8 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
   const ready = !!owner && !!(agentWallet?.authorizationReady || agentWallet?.authorize) && !!status?.open && Object.keys(errs).length === 0 && step === null && !connecting && !made
   const mine = grid.mode === 'live' ? grid.agents.filter((a) => !a.house && a.coin.real !== false) : []
   const userBots = mine.length
+  // one bot per Phantom: once yours exists, the page shows it instead of the launch form
+  const myBot = me ? mine.find((a) => a.owner === me || (made && a.coin.mint === made.mint)) : undefined
   const err = (k: keyof Draft) => (touched[k] ? errs[k] : undefined)
 
   async function launch(e: FormEvent) {
@@ -139,7 +142,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
         onStep: setStep,
         draft: { ...d, maxSol: Number(d.maxSol || MAX_TRADE), takeProfit: Number(d.takeProfit || HOUSE.takeProfit), stopLoss: Number(d.stopLoss || HOUSE.stopLoss) },
       })
-      setMade({ mint: r.mint, name: d.name })
+      setMade({ mint: r.mint, name: d.botName.trim() || d.name })
       setD(EMPTY)
       setImage(null)
       setTouched({})
@@ -154,6 +157,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
   return (
     <Page say="make me a sibling" n={5} label="the grid" title="Launch a bot" sub={`one agent per wallet, with its own coin on pump.fun. connect phantom and sign one free message. one approval launches the coin and funds your bot’s own trading wallet. ${status?.open ? 'launches are open.' : 'launches open once the bot runner is live.'}`}>
       <AgentWalletSetup onWalletChange={onWalletChange} owner={owner} onOwnerChange={setOwner} />
+      {myBot || made ? <YourBot bot={myBot} pending={made ?? undefined} wallet={agentWallet} /> : (<>
       <div className="gd-line" role="radiogroup" aria-label="pick a bot">
         {FAMILY.map((f, i) => (
           <button
@@ -310,16 +314,9 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
                 ))}
               </ol>
             )}
-            {made && (
-              <p className="gd-made">
-                {made.name}’s coin is confirmed. <a href={`https://pump.fun/coin/${made.mint}`} target="_blank" rel="noreferrer">see it on pump.fun</a>. registration does not by itself start trading or grant spending permission.
-              </p>
-            )}
             <p className={`gd-note ${fail ? 'bad' : ''}`}>
               {fail ||
-                (made
-                  ? 'this wallet has its agent. its creator-fee allocation stays 80% to this wallet and 20% to the burn wallet.'
-                  : status === null
+                (status === null
                   ? 'checking the launchpad'
                   : !status.open
                     ? `${status.reason ?? 'launching is closed right now.'}`
@@ -331,11 +328,13 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
         </form>
       </div>
 
+      </>)}
+
       <Section title="On the grid" note={`${userBots} launched`}>
         {mine.length ? (
           <div className="gd-list">
             {mine.map((a) => (
-              <a key={a.id} className="card gd-bot" href={`https://pump.fun/coin/${a.coin.mint}`} target="_blank" rel="noreferrer">
+              <a key={a.id} className="card gd-bot" href={`#matrix/${a.coin.mint}`}>
                 <LiveBot color={a.color} shape={a.shape as Shape} habit="float" size={40} />
                 <b>{a.name}</b>
                 <span className="mono">${a.coin.symbol}</span>

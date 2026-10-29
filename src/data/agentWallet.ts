@@ -9,6 +9,8 @@ export interface AgentWalletSession {
   /** Adds Grok Bot's policy-scoped signer to this wallet. Present only when the policy checked out. */
   authorize?: () => Promise<void>
   policySummary?: string
+  /** Removes Grok Bot's signer, so the bot can no longer trade. Present only while it can. */
+  stop?: () => Promise<void>
 }
 export type WalletReadiness = { canAuthorize: false; walletAuthorizationReady: false; executionEnabled: false; reason: string } | {
   canAuthorize: true; walletAuthorizationReady: boolean; executionEnabled: false; reason: string;
