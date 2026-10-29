@@ -28,3 +28,7 @@ export function quotePrices(held, quotes) {
   }
   return prices;
 }
+
+/** A sell for this coin was already confirmed and planned but expired unsent: re-plan at once. */
+export const sellJustExpired = (intents, mint, now) =>
+  (intents || []).some(i => i.side === 'sell' && i.mint === mint && i.state === 'expired' && now - i.createdAt >= 0 && now - i.createdAt < 120_000);

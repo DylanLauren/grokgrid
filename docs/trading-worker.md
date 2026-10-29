@@ -229,3 +229,11 @@ Each tick:
 Routes are the pump.fun bonding curve, or the canonical PumpSwap pool after graduation (`scripts/pump-chain.mjs`). Buys are exact-out under a SOL ceiling. Sells set the on-chain minimum to the intent's `minimumReceiveLamports`. Every transaction is simulated before signing.
 
 `touch` the stop file to halt signing on the next tick. Deleting the key file also stops it.
+
+## Fast sells
+
+In execute mode with `--once` (how launchd runs it, every 30 seconds), the worker does its normal tick and then stays up for the rest of that 30-second slot. About every 2 seconds it signs any **sell** that the exit watcher or the strategy has just planned, so a stop-loss is not left waiting for the next tick.
+- **Same rules as the normal tick:** the same journal lock, STOP file and risk checks (sells are never held back by a loss stop), and the signature is journaled before broadcast.
+- **Sells only:** the fast path refuses to build a buy. Buys keep the 30-second tick.
+- **Settling:** a sent sell is settled as soon as it finalizes, so the next one isn't blocked behind it.
+- **Exit watcher:** if a sell it planned expired unsent, it re-plans that coin's exit at once, without the usual two-check confirmation.

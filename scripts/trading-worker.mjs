@@ -107,6 +107,45 @@ async function tick() {
   await heartbeat(root,'trading',{mode:executes(policy)?'execute':'observe-only',healthy:observerFresh,note:execution.reason});
   console.log(JSON.stringify({status:status.status,revision:state.revision,intents:state.intents.length,executionEnabled:policy.executionEnabled}));
 }
+// Fast sells: in execute mode each launchd run (every 30 s) stays up for most of its slot and,
+// every 2 s, signs any sell the exit watcher or strategy has just planned, so a stop-loss never
+// waits for the next 30-second tick. Sells only; buys keep the normal tick. Same journal, lock,
+// stop file and journal-before-broadcast rules as tick().
+const SELL_WATCH_MS=25000, SELL_POLL_MS=2000;
+async function fastSells(until) {
+  const policy=validateTradingPolicy(await json(join(root,'trading-config.json')));
+  if(!executes(policy))return;
+  const {rpcUrl,houseWallet}=await json(join(root,'observer-config.json'));
+  if(houseWallet!==policy.wallet)throw Error('RPC wallet mismatch');
+  const conn=connect(rpcUrl);let signer=null;
+  while(!stop&&Date.now()<until){
+    let pendingSend=null;
+    const peek=(await json(join(root,'trading','trading-journal.json')).catch(()=>null))?.state;
+    const wanted=peek?.intents?.some(i=>i.side==='sell'&&(i.state==='planned'||i.state==='held-ambiguous'));
+    if(wanted)await withTradingStore(join(root,'trading'),policy,async s=>{
+      s=expireIntents(s,Date.now());
+      // Settle a sent sell as soon as it finalizes, so the next one is not blocked behind it.
+      if(s.intents.some(i=>i.state==='held-ambiguous')){
+        const verify=createFinalizedReceiptVerifier(rpcUrl);
+        for(const intent of s.intents.filter(i=>i.state==='held-ambiguous'))s=await reconcileHeldIntent(s,policy,intent.id,verify);
+      }
+      if(!s.intents.some(i=>i.side==='sell'&&i.state==='planned'))return s;
+      const stopFilePresent=await access(policy.stopFile).then(()=>true,()=>false);
+      const signed=await signNext(s,policy,{stopFilePresent,signatureOf:signedSignature,sign:tx=>{tx.sign([signer]);},
+        build:async intent=>{
+          if(intent.side!=='sell')throw Error('fast path signs sells only');
+          signer??=await loadSigner(policy.keypairFile,policy.wallet);
+          const {tokenProgram}=await readMint(conn,intent.mint);
+          return buildSell(conn,{wallet:policy.wallet,mint:intent.mint,tokenUnits:intent.tokenUnits,minimumReceiveLamports:intent.minimumReceiveLamports,slippageBps:intent.slippageBps,tokenProgram});
+        }},Date.now());
+      if(signed.tx)pendingSend=signed.tx;
+      return signed.state;
+    }).catch(e=>{if(e?.code!=='TRADING_LOCKED')throw e;});
+    if(pendingSend)try{await conn.sendRawTransaction(pendingSend.serialize(),{skipPreflight:false,preflightCommitment:'finalized',maxRetries:0});}catch{}
+    try{await delay(SELL_POLL_MS,undefined,{signal:shutdown.signal});}catch{}
+  }
+}
+const startedAt=Date.now();
 do {
   try{await tick();}catch(error){
     // Raw provider errors, input contents and paths may contain credentials.
@@ -115,6 +154,7 @@ do {
     console.error('Trading observer unavailable; no execution attempted. Inspect private configuration and journal.');
     if(args.includes('--once')||proposalAt>=0)process.exitCode=1;
   }
+  if(args.includes('--once')&&proposalAt<0&&!stop)try{await fastSells(startedAt+SELL_WATCH_MS);}catch{console.error('Fast sell watch stopped; the next tick continues.');}
   if(args.includes('--once')||proposalAt>=0||stop)break;
   try{await delay(30000,undefined,{signal:shutdown.signal});}catch{}
 }while(!stop);
