@@ -144,7 +144,7 @@ function GridSection({ token }: { token: GridToken }) {
     ['24h volume', token.market ? mc(token.market.vol24hUsd) : '–'],
     ['supply', token.supply !== null ? compact(token.supply) : '–', `of ${compact(token.startSupply)} at launch`],
     ['burned', token.burned !== null ? compact(token.burned) : '–', pct !== null ? `${pct < 0.01 && pct > 0 ? '<0.01' : pct.toFixed(2)}% of supply` : undefined],
-    ['treasury', token.treasury?.sol != null ? `${token.treasury.sol.toFixed(3)} SOL` : '–', '80% of fees, funds the bots'],
+    ['treasury', token.treasury?.sol != null ? `${token.treasury.sol.toFixed(3)} SOL` : '–', '80% of fees, funds Grok Bot’s trades'],
     ['burn wallet', token.burnWallet?.sol != null ? `${token.burnWallet.sol.toFixed(3)} SOL` : '–', '20% of fees, waiting to buy and burn'],
   ]
   return (
