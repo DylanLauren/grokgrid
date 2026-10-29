@@ -15,9 +15,9 @@
 	<key>RunAtLoad</key>
 	<true/>
 	<key>StandardErrorPath</key>
-	<string>/dev/null</string>
+	<string>__HOME__/.config/grokgrid/runtime/logs/strategy.log</string>
 	<key>StandardOutPath</key>
-	<string>/dev/null</string>
+	<string>__HOME__/.config/grokgrid/runtime/logs/strategy.log</string>
 	<key>StartInterval</key>
 	<integer>60</integer>
 	<key>WorkingDirectory</key>

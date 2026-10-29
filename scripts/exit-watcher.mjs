@@ -20,6 +20,7 @@ import { validateTradingPolicy, planIntent, executes } from './trading-policy.mj
 import { withTradingStore } from './trading-store.mjs';
 import { action } from './runtime-ingest.mjs';
 import { quotePrices, confirmExit, sellJustExpired } from './exit-watcher-core.mjs';
+import { safeError } from './log-safe.mjs';
 
 const run = promisify(execFile);
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
@@ -88,11 +89,11 @@ async function main() {
   const conn = connect((await json(join(root, 'observer-config.json'))).rpcUrl);
   const once = process.argv.includes('--once');
   for (;;) {
-    const status = await tick(conn).catch(e => ({ state: 'error', error: String(e?.message || e).slice(0, 120).replace(/api-key=[^&\s]+/gi, '') }));
+    const status = await tick(conn).catch(e => ({ state: 'error', error: safeError(e).replace(/api-key=[^&\s]+/gi, '') }));
     await savePrivate('exit-watcher-status.json', { observedAt: new Date().toISOString(), ...status }).catch(() => {});
     if (once) { console.log(JSON.stringify(status)); return; }
     await new Promise(r => setTimeout(r, EVERY_MS));
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main().catch(e => { console.error(`exit watcher: ${String(e?.message || e).slice(0, 120)}`); process.exit(1); });
+if (import.meta.url === `file://${process.argv[1]}`) main().catch(e => { console.error(`exit watcher: ${safeError(e)}`); process.exit(1); });

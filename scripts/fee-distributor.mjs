@@ -14,6 +14,7 @@ import { ComputeBudgetProgram, PublicKey, TransactionMessage, VersionedTransacti
 import { connect, loadSigner, signedSignature } from './pump-chain.mjs';
 import { action } from './runtime-ingest.mjs';
 import { DEFAULT_DISTRIBUTOR, validateDistributorConfig, coinsToDistribute, distributeGate, checkInstructions, houseCostOk } from './fee-distributor-core.mjs';
+import { safeError } from './log-safe.mjs';
 
 const require = createRequire(import.meta.url);
 const { OnlinePumpSdk } = require('@pump-fun/pump-sdk');
@@ -82,4 +83,4 @@ async function tick() {
   console.log(JSON.stringify({ enabled: cfg.enabled, live: !!signer, coins: results.length, sent: results.filter(r => r.result === 'sent').length }));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) tick().catch(e => { console.error(`fee distributor: ${String(e?.message || e).slice(0, 120)}`); process.exit(1); });
+if (import.meta.url === `file://${process.argv[1]}`) tick().catch(e => { console.error(`fee distributor: ${safeError(e)}`); process.exit(1); });

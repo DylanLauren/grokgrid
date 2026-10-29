@@ -14,9 +14,9 @@
 	<key>RunAtLoad</key>
 	<true/>
 	<key>StandardErrorPath</key>
-	<string>/dev/null</string>
+	<string>__HOME__/.config/grokgrid/runtime/logs/phone-renewal.log</string>
 	<key>StandardOutPath</key>
-	<string>/dev/null</string>
+	<string>__HOME__/.config/grokgrid/runtime/logs/phone-renewal.log</string>
 	<key>StartInterval</key>
 	<integer>1800</integer>
 </dict>

@@ -105,3 +105,12 @@ Every worker's Solana connection (`connect()` in `scripts/pump-chain.mjs`) uses 
 - **Endpoint:** `GROKGRID_RPC_FALLBACK` when it is set to an https URL, otherwise Solana's public RPC.
 - **Sends:** retrying a send re-sends the same signed transaction, which has the same signature, so it can't double-spend.
 - **Not covered:** direct JSON-RPC fetches outside `connect()` (Helius DAS holder counts, the receipt verifier) still use the primary and fail closed as before.
+
+## Worker logs
+
+Each launchd job writes its stdout and stderr to `runtime/logs/<job>.log`. Workers print one line per run plus short error lines. Provider errors are redacted before logging (`scripts/log-safe.mjs`: URLs cut to their origin, `api-key` / token / secret / authorization values removed), and no worker prints keys, tokens or config contents.
+
+- **Rotation:** `fun.grokgrid.log-rotate` runs hourly. A log over 5 MB is copied to `.1` (older copies shift to `.2` and `.3`) and then truncated in place, because launchd keeps the file open. It's user-level, so no root and no newsyslog.
+- **Already-installed jobs:** `ops/apply-worker-logs.sh` points them at the log files and installs the rotation job, without the full installer, which refuses while trading is live.
+  - It reloads only the jobs whose log paths change, and reloads the trading worker only when no sell is planned or in flight.
+  - `--revert` points them back to `/dev/null`.

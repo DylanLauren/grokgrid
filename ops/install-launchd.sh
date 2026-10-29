@@ -10,7 +10,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 RUNTIME="${GROKGRID_RUNTIME_DIR:-$HOME/.config/grokgrid/runtime}"
 AGENTS="$HOME/Library/LaunchAgents"
 NODE="$(command -v node)"
-JOBS=(runtime-observer trading-observer phone-renewal buyback strategy agent-runner pump-callouts x-posts fee-distributor phone-guardian exit-watcher)
+JOBS=(runtime-observer trading-observer phone-renewal buyback strategy agent-runner pump-callouts x-posts fee-distributor phone-guardian exit-watcher log-rotate)
 UID_N="$(id -u)"
 APPLY=""; CHECK=""
 for a in "$@"; do case "$a" in --apply-limits) APPLY="$a";; --check) CHECK=1;; esac; done
@@ -70,7 +70,7 @@ done
 
 [[ -n "$CHECK" ]] && { echo "Check passed; nothing installed."; exit 0; }
 BACKUP="$RUNTIME/backup-launchd-$(date +%Y%m%d-%H%M%S)"
-mkdir -m 700 -p "$BACKUP"
+mkdir -m 700 -p "$BACKUP" "$RUNTIME/logs"
 cp -p "$AGENTS"/fun.grokgrid.*.plist "$BACKUP/" 2>/dev/null || true
 echo "== installing (backup of old jobs: $BACKUP)"
 for j in "${JOBS[@]}"; do

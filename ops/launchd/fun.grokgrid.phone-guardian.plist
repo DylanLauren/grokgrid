@@ -14,9 +14,9 @@
 	<key>RunAtLoad</key>
 	<true/>
 	<key>StandardErrorPath</key>
-	<string>/dev/null</string>
+	<string>__HOME__/.config/grokgrid/runtime/logs/phone-guardian.log</string>
 	<key>StandardOutPath</key>
-	<string>/dev/null</string>
+	<string>__HOME__/.config/grokgrid/runtime/logs/phone-guardian.log</string>
 	<key>KeepAlive</key>
 	<true/>
 	<key>ThrottleInterval</key>
