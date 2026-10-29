@@ -1,0 +1,256 @@
+[
+  {
+    "wallet": "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ",
+    "records_downloaded": 5700,
+    "records_in_window": 5679,
+    "cutoff_reached": true,
+    "stop_reason": "cutoff-reached",
+    "pages": 57,
+    "oldest_timestamp": 1790613705,
+    "distinct_nonquote_mints": 303,
+    "classifications": {
+      "inflow-without-observed-payment": 2913,
+      "provider-swap-buy": 82,
+      "provider-swap-sell": 78,
+      "unverified-buy-candidate": 29,
+      "unverified-sell-candidate": 34,
+      "complex-exchange": 4
+    },
+    "provider_types": {
+      "INITIALIZE_ACCOUNT": 1720,
+      "UNKNOWN": 1479,
+      "TRANSFER": 2210,
+      "NFT_BID": 14,
+      "SWAP": 249,
+      "SET_AUTHORITY": 1,
+      "CLOSE_ACCOUNT": 4,
+      "WITHDRAW": 1,
+      "COMPRESSED_NFT_MINT": 1
+    }
+  },
+  {
+    "wallet": "5RZPhPW9qGEd3hRGibgYaF5Yk2jBzXR1VZMKSP71C3Lb",
+    "records_downloaded": 4300,
+    "records_in_window": 4255,
+    "cutoff_reached": true,
+    "stop_reason": "cutoff-reached",
+    "pages": 43,
+    "oldest_timestamp": 1790613537,
+    "distinct_nonquote_mints": 80,
+    "classifications": {
+      "unverified-buy-candidate": 83,
+      "provider-swap-buy": 144,
+      "inflow-without-observed-payment": 2170,
+      "provider-swap-sell": 92,
+      "unverified-sell-candidate": 63,
+      "complex-exchange": 6
+    },
+    "provider_types": {
+      "UNKNOWN": 2127,
+      "TRANSFER": 1878,
+      "SWAP": 249,
+      "COMPRESSED_NFT_MINT": 1
+    }
+  },
+  {
+    "wallet": "8bjZiTy5NRhZoX6PyEL8yZiu3PTbcvGxLSApJdyv6vXD",
+    "records_downloaded": 3699,
+    "records_in_window": 3663,
+    "cutoff_reached": true,
+    "stop_reason": "cutoff-reached",
+    "pages": 37,
+    "oldest_timestamp": 1790614247,
+    "distinct_nonquote_mints": 206,
+    "classifications": {
+      "outflow-without-observed-proceeds": 784,
+      "provider-swap-buy": 345,
+      "unverified-sell-candidate": 28,
+      "complex-exchange": 704,
+      "provider-swap-sell": 343,
+      "inflow-without-observed-payment": 394,
+      "unverified-buy-candidate": 6
+    },
+    "provider_types": {
+      "TRANSFER": 85,
+      "TOKEN_MINT": 2,
+      "SWAP": 1466,
+      "UNKNOWN": 2108,
+      "CREATE": 2
+    }
+  },
+  {
+    "wallet": "9PB1RLFsp65qLJ1SQMmcx2ff8Zn6cPYkYqMCWUfVC3sc",
+    "records_downloaded": 1700,
+    "records_in_window": 1618,
+    "cutoff_reached": true,
+    "stop_reason": "cutoff-reached",
+    "pages": 17,
+    "oldest_timestamp": 1790530996,
+    "distinct_nonquote_mints": 59,
+    "classifications": {
+      "provider-swap-buy": 319,
+      "unverified-buy-candidate": 201,
+      "provider-swap-sell": 219,
+      "inflow-without-observed-payment": 69,
+      "unverified-sell-candidate": 259,
+      "complex-exchange": 8
+    },
+    "provider_types": {
+      "UNKNOWN": 564,
+      "TRANSFER": 509,
+      "SWAP": 544,
+      "CLOSE_ACCOUNT": 1
+    }
+  },
+  {
+    "wallet": "AGdtsMmphhymH5wYW3dWKSkAxpLYRrNDCTFAfuq8ii9v",
+    "records_downloaded": 1900,
+    "records_in_window": 1818,
+    "cutoff_reached": true,
+    "stop_reason": "cutoff-reached",
+    "pages": 19,
+    "oldest_timestamp": 1790101128,
+    "distinct_nonquote_mints": 194,
+    "classifications": {
+      "inflow-without-observed-payment": 450,
+      "unverified-buy-candidate": 188,
+      "unverified-sell-candidate": 116,
+      "provider-swap-sell": 176,
+      "provider-swap-buy": 266,
+      "complex-exchange": 20
+    },
+    "provider_types": {
+      "UNKNOWN": 822,
+      "TRANSFER": 352,
+      "INITIALIZE_ACCOUNT": 198,
+      "SWAP": 446
+    }
+  },
+  {
+    "wallet": "BKXBzzDCAzXW8oy1twKkEWuGe4TFznWCjv5JSsqpECo3",
+    "records_downloaded": 2300,
+    "records_in_window": 2259,
+    "cutoff_reached": true,
+    "stop_reason": "cutoff-reached",
+    "pages": 23,
+    "oldest_timestamp": 1790597903,
+    "distinct_nonquote_mints": 7,
+    "classifications": {
+      "outflow-without-observed-proceeds": 299,
+      "provider-swap-sell": 1783,
+      "unverified-buy-candidate": 2,
+      "provider-swap-buy": 37,
+      "unverified-sell-candidate": 129,
+      "complex-exchange": 14
+    },
+    "provider_types": {
+      "UNKNOWN": 426,
+      "SWAP": 1820,
+      "TRANSFER": 1,
+      "INITIALIZE_ACCOUNT": 1,
+      "DEPOSIT": 1,
+      "TOKEN_MINT": 9,
+      "WITHDRAW_UNSTAKED_DEPOSITS": 1
+    }
+  },
+  {
+    "wallet": "CFzVktB6sfK8rpewZeJ5VRPcvG5BBtK6pSbZ7FHVze4V",
+    "records_downloaded": 2499,
+    "records_in_window": 2493,
+    "cutoff_reached": false,
+    "stop_reason": "page-budget",
+    "pages": 25,
+    "oldest_timestamp": 1793109472,
+    "distinct_nonquote_mints": 44,
+    "classifications": {
+      "inflow-without-observed-payment": 202,
+      "provider-swap-buy": 73,
+      "unverified-buy-candidate": 23,
+      "provider-swap-sell": 88,
+      "unverified-sell-candidate": 28,
+      "outflow-without-observed-proceeds": 11,
+      "complex-exchange": 3
+    },
+    "provider_types": {
+      "UNKNOWN": 370,
+      "SWAP": 196,
+      "CLOSE_ACCOUNT": 10,
+      "TRANSFER": 1916,
+      "CREATE": 1
+    }
+  },
+  {
+    "wallet": "FYN6YTuZ2T8ixnQzouMJ3TEiVGqJuCJkeHDgP6fQe4hw",
+    "records_downloaded": 400,
+    "records_in_window": 346,
+    "cutoff_reached": true,
+    "stop_reason": "cutoff-reached",
+    "pages": 4,
+    "oldest_timestamp": 1790193534,
+    "distinct_nonquote_mints": 6,
+    "classifications": {
+      "provider-swap-sell": 142,
+      "provider-swap-buy": 151,
+      "outflow-without-observed-proceeds": 11,
+      "unverified-sell-candidate": 16,
+      "unverified-buy-candidate": 13,
+      "inflow-without-observed-payment": 3
+    },
+    "provider_types": {
+      "SWAP": 293,
+      "UNKNOWN": 32,
+      "COMPRESSED_NFT_MINT": 2,
+      "TRANSFER": 8,
+      "INITIALIZE_ACCOUNT": 10,
+      "WITHDRAW_UNSTAKED_DEPOSITS": 1
+    }
+  },
+  {
+    "wallet": "GEkyVWgf5ugVkvdU8GwUDKd9jdkkXrz3qNy14823GSCM",
+    "records_downloaded": 1500,
+    "records_in_window": 1448,
+    "cutoff_reached": true,
+    "stop_reason": "cutoff-reached",
+    "pages": 15,
+    "oldest_timestamp": 1788270305,
+    "distinct_nonquote_mints": 271,
+    "classifications": {
+      "complex-exchange": 26,
+      "unverified-sell-candidate": 29,
+      "provider-swap-sell": 76,
+      "outflow-without-observed-proceeds": 196,
+      "inflow-without-observed-payment": 546,
+      "provider-swap-buy": 75,
+      "unverified-buy-candidate": 4
+    },
+    "provider_types": {
+      "TRANSFER": 42,
+      "UNKNOWN": 1049,
+      "SWAP": 161,
+      "INITIALIZE_ACCOUNT": 196
+    }
+  },
+  {
+    "wallet": "HvvEk6DkVfri3xGqvh4KK3eVqtGT6RRvdWaaKBA5j1gV",
+    "records_downloaded": 1400,
+    "records_in_window": 1317,
+    "cutoff_reached": true,
+    "stop_reason": "cutoff-reached",
+    "pages": 14,
+    "oldest_timestamp": 1790505873,
+    "distinct_nonquote_mints": 17,
+    "classifications": {
+      "unverified-buy-candidate": 431,
+      "unverified-sell-candidate": 113,
+      "provider-swap-buy": 524,
+      "provider-swap-sell": 43,
+      "inflow-without-observed-payment": 8,
+      "outflow-without-observed-proceeds": 86
+    },
+    "provider_types": {
+      "TRANSFER": 637,
+      "SWAP": 567,
+      "UNKNOWN": 113
+    }
+  }
+]

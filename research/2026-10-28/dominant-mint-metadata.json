@@ -1,0 +1,19 @@
+{
+  "http": 200,
+  "asset": "DEW9dSN6QpWyNthphCpMmAbZP1Q4cEKR9xQXAri98WDP",
+  "metadata": {
+    "json_name": "Super Inu",
+    "name": "Super Inu",
+    "symbol": "SI"
+  },
+  "tokenInfo": {
+    "symbol": "SI",
+    "supply": 994941523457826,
+    "decimals": 6,
+    "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "price_info": {
+      "price_per_token": 0.014191938,
+      "currency": "USDC"
+    }
+  }
+}
