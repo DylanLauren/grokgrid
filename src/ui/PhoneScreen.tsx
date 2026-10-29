@@ -3,26 +3,36 @@ import type { Feed, Live } from '../data/types'
 import { FRESH_MS } from '../data/useLive'
 import { PHONE_STREAM } from '../config'
 import { useWhep } from './useWhep'
+import { useLivePhone } from './useLivePhone'
+import type { LivePhoneState } from './livePhoneSession'
 import { fetchPhoneFrame } from './phoneFrame'
 import './phone.css'
 
 // Show only actual broadcast frames. An offline feed must never impersonate a live screen.
 export function PhoneScreen({ live, watching }: { feed: Feed; live: Live; watching: boolean }) {
   const [now, setNow] = useState(() => Date.now())
-  const { video, playing } = useWhep(PHONE_STREAM, watching)
+  const { video: liveVideo, state: videoState, playing: livePlaying } = useLivePhone(watching)
+  const { video, playing } = useWhep(PHONE_STREAM, watching && videoState === 'unavailable')
+  const fallbackPlaying = watching && videoState === 'unavailable' && playing
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
   return (
     <div className="ph-wrap">
-      <Stream ts={live.screenTs} now={now} watching={watching} />
+      <div className="ph-snapshot" aria-hidden={livePlaying || fallbackPlaying}>
+        <Stream ts={live.screenTs} now={now} watching={watching} videoState={videoState} />
+      </div>
+      <div className={`ph ph-stream ph-video ${livePlaying ? 'on' : ''}`} aria-hidden={!livePlaying}>
+        <div className="ph-viewport"><video ref={liveVideo} muted playsInline autoPlay /></div>
+        <span className="ph-live mono"><i aria-hidden="true" />live video</span>
+      </div>
       {PHONE_STREAM && (
-        <div className={`ph ph-stream ph-video ${playing ? 'on' : ''}`} aria-hidden={!playing}>
+        <div className={`ph ph-stream ph-video ${fallbackPlaying ? 'on' : ''}`} aria-hidden={!fallbackPlaying}>
           <div className="ph-viewport">
             <video ref={video} muted playsInline autoPlay />
           </div>
-          <span className="ph-live mono"><i aria-hidden="true" />live screen</span>
+          <span className="ph-live mono"><i aria-hidden="true" />live video</span>
         </div>
       )}
     </div>
@@ -31,7 +41,7 @@ export function PhoneScreen({ live, watching }: { feed: Feed; live: Live; watchi
 
 // Real frames from his phone. The next frame loads behind the current one, then swaps in,
 // so the screen never flashes blank.
-function Stream({ ts, now, watching }: { ts: number; now: number; watching: boolean }) {
+function Stream({ ts, now, watching, videoState }: { ts: number; now: number; watching: boolean; videoState: LivePhoneState }) {
   const [frame, setFrame] = useState<{ ts: number; src: string } | null>(null)
   useEffect(() => {
     let active = true
@@ -72,23 +82,30 @@ function Stream({ ts, now, watching }: { ts: number; now: number; watching: bool
     }
   }, [ts, watching])
   useEffect(() => () => { if (frame) URL.revokeObjectURL(frame.src) }, [frame])
-  if (!frame || now < frame.ts || now - frame.ts >= FRESH_MS) return <Offline />
+  if (!frame || now < frame.ts || now - frame.ts >= FRESH_MS) return <Offline videoState={videoState} />
   return (
     <div className="ph ph-stream">
       <div className="ph-viewport">
         <img src={frame.src} alt="Grok Bot’s captured working browser" />
       </div>
-      <span className="ph-live mono"><i aria-hidden="true" />live screen</span>
+      <span className="ph-live mono"><i aria-hidden="true" />{snapshotLabel(videoState)}</span>
     </div>
   )
 }
 
-function Offline() {
+function snapshotLabel(state: LivePhoneState) {
+  if (state === 'connecting') return 'Connecting video · snapshot'
+  if (state === 'waiting') return 'Waiting for video · snapshot'
+  if (state === 'unavailable') return 'Video unavailable · snapshot'
+  return 'Screen snapshot'
+}
+
+function Offline({ videoState }: { videoState: LivePhoneState }) {
   return (
     <div className="ph ph-offline" role="status">
       <img src="/brands/grokbot.svg" width={48} height={48} alt="" />
-      <strong>Screen offline</strong>
-      <span>Waiting for the working browser feed.</span>
+      <strong>{videoState === 'idle' ? 'Watch me trade!' : videoState === 'connecting' ? 'Connecting live video' : videoState === 'waiting' ? 'Waiting for live video' : 'Screen offline'}</strong>
+      <span>{videoState === 'idle' ? 'Open the phone to connect to the live screen.' : videoState === 'unavailable' ? 'Video unavailable. Waiting for a fresh screen snapshot.' : 'The working browser appears here when available.'}</span>
     </div>
   )
 }

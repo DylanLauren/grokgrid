@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { readFileSync } from 'node:fs'
 import { Box3, BufferGeometry, DoubleSide, Float32BufferAttribute, Matrix4, Mesh, MeshBasicMaterial, PerspectiveCamera, Quaternion, Raycaster, Spherical, Vector3 } from 'three'
-import { PHONE, ROOM_ORBIT, ROOM_VIEW, phoneGeometry, phoneView } from '../src/scene/cameraGeometry'
+import { PHONE, ROOM_ORBIT, ROOM_VIEW, constrainRoomOrbit, phoneGeometry, phoneView } from '../src/scene/cameraGeometry'
 
 test('phone projects upright, without perspective skew, inside responsive header/footer margins', () => {
   assert.equal(PHONE.w / PHONE.h, 300 / 640)
@@ -48,8 +48,11 @@ test('entire permitted room orbit clears actual baked furniture and both walls w
   const distance=ROOM_ORBIT.minDistance+(ROOM_ORBIT.maxDistance-ROOM_ORBIT.minDistance)*r/12
   const polar=ROOM_ORBIT.minPolarAngle+(ROOM_ORBIT.maxPolarAngle-ROOM_ORBIT.minPolarAngle)*p/18
   const azimuth=ROOM_ORBIT.minAzimuthAngle+(ROOM_ORBIT.maxAzimuthAngle-ROOM_ORBIT.minAzimuthAngle)*a/24
-  const position=new Vector3().setFromSpherical(new Spherical(distance,polar,azimuth)).add(target)
+  const safe=constrainRoomOrbit(azimuth,polar,distance)
+  const position=new Vector3().setFromSpherical(new Spherical(safe.distance,safe.polar,safe.azimuth)).add(target)
   assert.ok(position.x>-1.65 && position.x<2.9 && position.z>-.85 && position.z<3.3 && position.y>.05 && position.y<2.95)
+  const camera=new PerspectiveCamera(38,2.8,.02,30);camera.position.copy(position);camera.lookAt(target);camera.updateMatrixWorld()
+  for(const x of [-1,1])for(const y of [-1,1]){const corner=new Vector3(x,y,-1).unproject(camera);assert.ok(corner.x>-1.7&&corner.x<3&&corner.z>-.9&&corner.z<3.4&&corner.y>0&&corner.y<3,'near-frustum room clearance')}
   for(const name of ['desk','chair','shelf'])assert.ok(!bounds.get(name)!.clone().expandByScalar(.04).containsPoint(position),name+' camera clearance')
  }
 })
@@ -79,11 +82,35 @@ test('room orbit keeps the actual chair out of the sightlines to the bot and hel
   const distance=ROOM_ORBIT.minDistance+(ROOM_ORBIT.maxDistance-ROOM_ORBIT.minDistance)*r/6
   const polar=ROOM_ORBIT.minPolarAngle+(ROOM_ORBIT.maxPolarAngle-ROOM_ORBIT.minPolarAngle)*p/12
   const azimuth=ROOM_ORBIT.minAzimuthAngle+(ROOM_ORBIT.maxAzimuthAngle-ROOM_ORBIT.minAzimuthAngle)*a/20
-  const position=new Vector3().setFromSpherical(new Spherical(distance,polar,azimuth)).add(target)
+  const safe=constrainRoomOrbit(azimuth,polar,distance)
+  const position=new Vector3().setFromSpherical(new Spherical(safe.distance,safe.polar,safe.azimuth)).add(target)
   for(const subject of subjects)assert.ok(!obstructed(position,subject),`chair obstruction at ${distance},${polar},${azimuth}`)
  }
  const initial=new Spherical().setFromVector3(new Vector3(...ROOM_VIEW.slice(0,3)).sub(target))
  assert.ok(initial.phi>=ROOM_ORBIT.minPolarAngle&&initial.phi<=ROOM_ORBIT.maxPolarAngle)
  assert.ok(initial.theta>=ROOM_ORBIT.minAzimuthAngle&&initial.theta<=ROOM_ORBIT.maxAzimuthAngle)
+ const preserved=constrainRoomOrbit(initial.theta,initial.phi,initial.radius)
+ assert.ok(Math.abs(preserved.azimuth-initial.theta)<1e-12&&Math.abs(preserved.polar-initial.phi)<1e-12&&Math.abs(preserved.distance-initial.radius)<1e-12,'default room composition stays unchanged')
  chair.geometry.dispose();chair.material.dispose()
+})
+
+test('expanded orbit offers rear-left and overhead views with continuous boundary movement',()=>{
+ assert.ok(ROOM_ORBIT.maxAzimuthAngle-ROOM_ORBIT.minAzimuthAngle>3)
+ assert.ok(ROOM_ORBIT.minPolarAngle<=.4);assert.ok(ROOM_ORBIT.maxDistance>=3.4)
+ const position=(az:number,phi:number)=>{const s=constrainRoomOrbit(az,phi,3.4);return new Vector3().setFromSpherical(new Spherical(s.distance,s.polar,s.azimuth))}
+ for(let i=0;i<=1000;i++){
+  const az=ROOM_ORBIT.minAzimuthAngle+(ROOM_ORBIT.maxAzimuthAngle-ROOM_ORBIT.minAzimuthAngle)*i/1000
+  assert.ok(position(az,1.3).distanceTo(position(az+.0001,1.3))<.002,'azimuth limit must slide, not snap')
+ }
+ for(let i=0;i<=900;i++){
+  const phi=.4+i/1000
+  assert.ok(position(-.9,phi).distanceTo(position(-.9,phi+.0001))<.002,'polar limit must slide, not snap')
+ }
+})
+
+test('rear-left room view rises above the bot instead of filling the view with its back',()=>{
+ const safe=constrainRoomOrbit(-1.15,1.3,3.4)
+ const camera=new Vector3().setFromSpherical(new Spherical(safe.distance,safe.polar,safe.azimuth)).add(new Vector3(...ROOM_VIEW.slice(3)))
+ assert.ok(camera.y>2.1,'rear viewpoint must reveal the desktop from above')
+ assert.ok(camera.distanceTo(new Vector3(0,.86,.64))>1.85,'keep comfortable distance from the mascot')
 })

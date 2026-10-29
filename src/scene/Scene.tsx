@@ -1,5 +1,5 @@
 import { CameraControls, CameraControlsImpl, ContactShadows, Environment, Html, Lightformer, RoundedBox } from '@react-three/drei'
-import { Canvas, useThree } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Component, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
 import type { Feed, Live } from '../data/types'
@@ -8,7 +8,7 @@ import { Bot, type Mood } from './Bot'
 import { MON, Room, RoomBaked, RoomLive } from './Room'
 import { Props } from './Props'
 import { MonitorScreen } from '../ui/MonitorScreen'
-import { BOT_POS, BOT_YAW, PHONE, ROOM_ORBIT, ROOM_VIEW, phoneView } from './cameraGeometry'
+import { BOT_POS, BOT_YAW, PHONE, ROOM_ORBIT, ROOM_VIEW, constrainRoomOrbit, phoneView } from './cameraGeometry'
 
 export type View = 'third' | 'phone'
 
@@ -49,11 +49,16 @@ function Later({ children }: { children: ReactNode }) {
 function Rig({ view }: { view: View }) {
   const ref = useRef<CameraControls>(null)
   const previous = useRef<View | null>(null)
+  const transitioning = useRef(false)
+  const transitionGeneration = useRef(0)
+  const spherical = useRef(new THREE.Spherical())
+  const target = useRef(new THREE.Vector3(...ROOM_VIEW.slice(3)))
+  const camera = useThree((state) => state.camera)
   const { width, height } = useThree((state) => state.size)
   useEffect(() => {
     const c = ref.current
     if (!c) return
-    if (view === 'third' && previous.current === view) return
+    if (view === 'third' && previous.current === view && !transitioning.current) return
     const wasPhone = previous.current === 'phone'
     previous.current = view
     c.stop()
@@ -62,12 +67,33 @@ function Rig({ view }: { view: View }) {
       minDistance: 0.05, maxDistance: 4, minPolarAngle: 0.01,
       maxPolarAngle: Math.PI - 0.01, minAzimuthAngle: -Infinity, maxAzimuthAngle: Infinity,
     })
-    c.enabled = view === 'third'
+    c.enabled = false
     // Resize only reframes the phone, preserving a visitor's chosen room angle.
     const pose = view === 'phone' ? phoneView(width, height) : ROOM_VIEW
     void c.zoomTo(1, false)
-    void c.setLookAt(...pose, !reduced && (view === 'phone' || wasPhone))
+    const generation = ++transitionGeneration.current
+    transitioning.current = true
+    void c.setLookAt(...pose, !reduced && (view === 'phone' || wasPhone)).then(() => {
+      if (generation !== transitionGeneration.current) return
+      transitioning.current = false
+      c.enabled = view === 'third'
+    })
+    return () => { transitionGeneration.current++ }
   }, [view, width, height])
+  // CameraControls updates at -1; project before Html screens/render callbacks
+  // at 0. Public setters retain the corrected pose, avoiding hidden zoom debt.
+  useFrame(() => {
+    const c = ref.current
+    if (view !== 'third' || transitioning.current || !c) return
+    c.getSpherical(spherical.current, false)
+    const safe = constrainRoomOrbit(spherical.current.theta, spherical.current.phi, spherical.current.radius)
+    if (safe.polar < spherical.current.phi - 1e-7) c.polarAngle = safe.polar
+    if (safe.distance < spherical.current.radius - 1e-7) c.distance = safe.distance
+    spherical.current.set(safe.distance, safe.polar, safe.azimuth)
+    camera.position.setFromSpherical(spherical.current).add(target.current)
+    camera.lookAt(target.current)
+    camera.updateMatrixWorld()
+  }, -0.5)
   const action = CameraControlsImpl.ACTION
   return (
     <CameraControls

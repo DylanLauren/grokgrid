@@ -74,6 +74,26 @@ test('operator stop terminates the child and never respawns it',async()=>{
   const result=JSON.parse(await readFile(join(root,'local-phone-supervisor-status.json'),'utf8'));assert.equal(result.state,'stopped');assert.equal(result.reason,'operator-stop')
  }finally{await rm(root,{recursive:true,force:true})}
 })
+test('operator pause and JPEG source rejection terminate the optional video sidecar',async()=>{
+ for(const reason of ['operator','window-identity-mismatch']){
+  const root=await realpath(await mkdtemp(join(tmpdir(),'phone-video-supervisor-'))),configPath=join(root,'config.json'),tokenPath=join(root,'token'),statusPath=join(root,'publisher-status.json'),videoPath=join(root,'video.json')
+  try{
+   await writeFile(configPath,JSON.stringify({source:'grok-bot-actual-window',windowId:99,ownerPid:123,bundleId:'com.google.Chrome',title:'Pump',browserUrl:'https://pump.fun/',tokenFile:tokenPath,statusFile:statusPath,videoConfigFile:videoPath}),{mode:0o600})
+   await writeFile(tokenPath,'opaque',{mode:0o600});await writeFile(videoPath,'{}',{mode:0o600})
+   let videoStarts=0,videoStops=0
+   const fake=()=>{const child=new EventEmitter() as any;child.pid=9876;child.kill=()=>{setImmediate(()=>child.emit('exit',null,'SIGTERM'));return true};return child}
+   await runPhoneSupervisor(configPath,{
+    spawnVideo:()=>{videoStarts++;const child=fake();child.kill=()=>{videoStops++;setImmediate(()=>child.emit('exit',null,'SIGTERM'));return true};return child},
+    spawnPublisher:()=>{const child=fake();setTimeout(async()=>{
+     if(reason==='operator')process.emit('SIGTERM')
+     else{await writeFile(statusPath,JSON.stringify({state:'stopped-error',reason,observedAt:new Date().toISOString()}),{mode:0o600});child.emit('exit',1,null)}
+    },30);return child},
+   })
+   assert.equal(videoStarts,1);assert.ok(videoStops>=1)
+   await assert.rejects(lstat(join(root,'local-phone-supervisor-status.json.lock')))
+  }finally{await rm(root,{recursive:true,force:true})}
+ }
+})
 test('expiry retry requires changed capability metadata and never repins the source',async()=>{
  const root=await realpath(await mkdtemp(join(tmpdir(),'phone-supervisor-renew-'))),configPath=join(root,'config.json'),tokenPath=join(root,'token'),statusPath=join(root,'publisher-status.json')
  try{

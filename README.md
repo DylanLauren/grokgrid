@@ -26,7 +26,7 @@ npm run build
   - `GET /api/screen?t=<ts>` his latest phone frame as a JPEG.
   - `POST /api/ingest` where Grok Bot posts what it just did (`Authorization: Bearer $INGEST_TOKEN`). Trade signatures are checked on chain. Event types: `trade`, `agent`, `fees`, `wallet`, plus
     - `{ "type": "action", "text": "reading the trader list" }` one line per step he takes; shows on his phone and in the monitor's agent log.
-    - `{ "type": "screen", "jpeg": "<base64>" }` a screenshot of his phone (about 390x844, JPEG quality 70, under 330 KB), every 2 to 3 seconds while he trades. While frames keep coming, the phone in the room shows them; when they stop for 12 seconds it falls back to the redrawn app.
+    - `{ "type": "screen", "jpeg": "<base64>" }` a screenshot of his phone (about 390x844, JPEG quality 70, under 330 KB), every 2 to 3 seconds while he trades. While frames keep coming, the phone in the room shows them; when they stop for 12 seconds it shows Screen offline.
 
 ## Launching a grid bot
 
@@ -49,15 +49,24 @@ The capture worker posts actual frames from one explicitly pinned bot-controlled
 
 Follow [the phone setup guide](docs/phone-feed.md) to configure the private window identity and screen capability, then run `node scripts/phone-feed.mjs --config /absolute/private/config.json --check`. This check captures and uploads nothing. After confirming the actual source, run without `--check` to publish. If frames stop, the site shows Screen offline after 12 seconds.
 
-### Paid: real-time video
+### On-demand WebRTC video
 
-The phone in the room plays his real phone screen as live video (WebRTC, under half a second behind) whenever someone opens the phone view.
+Clicking **Watch me trade!** joins a subscribe-only LiveKit session. The browser
+loads the video client only in phone view and disconnects on leaving it. The Mac
+publisher starts only while viewers are present and stops after the last viewer
+leaves. It captures the pinned pump.fun page, without Chrome tabs, audio or other
+windows. Fresh JPEG snapshots remain the fallback; snapshots are labelled as such.
 
-1. Create a live input in Cloudflare Stream. It gives two URLs:
-   - WebRTC **publish** URL (WHIP), `.../<secret>/webRTC/publish`. Secret: it goes only on Grok Bot's computer.
-   - WebRTC **playback** URL (WHEP), `.../<input id>/webRTC/play`. Public: set it as `VITE_PHONE_STREAM` in Vercel.
-2. On Grok Bot's computer, run his phone (an Android emulator with the pump.fun app, or a phone-sized browser window on pump.fun) and broadcast that window to the publish URL. OBS 30+ does this: Settings, Stream, Service "WHIP", Server = the publish URL; canvas 720x1560 portrait, 30 fps.
-3. Cost: $1 per 1,000 minutes watched. The site only connects while a visitor is in the phone view.
+Set the server-only Vercel variables `LIVEKIT_URL`, `LIVEKIT_API_KEY` and
+`LIVEKIT_API_SECRET` for Production and Preview, then redeploy. Never use a
+`VITE_` prefix for provider credentials. The ingress publish credential stays only
+in private local files. [The video setup guide](docs/phone-video.md) describes the
+fixed room, publisher, capture checks and optional `videoConfigFile` integration
+with the existing Mac helper. The free provider plan has usage limits; this setup
+does not require a paid upgrade or enable automatic billing.
+
+An already-configured WHEP endpoint can still be supplied through the public
+`VITE_PHONE_STREAM` setting as a fallback. It also connects only in phone view.
 
 Without a stream the phone shows fresh screenshots from `screen` events; without those it shows Screen offline.
 
@@ -80,7 +89,7 @@ it cannot read the launch queue or change wallets, trades, agents or actions.
 It expires after seven days. Renew before expiry; rotate `INGEST_TOKEN` to revoke
 all outstanding capabilities. Existing full-token ingestion still works.
 
-The phone displays fresh captured JPEGs or WHEP video and shows **Screen offline**
+The phone displays fresh captured JPEGs or verified WebRTC video and shows **Screen offline**
 when neither is available. It does not redraw an illustrative trading app. A live
 screen demonstrates capture only; it does not prove the bot is trading.
 
