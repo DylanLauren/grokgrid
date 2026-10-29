@@ -16,8 +16,8 @@ async function postIngest(root, event, fetchImpl = fetch) {
     const token = (await readPrivateText(cfg.tokenFile)).trim();
     const r = await fetchImpl(`${ORIGIN}/api/ingest`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       body: JSON.stringify(event), redirect: 'error', signal: AbortSignal.timeout(8000) });
-    return event.type === 'trade' ? r.status : r.ok;
-  } catch { return event.type === 'trade' ? 0 : false; }
+    return ['trade', 'tradeMc'].includes(event.type) ? r.status : r.ok;
+  } catch { return ['trade', 'tradeMc'].includes(event.type) ? 0 : false; }
 }
 
 /** Heartbeat the site reads; stale after 120s. */
@@ -59,4 +59,10 @@ export function phoneBeat(s, now) {
   const sent = Date.parse(s?.lastSentAt ?? '');
   const healthy = s?.state === 'sending' && Number.isFinite(sent) && sent <= now + 5000 && now - sent < 60000;
   return { mode: 'observe-only', healthy, note: healthy ? 'live' : String(s?.state || 'unknown').slice(0, 40) };
+}
+
+/** Market cap at a trade, for a trade the site already has (set only if missing). Returns the HTTP status. */
+export function postTradeMc(root, { agent, sig, mint, mcUsd, approx = true }, fetchImpl) {
+  if (!Number.isFinite(mcUsd) || mcUsd <= 0) return Promise.resolve(0);
+  return postIngest(root, { type: 'tradeMc', agent, sig, mint, mcUsd: Math.round(mcUsd), approx: approx === true }, fetchImpl);
 }
