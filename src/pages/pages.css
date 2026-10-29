@@ -82,13 +82,14 @@
 .st-tiles-5 { grid-template-columns: repeat(5, 1fr); }
 .st-tile b.st-up { color: var(--gain); }
 .st-tile b.st-down { color: var(--paper-50); }
-.st-trades { display: grid; }
+.st-trades { display: grid; background: #0f0f10; border: 1px solid var(--hair); border-radius: var(--r-card); padding: 4px 14px; overflow: hidden; }
+.st-trades > .st-tr:last-child { border-bottom: 0; }
 .st-tr { display: grid; grid-template-columns: 44px 1.2fr 70px 1fr 1fr 1fr 90px 28px; gap: 12px; align-items: center; padding: 12px 6px; border-bottom: 1px solid var(--hair); font-size: 14px; transition: background 0.2s, padding 0.3s cubic-bezier(.2,.8,.2,1); }
-.st-tr:hover { background: #ffffff06; padding-left: 12px; }
-.st-tr.th { font-size: 11px; color: var(--paper-50); text-transform: uppercase; letter-spacing: 0.06em; padding-top: 0; }
+.st-tr:hover { background: #ffffff06; padding-left: 12px; border-radius: 10px; }
+.st-tr.th { font-size: 11px; color: var(--paper-50); text-transform: uppercase; letter-spacing: 0.06em; padding-top: 14px; }
 .st-tr.th:hover { background: none; padding-left: 6px; }
 .st-tr .r { text-align: right; }
-.st-tr em { font-style: normal; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 6px; justify-self: start; }
+.st-tr em { font-style: normal; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 6px; justify-self: start; align-self: center; line-height: 1.5; }
 .st-tr em.buy { color: var(--gain); background: #4ade801a; }
 .st-tr em.sell { color: var(--loss); background: #f871711a; }
 .st-tr a { color: var(--paper-50); }
@@ -109,6 +110,16 @@
 .gd-line::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 46px; background: #dfe2e8; border-top: 1px solid #0000000d; }
 .gd-pick { position: relative; z-index: 1; display: grid; justify-items: center; gap: 4px; padding-bottom: 10px; }
 .gd-pick .lb { width: 100% !important; height: auto !important; aspect-ratio: 1; }
+/* hover: the bot steps forward with a spin, gets a soft spotlight, the rest step back */
+.gd-pick { transition: opacity 0.35s cubic-bezier(0.22, 1, 0.36, 1), filter 0.35s; }
+.gd-line:hover .gd-pick:not(:hover):not(.on) { opacity: 0.45; filter: saturate(0.5); }
+.gd-pick .lb-body { transition: scale 0.45s cubic-bezier(0.22, 1, 0.36, 1), filter 0.45s; }
+.gd-pick:hover .lb-body { scale: 1.16; filter: drop-shadow(0 16px 18px rgba(0, 0, 0, 0.22)); animation: gd-spin 0.8s cubic-bezier(0.22, 1, 0.36, 1); }
+.gd-pick:hover .lb-shadow { transform: scale(0.6); opacity: 0.1; }
+.gd-pick::after { content: ''; position: absolute; inset: 4% 8% 18%; border-radius: 50%; background: radial-gradient(closest-side, rgba(0, 0, 0, 0.07), transparent); opacity: 0; scale: 0.7; transition: opacity 0.4s, scale 0.5s cubic-bezier(0.22, 1, 0.36, 1); z-index: -1; pointer-events: none; }
+.gd-pick:hover::after { opacity: 1; scale: 1.05; }
+@keyframes gd-spin { 0% { transform: none; } 45% { transform: translateY(-14%) rotate(200deg); } 100% { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .gd-pick:hover .lb-body { animation: none; } }
 .gd-name { font-size: 12px; color: #0a0a0a80; font-family: var(--mono); transition: color 0.2s; }
 .gd-pick:hover .gd-name, .gd-pick.on .gd-name { color: #0a0a0a; }
 .gd-pick.on::before { content: ''; position: absolute; left: 10%; right: 10%; bottom: 4px; height: 3px; border-radius: 2px; background: #0a0a0a; }

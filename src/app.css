@@ -66,8 +66,8 @@
 .chip { display: inline-flex; align-items: center; height: 36px; font-size: 12px; border: 1px solid var(--hair-strong); border-radius: var(--r-pill); padding: 0 13px; }
 .buy-group { display: flex; gap: 6px; }
 .ca { height: 36px; font-size: 12px; border: 1px solid var(--hair-strong); border-radius: var(--r-pill); padding: 0 13px; }
-.buy { display: inline-flex; align-items: center; height: 36px; background: var(--paper); color: var(--ink); border-radius: var(--r-pill); padding: 0 16px; font-size: 14px; font-weight: 560; white-space: nowrap; }
-.buy.off { background: #ffffff12; color: var(--paper-50); font-weight: 450; font-size: 13px; border: 1px solid var(--hair); }
+.bar .buy, a.buy { display: inline-flex; align-items: center; height: 36px; background: var(--paper); color: var(--ink); border-radius: var(--r-pill); padding: 0 16px; font-size: 14px; font-weight: 560; white-space: nowrap; }
+.bar .buy.off { background: #ffffff12; color: var(--paper-50); font-weight: 450; font-size: 13px; border: 1px solid var(--hair); }
 
 /* bottom row over the room: calls left, camera centre, numbers right, all on one baseline */
 .calls-dock, .views, .strip { position: absolute; bottom: var(--edge); z-index: 20; transition: opacity 0.3s, transform 0.4s cubic-bezier(.2,.8,.2,1); }

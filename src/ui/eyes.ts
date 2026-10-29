@@ -25,7 +25,7 @@ const N = 32 // outline points per eye
 export const MAX_LOOK = 0.62 // radians the ball turns at most
 
 /** The two eye outlines as SVG path data for a bot looking toward (lx, ly), each -1..1. */
-export function eyePaths(shape: Shape, lx: number, ly: number, scale = 1, open = 1): [string, string] {
+export function eyePaths(shape: Shape, lx: number, ly: number, scale = 1, open = 1, open2 = open): [string, string] {
   const [cx, cy, r] = FACE[shape]
   const yaw = lx * MAX_LOOK
   const pitch = ly * MAX_LOOK
@@ -38,7 +38,9 @@ export function eyePaths(shape: Shape, lx: number, ly: number, scale = 1, open =
       // a pill: two half circles joined by straight sides
       const s = Math.sin(a)
       const ux = Math.cos(a) * HALF_W * scale
-      const uy = (s * HALF_W + Math.sign(s) * (HALF_H - HALF_W)) * scale * open
+      const o = side < 0 ? open : open2
+      // closing squeezes the pill toward a flat line, the round ends staying round
+      const uy = (s * HALF_W * Math.min(1, o * 1.6) + Math.sign(s) * Math.max(0, HALF_H * o - HALF_W)) * scale
       let x = side * EYE_X + ux
       let y = EYE_Y + uy
       let z = Math.sqrt(Math.max(0, 1 - x * x - y * y))
@@ -62,6 +64,19 @@ export function eyeInk(color: string) {
 
 // ---------- the one clock every live bot shares ----------
 
+type Face = 'none' | 'blink' | 'wink' | 'squint' | 'wide' | 'sleepy'
+// how open each eye is and how big they get, per face
+const FACES: Record<Face, [number, number, number]> = {
+  none: [1, 1, 1],
+  blink: [0.08, 0.08, 1],
+  wink: [1, 0.08, 1.02],
+  squint: [0.42, 0.42, 1.04],
+  wide: [1.12, 1.12, 1.22],
+  sleepy: [0.34, 0.34, 0.98],
+}
+const FACE_TIME: Record<Face, number> = { none: 0, blink: 150, wink: 480, squint: 900, wide: 750, sleepy: 1300 }
+const PICK: Face[] = ['blink', 'blink', 'wink', 'squint', 'wide', 'sleepy']
+
 export interface Looker {
   el: HTMLElement
   paths: [SVGPathElement, SVGPathElement]
@@ -71,6 +86,12 @@ export interface Looker {
   lx: number
   ly: number
   sc: number
+  o1: number
+  o2: number
+  // a face now and then: blink, wink, squint, wide eyes, sleepy
+  face: Face
+  faceUntil: number
+  faceNext: number
   // idle glance
   gx: number
   gy: number
@@ -105,7 +126,7 @@ function tick(now: number) {
       // attentive: eyes come nearly front on, a little bigger, still following
       tx = (dx / (r.width * 0.6)) * 0.35
       ty = (dy / (r.width * 0.6)) * 0.35
-      ts = 1.1
+      ts = 1.16
     } else if (active) {
       const k = Math.min(1, dist / 260)
       tx = (dx / (dist || 1)) * k
@@ -121,11 +142,25 @@ function tick(now: number) {
       }
       if (now < b.until) { tx = b.gx; ty = b.gy }
     }
+    // now and then a face
+    if (now > b.faceNext) {
+      b.face = PICK[Math.floor(Math.random() * PICK.length)]
+      b.faceUntil = now + FACE_TIME[b.face]
+      b.faceNext = now + 3200 + Math.random() * 4200
+    }
+    if (now > b.faceUntil) b.face = 'none'
+    const face = near && b.face !== 'blink' && b.face !== 'wink' ? 'none' : b.face
+    const [f1, f2, fs] = FACES[face]
+    const ease = face === 'blink' ? 0.5 : 0.2
+    b.o1 += (f1 - b.o1) * ease
+    b.o2 += (f2 - b.o2) * ease
+    ts *= fs
     // smooth, a touch springy
     b.lx += (tx - b.lx) * 0.12
     b.ly += (ty - b.ly) * 0.12
     b.sc += (ts - b.sc) * 0.15
-    const [a1, a2] = eyePaths(b.shape, b.lx, b.ly, b.sc, b.doze && !near ? 0.22 : 1)
+    const doze = b.doze && !near ? 0.22 : 1
+    const [a1, a2] = eyePaths(b.shape, b.lx, b.ly, b.sc, b.o1 * doze, b.o2 * doze)
     b.paths[0].setAttribute('d', a1)
     b.paths[1].setAttribute('d', a2)
     // the whole face drifts a little the same way
@@ -137,7 +172,7 @@ function tick(now: number) {
 /** Start a bot looking around. Returns the stop function. */
 export function watch(el: HTMLElement, paths: [SVGPathElement, SVGPathElement], shape: Shape, doze = false) {
   if (still) return () => {}
-  const b: Looker = { el, paths, shape, doze, lx: 0, ly: 0, sc: 1, gx: 0, gy: 0, until: 0, next: performance.now() + Math.random() * 2500 }
+  const b: Looker = { el, paths, shape, doze, lx: 0, ly: 0, sc: 1, o1: 1, o2: 1, face: 'none', faceUntil: 0, faceNext: performance.now() + 1500 + Math.random() * 4000, gx: 0, gy: 0, until: 0, next: performance.now() + Math.random() * 2500 }
   if (!lookers.size) addEventListener('pointermove', onMove, { passive: true })
   lookers.add(b)
   if (!raf) raf = requestAnimationFrame(tick)
