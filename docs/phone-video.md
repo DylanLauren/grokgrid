@@ -50,6 +50,12 @@ keeps it out of ffmpeg arguments and suppresses provider error output. The bridg
 preserves mapped session URLs, query credentials, ETags and PATCH/DELETE bodies;
 it rejects upstream redirects and foreign-origin session locations. Shutdown
 also attempts bounded DELETE requests for sessions the encoder did not close.
+The installed ffmpeg WHIP client rejects TCP ICE candidates in otherwise usable
+SDP answers. For successful SDP POST responses only, the bridge removes TCP
+candidates when the same media or explicitly shared BUNDLE transport offers a
+usable UDP candidate for that ICE component. Without a UDP alternative it fails
+closed. ICE credentials, fingerprints, codec attributes, UDP candidates and
+non-SDP/PATCH/DELETE bodies are preserved; response framing uses the new body size.
 
 ## Capture and recovery boundaries
 
@@ -83,12 +89,12 @@ The existing JPEG fallback remains independent until full video acceptance.
 
 Local tests cover viewer demand, private-file checks, source-versus-transport
 restart decisions, localhost-only encoder arguments, and WHIP session forwarding,
-cleanup and redirect restrictions. The Swift implementation typechecks against
-the installed macOS SDK. These checks do not prove a live room or background
-capture: first publication still needs source/crop visual verification, decoded
-video-frame measurements including a static page, two-viewer/last-viewer-stop
-checks, and a controlled off-Space test. No production publication was started
-while implementing this sidecar.
+cleanup, redirect restrictions and UDP-only SDP compatibility. The Swift
+implementation typechecks against the installed macOS SDK. Actual LiveKit
+publication and decoded Chrome playback were subsequently verified below,
+including a 60-second 15 fps run. Local source checks also passed off-Space.
+Those results do not by themselves prove uninterrupted multi-viewer playback or
+every restart case; the later lifecycle observations distinguish what was tested.
 
 ### Local capture observation — 2026-10-29 UTC
 
@@ -123,8 +129,8 @@ A subsequent 60-second real-browser run collected 61 samples. Video time advance
 from 32.444280 to 92.447219 seconds and decoded-frame count advanced from 487 to 1387:
 900 decoded frames in 60 seconds, or 15 fps. Every sample had the active overlay and
 `readyState:4`; there were zero inactive, stalled or not-ready samples. The
-observed video remained 780×1688 throughout. Multi-viewer/last-viewer shutdown is
-verified separately from these playback results.
+observed video remained 780×1688 throughout. Multi-viewer/last-viewer shutdown
+must be assessed separately from these playback results.
 
 
 ### Optional dedicated-window size recovery
@@ -158,4 +164,39 @@ could leave JavaScript viewport dimensions inconsistent with requested bounds.
 The replacement dedicated window uses native outer size 406×851 at (10,40), with
 page viewport 406×819 and a 32-pixel title bar removed. Its checked video output
 is 780×1572, preserving the complete page with only a small aspect-ratio margin.
-Final multi-viewer and shutdown acceptance follows this corrected geometry.
+With publication paused, the operator changed only the verified dedicated source
+width from 406 to 440. Read-only checking rejected it with `source-size-mismatch`;
+preparation returned `changed:true`, and a new independent check passed at
+780×1572. This verified the configured size recovery without changing source pins.
+
+During the final lifecycle check, the main QA tab became hidden through a focus
+change outside the test. The temporary second subscribe-only participant remained
+connected after the main viewer left, but the encoder encountered a transport
+failure, so this is not evidence of uninterrupted remaining-viewer playback.
+Private diagnostics identified ffmpeg rejecting TCP ICE candidates despite UDP
+alternatives; the compatibility fix above addresses that specific failure.
+After disconnecting the temporary participant, status at 01:01:40 UTC reported
+zero viewers and `waiting-for-viewers`, with no video capture or ffmpeg children.
+The JPEG fallback may separately report `waiting-for-window` when the pinned
+window is off-Space; that does not establish a failure in SCK video capture.
+
+### UDP compatibility and demand lifecycle acceptance — 2026-10-29 UTC
+
+After reloading the helper with the compatibility fix, the bridge received
+HTTP 201 and removed four unsupported TCP candidates. The approved QA tab stayed
+hidden; two temporary real subscribe-only Room connections exercised the service
+without taking browser focus. One actual WebRTC receiver reported 285 decoded
+frames at the corrected 780×1572 size, with 2.5 MB received.
+
+At 01:03:59 UTC the controller reported two viewers and 480 complete frames.
+After one connection left, 01:04:21 UTC showed one viewer and 800 complete frames;
+both capture and encoder retained their original process IDs. After the last
+connection left, 01:04:39 UTC showed zero viewers, `waiting-for-viewers`, and no
+capture or ffmpeg children. A fresh connection then restarted both processes;
+at 01:05:08 UTC the controller reported one viewer and 252 complete frames with
+a new successful HTTP 201 and the same four-candidate compatibility adjustment.
+That restarted receiver decoded 255 frames at 780×1572. Both temporary connections
+were then explicitly disconnected, leaving the helper available for future demand.
+These are service and decoded-media checks, not a claim of two simultaneously
+rendered phone interfaces. Visible primary-interface playback was verified in
+the earlier 60-second run.
