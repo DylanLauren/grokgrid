@@ -10,6 +10,7 @@ import { homedir } from 'node:os';
 import { access } from 'node:fs/promises';
 import { validateTradingPolicy, expireIntents, planIntent, reconcileHeldIntent, dropExpiredSubmission, executes } from './trading-policy.mjs';
 import { journalRisk, signNext } from './trading-executor.mjs';
+import { heartbeat } from './runtime-ingest.mjs';
 import { connect, readMint, buildBuy, buildSell, loadSigner, signatureStatus, signedSignature } from './pump-chain.mjs';
 import { createFinalizedReceiptVerifier } from './trading-reconcile.mjs';
 import { collectFinalizedPositions } from './trading-positions.mjs';
@@ -99,12 +100,15 @@ async function tick() {
   const readiness=tradingReadiness(policy,observation,positions,state,now),observerFresh=readiness.observerFresh;
   const nextRefresh=positionRefreshPlan(policy,attempt,positions,now);
   const status={observedAt:new Date(now).toISOString(),mode:policy.mode,executionEnabled:policy.executionEnabled,signingEnabled:policy.signingEnabled,execution,status:!observerFresh?'observer-unavailable':executes(policy)?'executing':'observing-execution-disabled',agentId:policy.agentId,wallet:policy.wallet,observerFresh,observerAgeMs:Number.isFinite(age)?age:null,journalRevision:state.revision,intents:state.intents.map(i=>({id:i.id,mint:i.mint,side:i.side,state:i.state})),pendingLaunchesObserved:observerFresh&&Array.isArray(observation.pendingLaunches)?observation.pendingLaunches.length:null,strategy:'unvalidated-no-orders',automaticLaunchesEnabled:false,reconciliationEnabled:args.includes('--reconcile'),positionsRefreshed,readiness,positionRefresh:{outcome:attempt?.outcome??'unavailable',nextAttemptAt:nextRefresh.nextAttemptAt},launchIntake:{...launchIntake,observedCount:(state.launchesObserved??[]).length,acknowledged:false,executionEnabled:false}};
-  await savePrivate('trading-status.json',status);console.log(JSON.stringify({status:status.status,revision:state.revision,intents:state.intents.length,executionEnabled:policy.executionEnabled}));
+  await savePrivate('trading-status.json',status);
+  await heartbeat(root,'trading',{mode:executes(policy)?'execute':'observe-only',healthy:observerFresh,note:execution.reason});
+  console.log(JSON.stringify({status:status.status,revision:state.revision,intents:state.intents.length,executionEnabled:policy.executionEnabled}));
 }
 do {
   try{await tick();}catch(error){
     // Raw provider errors, input contents and paths may contain credentials.
     if(error?.code!=='TRADING_LOCKED')try{await assertRoot();await savePrivate('trading-status.json',{observedAt:new Date().toISOString(),status:'unavailable',executionEnabled:false,signingEnabled:false});}catch{}
+    await heartbeat(root,'trading',{mode:'observe-only',healthy:false,note:'tick failed'});
     console.error('Trading observer unavailable; no execution attempted. Inspect private configuration and journal.');
     if(args.includes('--once')||proposalAt>=0)process.exitCode=1;
   }

@@ -38,7 +38,7 @@ export function tradingReadiness(policy,observation,positions,state,now) {
   if(!observerFresh)blockers.push('wallet-observation-unavailable');
   else if(BigInt(observation.house.balanceLamports)<=BigInt(policy.reserveLamports))blockers.push('spendable-sol-unavailable');
   if(!inventoryFresh)blockers.push('finalized-inventory-unavailable');
-  if(!policy.allowedMints.length)blockers.push('mint-allowlist-empty');
+  if(policy.allowedMints!=='dynamic'&&!policy.allowedMints.length)blockers.push('mint-allowlist-empty');
   if(state.intents.some(i=>i.state==='held-ambiguous'))blockers.push('unresolved-submission');
   if((state.launchesObserved??[]).some(i=>i.state==='identity-conflict'))blockers.push('launch-identity-conflict');
   return {readyForLiveTrading:false,executionEnabled:false,signingEnabled:false,observerFresh,inventoryFresh,inventoryComplete:inventoryFresh?true:null,inventoryMintCount:inventoryFresh?positions.positions.length:null,costBasisVerified:false,riskAccountingVerified:false,launchReadiness:launchRuleReadiness(observation,observerFresh,now),blockers};

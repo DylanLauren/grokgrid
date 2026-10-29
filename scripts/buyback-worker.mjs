@@ -10,6 +10,7 @@ import { resolve, join } from 'node:path';
 import { homedir } from 'node:os';
 import { validateBuybackConfig, executionBlockers, plannedSpend, openCycle, recordBuy, settleLeg, recordBurn, closeEmpty } from './buyback-policy.mjs';
 import { withBuybackStore } from './buyback-store.mjs';
+import { heartbeat } from './runtime-ingest.mjs';
 import { connect, readMint, readWallet, signatureStatus, buildBuy, buildBurn, loadSigner, signedSignature } from './pump-chain.mjs';
 
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
@@ -93,11 +94,13 @@ async function tick() {
     balanceLamports: wallet.lamports, tokenUnits: wallet.tokenUnits, openCycle: open ? { id: open.id, state: open.state } : null,
     cyclesBurned: state.cycles.filter(x => x.state === 'burned').length,
   });
+  await heartbeat(root, 'buyback', { mode: live ? 'execute' : 'observe-only', healthy: true, note: action });
 }
 
 tick().catch(async e => {
   // Error text only: never the config, RPC URL or key material.
   const message = String(e?.message || e).slice(0, 200).replace(/api-key=[^&\s]+/gi, 'api-key=[redacted]');
   await savePrivate('buyback-status.json', { observedAt: new Date().toISOString(), live: false, error: message }).catch(() => {});
+  await heartbeat(root, 'buyback', { mode: 'observe-only', healthy: false, note: 'tick failed' });
   console.error(`buyback tick failed: ${message}`); process.exit(1);
 });
