@@ -2,10 +2,11 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { MAIN_MINT, MAIN_NAME, MAIN_TICKER, X_HANDLE, buyUrl } from './config'
 import { XMark } from './ui/XMark'
+import { LogoBot } from './ui/LogoBot'
 import { stats, useFeed } from './data/useFeed'
 import type { View } from './scene/Scene'
 import { pct } from './lib/format'
-import { BotMark, type Shape } from './ui/BotMark'
+import type { Shape } from './ui/BotMark'
 import { LiveBot, type Habit } from './ui/LiveBot'
 import { CallCard } from './ui/CallCard'
 import { CallsPanel } from './ui/Panels'
@@ -159,7 +160,7 @@ export default function App() {
       </button>
       <header className={`bar ${tucked.on ? 'tuck' : ''}`}>
         <button className="brand" onClick={() => { setTab('desk'); setView('third') }}>
-          <BotMark size={30} />
+          <LogoBot size={34} />
           <span>GrokGrid</span>
           <span className="crew" aria-hidden>
             {CREW.map(([color, shape, habit], i) => (
@@ -296,7 +297,7 @@ function useTuck() {
 function MiniBot() {
   return (
     <span className="mb">
-      <LiveBot color="house" shape="sphere" habit="look" size={32} />
+      <LogoBot size={34} />
       <i className="mb-shadow" />
     </span>
   )
@@ -330,7 +331,7 @@ function BuyButton() {
 function NoRoom() {
   return (
     <div className="boot still">
-      <BotMark size={64} />
+      <LogoBot size={72} />
       <span className="mono">3D room unavailable on this device. The pages still work.</span>
     </div>
   )
@@ -339,7 +340,7 @@ function NoRoom() {
 function Boot() {
   return (
     <div className="boot">
-      <BotMark size={64} />
+      <LogoBot size={72} />
       <span className="mono">waking him up</span>
     </div>
   )

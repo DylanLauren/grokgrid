@@ -33,14 +33,14 @@
 .mini.on { opacity: 1; transform: none; pointer-events: auto; transition-delay: 0.12s; }
 .mini:hover { border-color: var(--paper-50); }
 .mb { position: relative; width: 32px; height: 32px; display: block; margin-top: -2px; }
-/* the LiveBot inside brings its own eyes; the box only floats it */
-.mb .lb { position: absolute; inset: 0; animation: mb-float 5.6s ease-in-out infinite; transition: rotate 0.7s cubic-bezier(.2,.8,.2,1), scale 0.7s cubic-bezier(.2,.8,.2,1); }
+/* the logo bot brings its own eyes; the box only floats it */
+.mb .logo-bot { position: absolute; inset: -1px; animation: mb-float 5.6s ease-in-out infinite; transition: rotate 0.7s cubic-bezier(.2,.8,.2,1), scale 0.7s cubic-bezier(.2,.8,.2,1); }
 .mb-shadow { position: absolute; left: 50%; bottom: -5px; width: 20px; height: 4px; margin-left: -10px; border-radius: 50%; background: #000; filter: blur(2px); opacity: 0.55; animation: mb-shade 5.6s ease-in-out infinite; }
 .mb .lb-shadow { display: none; }
-.mini:hover .mb .lb { rotate: -10deg; scale: 1.06; }
+.mini:hover .mb .logo-bot { rotate: -10deg; scale: 1.06; }
 @keyframes mb-float { 0%, 100% { translate: 0 1px; } 50% { translate: 0 -2px; } }
 @keyframes mb-shade { 0%, 100% { scale: 1; opacity: 0.55; } 50% { scale: 0.82; opacity: 0.35; } }
-@media (prefers-reduced-motion: reduce) { .mb .lb, .mb-shadow { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .mb .logo-bot, .mb-shadow { animation: none; } }
 .on-page .bar { background: #0a0a0ae6; backdrop-filter: blur(14px); border-bottom: 1px solid var(--hair); }
 .brand { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 560; letter-spacing: -0.035em; justify-self: start; }
 .brand > svg { transition: transform 0.5s cubic-bezier(.3,1.6,.5,1); }
