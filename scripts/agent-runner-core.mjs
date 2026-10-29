@@ -25,7 +25,7 @@ export function validateRunnerConfig(c) {
  * cap. It executes only in execute mode AND with a known Privy wallet id; otherwise it observes.
  */
 export function agentTradingPolicy(c, agent) {
-  const execute = c.mode === 'execute' && typeof agent.privyWalletId === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(agent.privyWalletId);
+  const execute = c.mode === 'execute' && typeof agent.privyWalletId === 'string' && /^[a-zA-Z0-9:_-]{1,128}$/.test(agent.privyWalletId);
   const k = c.caps;
   const trade = min(agent.maxTradeLamports, k.maxTradeLamports);
   return validateTradingPolicy({
