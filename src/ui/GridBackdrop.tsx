@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 
-// The grid behind every page. It leans toward the pointer and lights up white around it.
+// The grid behind every page. It leans toward the pointer and lifts a shade around it,
+// close to the background so it never pulls focus.
 // Still when the tab is hidden; a plain grid with reduced motion.
 const STEP = 56
 
@@ -76,13 +77,13 @@ export function GridBackdrop() {
           const g = glow[i]
           if (g < 0.04) continue
           ctx.strokeStyle = '#ffffff'
-          ctx.globalAlpha = g * 0.28
+          ctx.globalAlpha = g * 0.09
           ctx.beginPath()
           if (c + 1 < cols) { ctx.moveTo(xs[i], ys[i]); ctx.lineTo(xs[i + 1], ys[i + 1]) }
           if (r + 1 < rows) { ctx.moveTo(xs[i], ys[i]); ctx.lineTo(xs[i + cols], ys[i + cols]) }
           ctx.stroke()
           // a dot where lines cross
-          ctx.globalAlpha = g * 0.9
+          ctx.globalAlpha = g * 0.18
           ctx.fillStyle = '#ffffff'
           ctx.fillRect(xs[i] - 1, ys[i] - 1, 2, 2)
           ctx.globalAlpha = 1
