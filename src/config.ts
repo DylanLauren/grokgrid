@@ -7,7 +7,7 @@ export const BURN_WALLET = import.meta.env.VITE_BURN_WALLET || ''
 // WHEP playback URL of his phone's live stream (public; the publish URL never goes here)
 export const PHONE_STREAM = import.meta.env.VITE_PHONE_STREAM || ''
 // the public source code
-export const GITHUB_URL = import.meta.env.VITE_GITHUB_URL || 'https://github.com/DylComp/grokgrid'
+export const GITHUB_URL = import.meta.env.VITE_GITHUB_URL || 'https://github.com/DylanLauren/grokgrid'
 export const X_HANDLE = import.meta.env.VITE_X_HANDLE || 'GrokGrid'
 
 export const buyUrl = () => (MAIN_MINT ? `https://pump.fun/coin/${MAIN_MINT}` : '')
