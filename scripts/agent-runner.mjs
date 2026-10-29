@@ -55,7 +55,7 @@ async function syncAgents(state, token, now) {
       if (state.agents[e.id]) continue;
       // One agent per wallet and per mint, across all batches: a second claim is quarantined, never run.
       const clash = Object.values(state.agents).find(a => a.wallet === e.wallet || a.mint === e.mint);
-      state.agents[e.id] = { id: e.id, wallet: e.wallet, mint: e.mint, queuedAt: e.ts, status: clash ? `quarantined-duplicate-of:${clash.id}` : 'awaiting-rules' };
+      state.agents[e.id] = { id: e.id, wallet: e.wallet, mint: e.mint, queuedAt: e.ts, status: clash ? `quarantined-duplicate-of:${clash.id}` : 'awaiting-rules', ...(e.privyWalletId ? { privyWalletId: e.privyWalletId } : {}) };
     }
     cursor = batch.nextCursor;
     if (!batch.hasMore) break;
@@ -72,7 +72,6 @@ async function syncAgents(state, token, now) {
       // Rules are pinned on first sight; a later change is flagged, never silently adopted.
       if (a.rules && digest(a.rules) !== digest(rules)) { a.status = 'rules-changed-review'; continue; }
       a.rules ??= rules;
-      a.privyWalletId = typeof record.privyWalletId === 'string' ? record.privyWalletId : a.privyWalletId;
       a.status = 'ready';
     } catch (e) { a.status = `rules-invalid:${String(e.message).slice(0, 40)}`; }
   }

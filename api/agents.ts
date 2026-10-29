@@ -49,7 +49,8 @@ export async function GET() {
     coin: { mint: MAIN_MINT, symbol: process.env.VITE_MAIN_TICKER || 'GRID', name: 'Grok Grid', image: '/favicon.svg', hue: '#f4f4f2' },
   }
 
-  const agents = [houseRecord, ...records].map((r, i) => {
+  // privyWalletId stays server-side: the runner gets it from the authenticated launch outbox.
+  const agents = [houseRecord, ...records].map(({ privyWalletId: _pw, ...r }, i) => {
     const st = toHash(perAgent[i * 2])
     const last = lastCalls[i]
     const lastToken = last?.mint ? mkt[last.mint] : undefined

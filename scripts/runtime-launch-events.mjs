@@ -13,10 +13,10 @@ export function validateLaunchEvents(value,after,now=Date.now(),limit=50) {
   const ids=new Set(),mints=new Set(),wallets=new Set();
   let previous=start;
   const events=value.events.map(row=>{
-    if(!row||launchCursor(row.cursor)<=previous||launchCursor(row.cursor)>head||typeof row.id!=='string'||!/^[a-zA-Z0-9_-]{1,96}$/.test(row.id)||row.id==='house'||typeof row.mint!=='string'||!addresses.test(row.mint)||typeof row.wallet!=='string'||!addresses.test(row.wallet)||!Number.isSafeInteger(row.ts)||row.ts<1||row.ts>now+300_000||ids.has(row.id)||mints.has(row.mint)||wallets.has(row.wallet))throw Error('launch-event-identity-invalid');
+    if(!row||launchCursor(row.cursor)<=previous||launchCursor(row.cursor)>head||typeof row.id!=='string'||!/^[a-zA-Z0-9_-]{1,96}$/.test(row.id)||row.id==='house'||typeof row.mint!=='string'||!addresses.test(row.mint)||typeof row.wallet!=='string'||!addresses.test(row.wallet)||!Number.isSafeInteger(row.ts)||row.ts<1||row.ts>now+300_000||ids.has(row.id)||mints.has(row.mint)||wallets.has(row.wallet)||(row.privyWalletId!==undefined&&(typeof row.privyWalletId!=='string'||!/^[a-zA-Z0-9:_-]{1,128}$/.test(row.privyWalletId))))throw Error('launch-event-identity-invalid');
     previous=launchCursor(row.cursor);
     ids.add(row.id);mints.add(row.mint);wallets.add(row.wallet);
-    return {cursor:row.cursor,id:row.id,mint:row.mint,wallet:row.wallet,ts:row.ts};
+    return {cursor:row.cursor,id:row.id,mint:row.mint,wallet:row.wallet,ts:row.ts,...(typeof row.privyWalletId==='string'?{privyWalletId:row.privyWalletId}:{})};
   });
   if(next!==previous||(!events.length&&head!==start))throw Error('launch-events-gap');
   return {version:1,events,nextCursor:String(next),headCursor:String(head),hasMore:value.hasMore,coverage:LAUNCH_COVERAGE,executionEnabled:false};
