@@ -292,3 +292,50 @@
 }
 @media (max-width: 900px) { .pg { padding-top: calc(var(--bar) + 80px); } }
 .dc-sec .addr { margin-bottom: 14px; }
+
+/* ---------- page entrances: each page arrives its own way ---------- */
+/* shared tokens, as the official site uses them: a long soft settle, items 420ms, staggered */
+.page { --ease-out: cubic-bezier(0.22, 1, 0.36, 1); }
+.pg > :nth-child(n + 2) { animation: fx-item 0.6s var(--ease-out) backwards; }
+.pg > :nth-child(2) { animation-delay: 0.18s; }
+.pg > :nth-child(3) { animation-delay: 0.26s; }
+.pg > :nth-child(4) { animation-delay: 0.34s; }
+.pg > :nth-child(n + 5) { animation-delay: 0.42s; }
+.pg-sub { animation: fx-item 0.65s var(--ease-out) 0.12s backwards; }
+.pg-eyebrow { animation: fx-row 0.65s var(--ease-out) backwards; }
+@keyframes fx-item { from { opacity: 0; transform: translateY(8px) scale(0.97); } }
+@keyframes fx-row { from { opacity: 0; transform: translateX(-10px); } }
+@keyframes fx-pop { from { opacity: 0; transform: translateY(3px) scale(0.7); } }
+
+/* stats: the letters rise out of a blur (the default), then each card lifts in turn */
+.fx-stats .st-hero > *, .fx-stats .pg-sec .card { animation: fx-item 0.42s var(--ease-out) backwards; }
+.fx-stats .st-hero > :nth-child(2) { animation-delay: 0.32s; }
+.fx-stats .st-hero > :first-child { animation-delay: 0.22s; }
+
+/* matrix: the title slides in from the left and the rows file in under it, one after another */
+.fx-matrix .pg-title span { animation-name: fx-slide; }
+@keyframes fx-slide { from { transform: translateX(-0.35em); opacity: 0; filter: blur(4px); } }
+.fx-matrix .pg > :nth-child(n + 2) { animation: none; }
+.fx-matrix .mx-row { animation: fx-row 0.42s var(--ease-out) backwards; animation-delay: calc(0.2s + var(--r, 0) * 40ms); }
+
+/* the grid: the title letters pop, and the family pops in one by one (LiveBot reads --in) */
+.fx-grid .pg-title span { animation-name: fx-pop; animation-duration: 0.65s; animation-timing-function: cubic-bezier(.3, 1.5, .5, 1); }
+.fx-grid .gd-name { animation: fx-item 0.42s var(--ease-out) backwards; animation-delay: calc(var(--in) + 0.15s); }
+
+/* docs: the title wipes on like ink, the contents list files in from the side */
+.fx-docs .pg-title { animation: fx-wipe 1.1s var(--ease-out) backwards; }
+.fx-docs .pg-title span { animation: none; }
+@keyframes fx-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 -5% 0 0); } }
+.fx-docs .dc-toc > * { animation: fx-row 0.42s var(--ease-out) backwards; }
+.fx-docs .dc-toc > :nth-child(1) { animation-delay: 0.2s; }
+.fx-docs .dc-toc > :nth-child(2) { animation-delay: 0.24s; }
+.fx-docs .dc-toc > :nth-child(3) { animation-delay: 0.28s; }
+.fx-docs .dc-toc > :nth-child(4) { animation-delay: 0.32s; }
+.fx-docs .dc-toc > :nth-child(5) { animation-delay: 0.36s; }
+.fx-docs .dc-toc > :nth-child(6) { animation-delay: 0.4s; }
+.fx-docs .dc-toc > :nth-child(n + 7) { animation-delay: 0.44s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pg > *, .pg-sub, .pg-eyebrow, .pg-title, .pg-title span, .mx-row, .gd-name, .dc-toc > *, .st-hero > *, .pg-sec .card { animation: none !important; }
+}
+.fx-matrix .mx-row { --in: calc(0.25s + var(--r, 0) * 40ms); }

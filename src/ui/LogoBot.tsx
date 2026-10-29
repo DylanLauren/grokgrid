@@ -1,63 +1,44 @@
 import { useEffect, useId, useRef } from 'react'
-import { eyePaths } from './eyes'
+import { eyePaths, watchWith } from './eyes'
 import './logobot.css'
 
 // The GrokGrid mark: Grok Bot with his phone in both hands, a cool blue edge on one side and a
 // warm one on the other. Alive like the bot in the room: his eyes stay on the phone, glance up
-// at you now and then, blink, and everything eases in and out so nothing ever snaps.
+// at you now and then, blink, watch your pointer when it comes near, and nothing ever snaps.
 
 // body circle in the 0..100 viewBox, and how the shared eye drawing (centred 50,50 r44) maps onto it
 const BX = 45, BY = 44, BR = 33
 const EYE = `translate(${BX - 50 * (BR / 44)} ${BY - 50 * (BR / 44)}) scale(${BR / 44})`
 
-// where he looks: mostly down at the phone, sometimes up at you, sometimes off to the side
-const LOOKS: [number, number, number][] = [
-  [0.62, 0.28, 2600], // phone
-  [0.7, 0.36, 1800], // phone, reading further down
-  [0.15, -0.05, 1100], // up at you
-  [0.58, 0.24, 2400],
+// where he looks: home is down at the phone; now and then further down, off to the side, or up at you
+const LOOKS: [number, number][] = [
+  [0.62, 0.28], // phone
+  [0.7, 0.38], // reading further down
+  [0.5, 0.22],
+  [0.15, -0.05], // up at you
+  [0.78, 0.12],
 ]
-
-const still = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export function LogoBot({ size = 30, animate = true }: { size?: number; animate?: boolean }) {
   const id = 'lg' + useId().replace(/[^a-zA-Z0-9]/g, '')
+  const svg = useRef<SVGSVGElement>(null)
   const e1 = useRef<SVGPathElement>(null)
   const e2 = useRef<SVGPathElement>(null)
   const [d1, d2] = eyePaths('sphere', LOOKS[0][0], LOOKS[0][1])
 
+  // the same clock as the rest of the family: glances, blinks, and the pointer when it comes close
   useEffect(() => {
-    if (!animate || still || !e1.current || !e2.current) return
-    let raf = 0, step = 0, nextLook = performance.now() + LOOKS[0][2]
-    let lx = LOOKS[0][0], ly = LOOKS[0][1], tx = lx, ty = ly
-    let open = 1, blinkAt = performance.now() + 2000 + Math.random() * 2000, blinkEnd = 0
-    const tick = (now: number) => {
-      raf = requestAnimationFrame(tick)
-      if (document.hidden) return
-      if (now > nextLook) {
-        step = (step + 1) % LOOKS.length
-        ;[tx, ty] = LOOKS[step]
-        nextLook = now + LOOKS[step][2] + Math.random() * 600
-      }
-      if (now > blinkAt) {
-        blinkEnd = now + 170
-        blinkAt = now + 2600 + Math.random() * 3200
-      }
-      // a slow drift on top of the target keeps the eyes moving like they're reading
-      const drift = Math.sin(now / 900) * 0.04
-      lx += (tx + drift - lx) * 0.05
-      ly += (ty + Math.cos(now / 1300) * 0.03 - ly) * 0.05
-      open += ((now < blinkEnd ? 0.08 : 1) - open) * (now < blinkEnd ? 0.45 : 0.25)
-      const [a, b] = eyePaths('sphere', lx, ly, 1, open)
-      e1.current!.setAttribute('d', a)
-      e2.current!.setAttribute('d', b)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
+    if (!animate || !svg.current || !e1.current || !e2.current) return
+    const [p1, p2] = [e1.current, e2.current]
+    return watchWith(svg.current, (lx, ly, sc, o1, o2) => {
+      const [a, b] = eyePaths('sphere', lx, ly, sc, o1, o2)
+      p1.setAttribute('d', a)
+      p2.setAttribute('d', b)
+    }, { glances: LOOKS, reach: 4 })
   }, [animate])
 
   return (
-    <svg className={`logo-bot ${animate ? 'alive' : ''}`} width={size} height={size} viewBox="9 9 82 82" aria-hidden="true" style={{ flex: 'none' }}>
+    <svg ref={svg} className={`logo-bot ${animate ? 'alive' : ''}`} width={size} height={size} viewBox="9 9 82 82" aria-hidden="true" style={{ flex: 'none' }}>
       <defs>
         {/* cool on the left, warm on the right, as in the artwork; a soft white core sits on top */}
         <linearGradient id={`${id}-rim`} x1="0.05" y1="0.35" x2="0.95" y2="0.75">

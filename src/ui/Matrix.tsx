@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { BOT_WALLET, MAIN_MINT, MAIN_NAME, MAIN_TICKER, solscan } from '../config'
 import type { Agent, AgentsFeed, Feed } from '../data/types'
 import { stats } from '../data/useFeed'
-import { ago, mc, pct, short, signedUsd, usd } from '../lib/format'
+import { ago, compact, mc, pct, short, signedUsd, usd } from '../lib/format'
 import { LiveBot, type Habit } from './LiveBot'
 import { CoinChip } from './CoinChip'
 import './matrix.css'
@@ -110,7 +110,7 @@ function Row({ a, i, solUsd, now }: { a: Agent; i: number; solUsd: number; now: 
   const sample = a.id.startsWith('demo')
   const live = !!a.coin.mint && !sample
   return (
-    <div className={`mx-row ${a.house ? 'house' : ''}`} role="row">
+    <div className={`mx-row ${a.house ? 'house' : ''}`} role="row" style={{ '--r': Math.min(i, 16) } as CSSProperties}>
       <span className="mx-i mono">{a.house ? '00' : String(i).padStart(2, '0')}</span>
       <span className="mx-bot">
         <span className="mx-face">
@@ -225,4 +225,3 @@ function useNow() {
   return now
 }
 
-const compact = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${Math.round(n)}`)

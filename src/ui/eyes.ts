@@ -6,7 +6,7 @@ import type { Shape } from './BotMark'
 // the far one, the way the official Grok Bot looks around.
 
 // face centre and radius for each body, in the 0..100 viewBox
-export const FACE: Record<Shape, [number, number, number]> = {
+const FACE: Record<Shape, [number, number, number]> = {
   sphere: [50, 50, 44],
   squircle: [50, 50, 42],
   tile: [51, 52, 41],
@@ -22,7 +22,7 @@ const HALF_W = 0.15
 const HALF_H = 0.33
 const N = 32 // outline points per eye
 
-export const MAX_LOOK = 0.62 // radians the ball turns at most
+const MAX_LOOK = 0.62 // radians the ball turns at most
 
 /** The two eye outlines as SVG path data for a bot looking toward (lx, ly), each -1..1. */
 export function eyePaths(shape: Shape, lx: number, ly: number, scale = 1, open = 1, open2 = open): [string, string] {
@@ -63,61 +63,54 @@ export function eyeInk(color: string) {
 }
 
 // ---------- the one clock every live bot shares ----------
+// Timed like the official Grok Bots: the body stays put, the eyes pick somewhere new to look
+// every second or so and hold it, slide there in a few hundred milliseconds, blink now and then,
+// and watch the pointer only while it is close. Every bot keeps its own clock, so none move in step.
 
 export type Face = 'none' | 'blink' | 'wink' | 'squint' | 'wide' | 'sleepy'
 // how open each eye is and how big they get, per face
 const FACES: Record<Face, [number, number, number]> = {
   none: [1, 1, 1],
-  blink: [0.08, 0.08, 1],
-  wink: [1, 0.08, 1.02],
-  squint: [0.42, 0.42, 1.04],
-  wide: [1.12, 1.12, 1.22],
-  sleepy: [0.34, 0.34, 0.98],
+  blink: [0.1, 0.1, 1],
+  wink: [1, 0.1, 1.02],
+  squint: [0.45, 0.45, 1.03],
+  wide: [1.1, 1.1, 1.14],
+  sleepy: [0.36, 0.36, 0.98],
 }
-const FACE_TIME: Record<Face, number> = { none: 0, blink: 150, wink: 480, squint: 900, wide: 750, sleepy: 1300 }
-const PICK: Face[] = ['blink', 'blink', 'wink', 'squint', 'wide', 'sleepy']
+const FACE_TIME: Record<Face, number> = { none: 0, blink: 140, wink: 520, squint: 1100, wide: 900, sleepy: 1500 }
+const MOODS: Face[] = ['wink', 'squint', 'wide', 'sleepy']
+
+// where an idle bot glances: centre, up and to the sides, down; centre comes up most
+const GLANCES: [number, number][] = [
+  [0, 0], [0.62, -0.42], [0, -0.6], [0, 0.48], [0.72, 0], [-0.6, -0.36], [-0.72, 0.06], [0.42, 0.4], [-0.38, 0.44],
+]
 
 export interface Looker {
-  el: HTMLElement
-  paths: [SVGPathElement, SVGPathElement]
-  shape: Shape
+  el: HTMLElement | SVGSVGElement
+  draw: (lx: number, ly: number, sc: number, o1: number, o2: number) => void
   doze?: boolean
-  flow?: number // set: the eyes trace this bot's own slow loop, and watch the pointer while it moves
+  glances: [number, number][]
+  reach: number // how far off, in bot widths, the pointer still gets watched
   // eased state
   lx: number
   ly: number
   sc: number
   o1: number
   o2: number
-  // a face now and then: blink, wink, squint, wide eyes, sleepy
+  // a blink every few seconds, and a mood now and then
+  blinkAt: number
+  blinkEnd: number
   face: Face
   faceUntil: number
   faceNext: number
-  // idle glance
+  // the glance it is holding
   gx: number
   gy: number
-  until: number
   next: number
 }
 
-// Flowing eyes: each bot traces its own slow loop (x, y frequencies, phase, reach), so no two
-// move alike. Sines in and out of every turn, so the motion never stops or snaps.
-const LOOPS: [number, number, number, number, number][] = [
-  [1, 2, 0, 0.55, 0.32], // figure eight
-  [1, 1, 1.57, 0.5, 0.38], // slow circle
-  [2, 3, 0.4, 0.5, 0.3], // knot
-  [1, 1, -1.57, 0.46, 0.42], // circle the other way
-  [3, 2, 1.1, 0.48, 0.3],
-  [1, 3, 0.7, 0.58, 0.26], // side to side with a ripple
-  [2, 1, 2.2, 0.42, 0.4], // up and down figure eight
-  [1, 2, 3.1, 0.52, 0.34],
-  [1, 1, 0.9, 0.3, 0.2], // a lazy drift
-]
-const FLOW_FACES: Face[] = ['blink', 'squint', 'wide', 'wink', 'blink', 'sleepy']
-const FLOW_TIME: Record<Face, number> = { none: 0, blink: 220, wink: 700, squint: 1500, wide: 1200, sleepy: 1800 }
-
 const lookers = new Set<Looker>()
-let raf = 0
+let raf = 0, last = 0
 let px = -1e4, py = -1e4, lastMove = -1e9
 const still = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -127,86 +120,87 @@ function onMove(e: PointerEvent) {
   lastMove = performance.now()
 }
 
+// a step of an ease toward a target that runs the same at any frame rate
+const lerp = (rate: number, dt: number) => 1 - Math.pow(1 - rate, dt / 16.67)
+
 function tick(now: number) {
   raf = lookers.size ? requestAnimationFrame(tick) : 0
+  const dt = Math.min(64, now - (last || now))
+  last = now
   if (document.hidden) return
-  const active = now - lastMove < 1600 // the pointer moved lately: everyone watches it
+  const pointerOn = now - lastMove < 4000
   for (const b of lookers) {
     const r = b.el.getBoundingClientRect()
     if (!r.width || r.bottom < 0 || r.top > innerHeight) continue
     const bx = r.left + r.width / 2, by = r.top + r.height / 2
     const dx = px - bx, dy = py - by
     const dist = Math.hypot(dx, dy)
-    const flowing = b.flow !== undefined
-    const near = !flowing && dist < r.width * 0.6 // the pointer is on it
-    let tx = 0, ty = 0, ts = 1
-    if (flowing && active) {
-      // the pointer moved lately: the whole team turns to watch it, easing in like water
-      const k = Math.min(1, dist / 220)
-      tx = (dx / (dist || 1)) * k * 0.95
-      ty = (dy / (dist || 1)) * k * 0.8
-    } else if (flowing) {
-      const [fx, fy, ph, ax, ay] = LOOPS[b.flow! % LOOPS.length]
-      const t = now / 1000 / (6.5 + (b.flow! % 4) * 0.9) * Math.PI * 2
-      tx = Math.sin(t * fx + ph) * ax
-      ty = Math.sin(t * fy + ph * 0.7) * ay
-      ts = 1 + Math.sin(t * 0.5 + ph) * 0.04 // the eyes breathe a little too
-    } else if (near) {
+    const near = dist < r.width * 0.6 // the pointer is on it
+    const watching = pointerOn && dist < Math.max(r.width * b.reach, 160)
+    let tx: number, ty: number, ts = 1
+    if (near) {
       // attentive: eyes come nearly front on, a little bigger, still following
       tx = (dx / (r.width * 0.6)) * 0.35
       ty = (dy / (r.width * 0.6)) * 0.35
-      ts = 1.16
-    } else if (active) {
-      const k = Math.min(1, dist / 260)
-      tx = (dx / (dist || 1)) * k
-      ty = (dy / (dist || 1)) * k * 0.8
+      ts = 1.08
+    } else if (watching) {
+      const k = Math.min(1, dist / (r.width * 1.1))
+      tx = (dx / dist) * k * 0.9
+      ty = (dy / dist) * k * 0.75
     } else {
-      // on its own: a glance somewhere every few seconds, hold, come back
+      // on its own: somewhere new every second or so, held
       if (now > b.next) {
-        const a = Math.random() * Math.PI * 2
-        b.gx = Math.cos(a) * (0.55 + Math.random() * 0.4)
-        b.gy = Math.sin(a) * 0.6
-        b.until = now + 700 + Math.random() * 600
-        b.next = now + 2200 + Math.random() * 1600
+        const pick = Math.random() < 0.3 ? b.glances[0] : b.glances[1 + Math.floor(Math.random() * (b.glances.length - 1))]
+        b.gx = pick[0] + (Math.random() - 0.5) * 0.12
+        b.gy = pick[1] + (Math.random() - 0.5) * 0.12
+        b.next = now + 1000 + Math.random() * 600
       }
-      if (now < b.until) { tx = b.gx; ty = b.gy }
+      tx = b.gx
+      ty = b.gy
     }
-    // now and then a face
+    // a quick blink every few seconds, sometimes two
+    if (now > b.blinkAt) {
+      b.blinkEnd = now + FACE_TIME.blink
+      b.blinkAt = now + (Math.random() < 0.15 ? 260 : 2800 + Math.random() * 3800)
+    }
+    // a mood once in a while; tiny bots skip them, at that size they read as shut eyes
     if (now > b.faceNext) {
-      // tiny bots only blink: a squint or wink at that size just reads as shut eyes
-      b.face = r.width < 40 ? 'blink' : flowing ? FLOW_FACES[Math.floor(Math.random() * FLOW_FACES.length)] : PICK[Math.floor(Math.random() * PICK.length)]
-      b.faceUntil = now + (flowing ? FLOW_TIME : FACE_TIME)[b.face]
-      b.faceNext = now + 3200 + Math.random() * 4200
+      b.face = r.width < 60 ? 'none' : MOODS[Math.floor(Math.random() * MOODS.length)]
+      b.faceUntil = now + FACE_TIME[b.face]
+      b.faceNext = now + 8000 + Math.random() * 7000
     }
     if (now > b.faceUntil) b.face = 'none'
-    // hovered: the bot's own hover face if it has one
     const hoverFace = b.el.dataset.hoverFace as Face | undefined
-    const face = near ? (hoverFace && FACES[hoverFace] ? hoverFace : b.face === 'blink' || b.face === 'wink' ? b.face : 'none') : b.face
+    const blinking = now < b.blinkEnd
+    const face: Face = blinking ? 'blink' : near ? (hoverFace && FACES[hoverFace] ? hoverFace : 'none') : b.face
     const [f1, f2, fs] = FACES[face]
-    // flowing eyes ease slower, so every face melts in and out
-    const ease = face === 'blink' ? (flowing ? 0.32 : 0.5) : flowing ? 0.07 : 0.2
+    const ease = lerp(blinking ? 0.55 : 0.14, dt)
     b.o1 += (f1 - b.o1) * ease
     b.o2 += (f2 - b.o2) * ease
     ts *= fs
-    // smooth, a touch springy
-    const follow = flowing ? (active ? 0.09 : 0.05) : 0.12
+    const follow = lerp(watching || near ? 0.2 : 0.15, dt)
     b.lx += (tx - b.lx) * follow
     b.ly += (ty - b.ly) * follow
-    b.sc += (ts - b.sc) * 0.15
+    b.sc += (ts - b.sc) * lerp(0.15, dt)
     const doze = b.doze && !near ? 0.22 : 1
-    const [a1, a2] = eyePaths(b.shape, b.lx, b.ly, b.sc, b.o1 * doze, b.o2 * doze)
-    b.paths[0].setAttribute('d', a1)
-    b.paths[1].setAttribute('d', a2)
+    b.draw(b.lx, b.ly, b.sc, b.o1 * doze, b.o2 * doze)
     // the whole face drifts a little the same way
     b.el.style.setProperty('--lx', b.lx.toFixed(3))
     b.el.style.setProperty('--ly', b.ly.toFixed(3))
   }
 }
 
-/** Start a bot looking around. Returns the stop function. */
-export function watch(el: HTMLElement, paths: [SVGPathElement, SVGPathElement], shape: Shape, doze = false, flow?: number) {
+/** Start something looking around. `draw` paints the eyes each frame. Returns the stop function. */
+export function watchWith(el: Looker['el'], draw: Looker['draw'], opts: { doze?: boolean; glances?: [number, number][]; reach?: number } = {}) {
   if (still) return () => {}
-  const b: Looker = { el, paths, shape, doze: flow === undefined && doze, flow, lx: 0, ly: 0, sc: 1, o1: 1, o2: 1, face: 'none', faceUntil: 0, faceNext: performance.now() + 1500 + Math.random() * 4000, gx: 0, gy: 0, until: 0, next: performance.now() + Math.random() * 2500 }
+  const t = performance.now()
+  const b: Looker = {
+    el, draw, doze: opts.doze, glances: opts.glances ?? GLANCES, reach: opts.reach ?? 2.5,
+    lx: opts.glances?.[0][0] ?? 0, ly: opts.glances?.[0][1] ?? 0, sc: 1, o1: 1, o2: 1,
+    blinkAt: t + 1200 + Math.random() * 3500, blinkEnd: 0,
+    face: 'none', faceUntil: 0, faceNext: t + 5000 + Math.random() * 9000,
+    gx: opts.glances?.[0][0] ?? 0, gy: opts.glances?.[0][1] ?? 0, next: t + 300 + Math.random() * 1200,
+  }
   if (!lookers.size) addEventListener('pointermove', onMove, { passive: true })
   lookers.add(b)
   if (!raf) raf = requestAnimationFrame(tick)
@@ -214,4 +208,13 @@ export function watch(el: HTMLElement, paths: [SVGPathElement, SVGPathElement], 
     lookers.delete(b)
     if (!lookers.size) removeEventListener('pointermove', onMove)
   }
+}
+
+/** Start a bot looking around. Returns the stop function. */
+export function watch(el: HTMLElement, paths: [SVGPathElement, SVGPathElement], shape: Shape, doze = false) {
+  return watchWith(el, (lx, ly, sc, o1, o2) => {
+    const [a1, a2] = eyePaths(shape, lx, ly, sc, o1, o2)
+    paths[0].setAttribute('d', a1)
+    paths[1].setAttribute('d', a2)
+  }, { doze })
 }

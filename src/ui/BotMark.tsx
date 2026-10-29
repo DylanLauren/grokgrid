@@ -26,7 +26,7 @@ export const BODY: Record<Shape, string> = {
 
 
 // The logo pose: glancing up and to the right, as on xAI's Grok Bot mark.
-export const LOGO_LOOK: [number, number] = [0.45, -0.35]
+const LOGO_LOOK: [number, number] = [0.45, -0.35]
 
 export function BotMark({ size = 28, color = 'house', shape = 'sphere', look = LOGO_LOOK }: { size?: number; color?: string; shape?: Shape; look?: [number, number] }) {
   const house = color === 'house'
