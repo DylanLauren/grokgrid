@@ -122,11 +122,20 @@ The three steps below never print a secret. The clipboard is cleared after each 
 **The policy** (`ops/privy-setup.mjs`, check offline with `--dry-build`) is default deny. It allows `signTransaction` only for:
 - compute-budget instructions;
 - token-account creation;
-- pump.fun curve `buy` with `max_sol_cost` ≤ 0.05 SOL, and curve `sell`;
-- PumpSwap `buy` with `max_quote_amount_in` ≤ 0.05 SOL, and PumpSwap `sell`;
-- SOL transfers ≤ 0.05 SOL (the PumpSwap SOL wrap);
-- WSOL `SyncNative` and `CloseAccount`.
+- pump.fun curve `buy` with `max_sol_cost` ≤ 0.05 SOL per instruction;
+- curve `sell` and PumpSwap `sell`.
 
-Every IDL check sits in the same rule as its program-id check. There is no message signing and no key export. The signer quorum owns the policy, so the app secret alone can't loosen it. Total size is about 23 KB.
+Every IDL check sits in the same rule as its program-id check. The signer quorum owns the policy. Total size is about 16 KB.
 
-**Known limits.** A system transfer's recipient and a `CloseAccount` destination can't be pinned per wallet, so a stolen authorization key could move up to 0.05 SOL per transaction that way, repeatedly. Keep the key file 0600 on the Mac only; remove the signer in Privy if it ever leaks. The runner's caps, daily-loss stop and stop file still apply on top of the policy.
+**Deliberately not allowed:** System Program transfers, `SyncNative` and `CloseAccount`. Their recipient can't be pinned to the agent's own accounts in a shared policy, so a stolen authorization key could drain funds through them. As a result, Privy-signed agents:
+- buy only on the bonding curve (`pool: false`);
+- sell graduated coins on PumpSwap without unwrapping (`unwrap: false`), so the proceeds stay as WSOL in the agent's own WSOL account.
+
+The house bot signs locally and is unaffected.
+
+**Remaining limits if the authorization key were stolen.** The 0.05 SOL cap applies per instruction, not per transaction, so one transaction could hold several capped buys. Token-account creation is paid by the agent and its owner can't be pinned. The protections are:
+- the key lives only in a 0600 file on the Mac;
+- each agent's funds are its owner's deposit;
+- the runner's own per-trade, exposure and daily-loss caps and the stop file.
+
+**The real fix is per-wallet override policies**: pin the token-account owner, the WSOL account and the close destination to each agent's wallet, created when the agent authorizes the signer. That's a follow-up. Once it exists, pool buys and unwrapping can come back.
