@@ -31,7 +31,8 @@ BASE=${BASE:-https://grokgrid.fun/} ONLY=m-matrix-full node scripts/capture.js "
 
 if [ -z "$SKIP_CLIPS" ]; then
   echo "== 3/6 3D clips in Blender"
-  for c in hero phone face lineup lineup_v family_run; do
+  CLIPS="hero phone face lineup family_run"; [ -n "$WIDE_ONLY" ] || CLIPS="$CLIPS lineup_v"
+  for c in $CLIPS; do
     "$BLENDER" -b --python scripts/chars.py -- --clip $c --res $RES --samples $SAMPLES --gpu $GPU \
       --phone-tex "$PWD/ui/m-matrix-full.png" --out "$PWD/clips/$c" > "clips/$c.log" 2>&1
     echo "   $c: $(ls clips/$c | wc -l | tr -d ' ') frames"
