@@ -53,7 +53,7 @@ const MIN_FUND = 0.05 // matches MIN_FUND_SOL in api/launch/prepare.ts
 const LAUNCH_COST = 0.03 // about: Solana network fees and pump.fun's coin-creation rent
 const MAX_TRADE = 0.05 // the signer policy's per-buy cap: a higher max could never be used
 const LIMITS = { name: 32, botName: 32, ticker: 10, description: 600, strategy: 140 }
-const RESERVED = ['house', 'housetrader', 'housebot', 'grokgrid', 'grokgridofficial', 'official', 'admin'] // matches api/_launch.ts
+const RESERVED = ['house', 'housetrader', 'housebot', 'grokgrid', 'grokgridofficial', 'grok', 'grokbot', 'thegrokbot', 'official', 'admin'] // matches api/_launch.ts
 const bytes = (s: string) => new TextEncoder().encode(s).length
 
 // What a field says is wrong with it, or nothing.
