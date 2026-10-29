@@ -11,11 +11,11 @@ import { homedir } from 'node:os';
 import { validateStrategyConfig, screen } from './strategy-policy.mjs';
 import { candidates, marketMetrics, chainFacts } from './strategy-data.mjs';
 import { paperTick, paperSummary, emptyPaper, livePlan } from './strategy-engine.mjs';
-import { connect } from './pump-chain.mjs';
+import { connect, quoteSell } from './pump-chain.mjs';
 import { validateTradingPolicy, planIntent, setAllowlist, executes } from './trading-policy.mjs';
 import { withTradingStore } from './trading-store.mjs';
 import { journalRisk } from './trading-executor.mjs';
-import { heartbeat } from './runtime-ingest.mjs';
+import { heartbeat, action } from './runtime-ingest.mjs';
 
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
 if (process.argv.slice(2).some(x => x !== '--once')) { console.error('Usage: strategy-worker.mjs [--once]'); process.exit(1); }
@@ -77,6 +77,10 @@ async function tick() {
     const market = await gather(c, conn, rpc.rpcUrl, held, now);
     const s = await withPaper(c, async prev => paperTick(prev, c, market, now, liquidating));
     Object.assign(status, { scanned: market.scanned, preScreened: market.preScreened, chainChecked: market.facts.size, paper: paperSummary(s, market), recent: s.log.slice(-10) });
+    // New paper fills go to the room's live feed as plainly labelled actions, never as trades.
+    let since = 0; try { since = (await json(join(root, 'strategy-status.json'))).paperPostedThrough || 0; } catch {}
+    for (const l of s.log.filter(l => l.at > since).slice(-3)) await action(root, `paper: ${l.line}`);
+    status.paperPostedThrough = s.log.length ? s.log[s.log.length - 1].at : since;
   } else {
     const policy = validateTradingPolicy(await json(join(root, 'trading-config.json')));
     if (policy.allowedMints !== 'dynamic') throw Error('Live strategy needs allowedMints: "dynamic"');
@@ -85,6 +89,10 @@ async function tick() {
     if (!positions?.complete || positions.wallet !== policy.wallet) throw Error('Finalized positions unavailable');
     let peaks = {}; try { peaks = (await json(join(root, 'strategy-live.json'))).peaks || {}; } catch {}
     const market = await gather(c, conn, rpc.rpcUrl, positions.positions.map(p => p.mint), now);
+    market.sellQuotes = new Map();
+    for (const p of positions.positions) if (BigInt(p.spendableTokenUnits) > 0n) {
+      try { const q = await quoteSell(conn, { mint: p.mint, tokenUnits: p.spendableTokenUnits, tokenProgram: p.tokenProgram }); if (q) market.sellQuotes.set(p.mint, q); } catch {}
+    }
     const outcomes = [];
     let planned;
     await withTradingStore(join(root, 'trading'), policy, async s => {

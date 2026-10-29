@@ -11,6 +11,7 @@ import { access } from 'node:fs/promises';
 import { validateTradingPolicy, expireIntents, planIntent, reconcileHeldIntent, dropExpiredSubmission, executes } from './trading-policy.mjs';
 import { journalRisk, signNext } from './trading-executor.mjs';
 import { heartbeat } from './runtime-ingest.mjs';
+import { postCallouts } from './trading-callouts.mjs';
 import { connect, readMint, buildBuy, buildSell, loadSigner, signatureStatus, signedSignature } from './pump-chain.mjs';
 import { createFinalizedReceiptVerifier } from './trading-reconcile.mjs';
 import { collectFinalizedPositions } from './trading-positions.mjs';
@@ -96,10 +97,12 @@ async function tick() {
   });
   // The signature is durable in the journal now; only then broadcast. A send error leaves it held.
   if(pendingSend)try{await pendingSend.conn.sendRawTransaction(pendingSend.tx.serialize(),{skipPreflight:false,preflightCommitment:'finalized',maxRetries:0});execution.broadcast='sent';}catch{execution.broadcast='error-held';}
+  // Reconciled trades become site callouts once each (best effort, never blocks trading).
+  let callouts={posted:0,pending:0};try{callouts=await postCallouts(root,state,{agent:policy.agentId});}catch{}
   const now=Date.now(), age=observation?now-Date.parse(observation.observedAt):NaN;
   const readiness=tradingReadiness(policy,observation,positions,state,now),observerFresh=readiness.observerFresh;
   const nextRefresh=positionRefreshPlan(policy,attempt,positions,now);
-  const status={observedAt:new Date(now).toISOString(),mode:policy.mode,executionEnabled:policy.executionEnabled,signingEnabled:policy.signingEnabled,execution,status:!observerFresh?'observer-unavailable':executes(policy)?'executing':'observing-execution-disabled',agentId:policy.agentId,wallet:policy.wallet,observerFresh,observerAgeMs:Number.isFinite(age)?age:null,journalRevision:state.revision,intents:state.intents.map(i=>({id:i.id,mint:i.mint,side:i.side,state:i.state})),pendingLaunchesObserved:observerFresh&&Array.isArray(observation.pendingLaunches)?observation.pendingLaunches.length:null,strategy:'unvalidated-no-orders',automaticLaunchesEnabled:false,reconciliationEnabled:args.includes('--reconcile'),positionsRefreshed,readiness,positionRefresh:{outcome:attempt?.outcome??'unavailable',nextAttemptAt:nextRefresh.nextAttemptAt},launchIntake:{...launchIntake,observedCount:(state.launchesObserved??[]).length,acknowledged:false,executionEnabled:false}};
+  const status={observedAt:new Date(now).toISOString(),mode:policy.mode,executionEnabled:policy.executionEnabled,signingEnabled:policy.signingEnabled,execution,callouts,status:!observerFresh?'observer-unavailable':executes(policy)?'executing':'observing-execution-disabled',agentId:policy.agentId,wallet:policy.wallet,observerFresh,observerAgeMs:Number.isFinite(age)?age:null,journalRevision:state.revision,intents:state.intents.map(i=>({id:i.id,mint:i.mint,side:i.side,state:i.state})),pendingLaunchesObserved:observerFresh&&Array.isArray(observation.pendingLaunches)?observation.pendingLaunches.length:null,strategy:'unvalidated-no-orders',automaticLaunchesEnabled:false,reconciliationEnabled:args.includes('--reconcile'),positionsRefreshed,readiness,positionRefresh:{outcome:attempt?.outcome??'unavailable',nextAttemptAt:nextRefresh.nextAttemptAt},launchIntake:{...launchIntake,observedCount:(state.launchesObserved??[]).length,acknowledged:false,executionEnabled:false}};
   await savePrivate('trading-status.json',status);
   await heartbeat(root,'trading',{mode:executes(policy)?'execute':'observe-only',healthy:observerFresh,note:execution.reason});
   console.log(JSON.stringify({status:status.status,revision:state.revision,intents:state.intents.length,executionEnabled:policy.executionEnabled}));

@@ -1,11 +1,12 @@
 import { createRequire } from 'node:module';
 import { PublicKey } from '@solana/web3.js';
-import { getMint, getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
+import { getMint, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 
 // Market data for the strategy. DexScreener for market metrics, the RPC (Helius) for
 // on-chain facts. Every fetch is bounded; a failed read yields null and screens out.
 const require = createRequire(import.meta.url);
-const { OnlinePumpSdk } = require('@pump-fun/pump-sdk');
+const { OnlinePumpSdk, bondingCurvePda } = require('@pump-fun/pump-sdk');
+const { canonicalPumpPoolPda } = require('@pump-fun/pump-swap-sdk');
 const DEX = 'https://api.dexscreener.com';
 const getJson = async (url, fetchImpl = fetch) => {
   const r = await fetchImpl(url, { headers: { accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(10000) });
@@ -59,19 +60,21 @@ export async function chainFacts(conn, rpcUrl, mint, minHolders, fetchImpl = fet
   if (!(supply > 0)) return null;
   const largest = (await conn.getTokenLargestAccounts(key, 'confirmed')).value;
   const parsed = await conn.getMultipleParsedAccounts(largest.map(a => a.address), { commitment: 'confirmed' });
-  // Curve and pool vaults are program-owned (off-curve) and are liquidity, not holders.
-  const wallets = largest.map((a, i) => ({ amount: Number(a.amount), owner: parsed.value[i]?.data?.parsed?.info?.owner }))
-    .filter(x => x.owner && PublicKey.isOnCurve(new PublicKey(x.owner).toBytes()));
-  const top10Share = wallets.slice(0, 10).reduce((n, x) => n + x.amount, 0) / supply;
+  // Only this coin's own bonding curve and canonical PumpSwap pool hold liquidity, not
+  // positions. Every other owner counts, including other program-owned accounts.
+  const venues = new Set([bondingCurvePda(key).toBase58(), canonicalPumpPoolPda(key).toBase58()]);
+  if (parsed.value.some(v => !v?.data?.parsed?.info?.owner)) return null;
+  const holders = largest.map((a, i) => ({ amount: Number(a.amount), owner: parsed.value[i].data.parsed.info.owner })).filter(x => !venues.has(x.owner));
+  const top10Share = holders.slice(0, 10).reduce((n, x) => n + x.amount, 0) / supply;
+  // The creator's share across all of its token accounts for this mint; unknown fails closed.
   let devShare = null;
   try {
     const creator = (await new OnlinePumpSdk(conn).fetchBondingCurve(key)).creator;
-    const ata = getAssociatedTokenAddressSync(key, creator, true, account.owner);
-    const bal = await conn.getTokenAccountBalance(ata, 'confirmed').catch(() => null);
-    devShare = bal ? Number(bal.value.amount) / supply : 0;
+    const accounts = await conn.getParsedTokenAccountsByOwner(creator, { mint: key }, 'confirmed');
+    devShare = accounts.value.reduce((n, a) => n + Number(a.account.data.parsed.info.tokenAmount.amount), 0) / supply;
   } catch { devShare = null; }
-  let holders = null;
-  try { holders = await dasHolders(rpcUrl, mint, minHolders, fetchImpl); } catch { holders = null; }
+  let holderCount = null;
+  try { holderCount = await dasHolders(rpcUrl, mint, minHolders, fetchImpl); } catch { holderCount = null; }
   return { mintAuthority: info.mintAuthority ? info.mintAuthority.toBase58() : null, freezeAuthority: info.freezeAuthority ? info.freezeAuthority.toBase58() : null,
-    decimals: info.decimals, top10Share, devShare, holders, tokenProgram: account.owner.toBase58() };
+    decimals: info.decimals, top10Share, devShare, holders: holderCount, tokenProgram: account.owner.toBase58() };
 }

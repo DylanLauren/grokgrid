@@ -15,8 +15,8 @@ export async function postIngest(root, event, fetchImpl = fetch) {
     const token = (await readPrivateText(cfg.tokenFile)).trim();
     const r = await fetchImpl(`${ORIGIN}/api/ingest`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       body: JSON.stringify(event), redirect: 'error', signal: AbortSignal.timeout(8000) });
-    return r.ok;
-  } catch { return false; }
+    return event.type === 'trade' ? r.status : r.ok;
+  } catch { return event.type === 'trade' ? 0 : false; }
 }
 
 /** Heartbeat the site reads; stale after 120s. */
@@ -30,3 +30,16 @@ export function heartbeat(root, worker, { mode, healthy, agents, note } = {}, fe
 
 /** One line for the site's live "what he's doing" feed. */
 export const action = (root, text, fetchImpl) => postIngest(root, { type: 'action', text: clean(text, 120) }, fetchImpl);
+
+/**
+ * A reconciled trade, as a callout. The site re-verifies the signature on chain and
+ * dedupes by signature. Returns the HTTP status (0 when unreachable).
+ */
+export function postTrade(root, { agent, side, mint, sig, symbol, name, image, note }, fetchImpl) {
+  const event = { type: 'trade', agent, side, mint, sig };
+  if (symbol) event.symbol = clean(symbol, 16);
+  if (name) event.name = clean(name, 48);
+  if (typeof image === 'string' && image.startsWith('https://')) event.image = image;
+  if (note) event.note = clean(note, 280);
+  return postIngest(root, event, fetchImpl);
+}
