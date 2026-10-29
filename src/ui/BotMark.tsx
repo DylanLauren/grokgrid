@@ -1,4 +1,6 @@
-// The bot family, drawn flat like the @bot banner. "house" is our white bot with black eyes.
+// The bot family, drawn flat and matte like the official Grok Bots. "house" is our white bot.
+import { eyeInk, eyePaths } from './eyes'
+
 export type Shape = 'sphere' | 'squircle' | 'cloud' | 'cone' | 'drop' | 'tile'
 
 export const FAMILY: { color: string; shape: Shape; name: string }[] = [
@@ -22,29 +24,19 @@ export const BODY: Record<Shape, string> = {
   drop: 'M54 8c4 0 8 4 14 14c14 22 22 36 22 48a40 40 0 0 1-80 0c0-18 22-38 34-54c4-6 6-8 10-8z',
 }
 
-// eye centres. The house bot glances up and to the right, as on xAI's Grok Bot mark.
-export const HOUSE_EYES = [[53, 37], [73, 28]]
-export const EYES = [[38, 44], [60, 40]]
 
-export function BotMark({ size = 28, color = 'house', shape = 'sphere' }: { size?: number; color?: string; shape?: Shape }) {
+// The logo pose: glancing up and to the right, as on xAI's Grok Bot mark.
+export const LOGO_LOOK: [number, number] = [0.45, -0.35]
+
+export function BotMark({ size = 28, color = 'house', shape = 'sphere', look = LOGO_LOOK }: { size?: number; color?: string; shape?: Shape; look?: [number, number] }) {
   const house = color === 'house'
+  const ink = house ? '#1a1a1a' : eyeInk(color)
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden="true" style={{ flex: 'none' }}>
-      {house && (
-        <defs>
-          <radialGradient id="bm-g" cx="0.4" cy="0.34" r="0.72">
-            <stop offset="0" stopColor="#ffffff" />
-            <stop offset="0.7" stopColor="#e7e7e7" />
-            <stop offset="1" stopColor="#bcbcbc" />
-          </radialGradient>
-        </defs>
-      )}
-      <path d={BODY[shape]} fill={house ? 'url(#bm-g)' : color} />
-      <g fill={house ? '#0a0a0a' : '#ffffff'}>
-        {(house ? HOUSE_EYES : EYES).map(([cx, cy], i) => (
-          <rect key={i} x={cx - 5.5} y={cy - 12.5} width="11" height="25" rx="5.5" transform={`rotate(-27 ${cx} ${cy})`} />
-        ))}
-      </g>
+      <path d={BODY[shape]} fill={house ? '#ffffff' : color} />
+      {eyePaths(shape, look[0], look[1]).map((d, i) => (
+        <path key={i} d={d} fill={ink} />
+      ))}
     </svg>
   )
 }

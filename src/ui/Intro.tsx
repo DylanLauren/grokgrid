@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { BODY, EYES, FAMILY, HOUSE_EYES, type Shape } from './BotMark'
+import { BODY, FAMILY, type Shape } from './BotMark'
+import { eyeInk, eyePaths } from './eyes'
 import './intro.css'
 
 // The opening: the whole bot family flies across the screen like Superman, capes out,
@@ -84,28 +85,15 @@ export function Intro({ onDone }: { onDone: () => void }) {
       return [cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.92]
     }
 
-    const drawBot = (shape: Shape, color: string, size: number, house: boolean) => {
+    // flat matte bodies with the same ball-painted eyes as the rest of the site
+    const drawBot = (shape: Shape, color: string, size: number, house: boolean, lx = 0, ly = 0) => {
       ctx.save()
       ctx.scale(size / 100, size / 100)
       ctx.translate(-50, -50)
-      if (house) {
-        const g = ctx.createRadialGradient(40, 34, 0, 40, 34, 72)
-        g.addColorStop(0, '#ffffff')
-        g.addColorStop(0.7, '#e7e7e7')
-        g.addColorStop(1, '#bcbcbc')
-        ctx.fillStyle = g
-      } else ctx.fillStyle = color
+      ctx.fillStyle = house ? '#ffffff' : color
       ctx.fill(paths[shape])
-      ctx.fillStyle = house ? '#0a0a0a' : '#ffffff'
-      for (const [ex, ey] of house ? HOUSE_EYES : EYES) {
-        ctx.save()
-        ctx.translate(ex, ey)
-        ctx.rotate((-27 * Math.PI) / 180)
-        ctx.beginPath()
-        ctx.roundRect(-5.5, -12.5, 11, 25, 5.5)
-        ctx.fill()
-        ctx.restore()
-      }
+      ctx.fillStyle = house ? '#1a1a1a' : eyeInk(color)
+      for (const d of eyePaths(shape, lx, ly)) ctx.fill(new Path2D(d))
       ctx.restore()
     }
 
@@ -158,7 +146,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
         ctx.save()
         ctx.globalAlpha = alpha
         ctx.translate(cx, cy + Math.sin(now * 0.006) * 4)
-        drawBot('sphere', 'house', unit * 0.16 * (hub + burst * 0.5), true)
+        drawBot('sphere', 'house', unit * 0.16 * (hub + burst * 0.5), true, Math.sin(now * 0.004) * 0.45, -0.1)
         ctx.restore()
       }
 
@@ -206,7 +194,10 @@ export function Intro({ onDone }: { onDone: () => void }) {
         ctx.scale(b.face, 1)
         ctx.rotate(tilt + 0.18 * Math.min(1, speed))
         drawCape(b.size, speed, now + i * 40, b.color, 1 - clamp((t - 0.8) / 0.2))
-        drawBot(b.shape, b.color, b.size, false)
+        // eyes ahead while flying, then they all turn to Grok Bot in the middle
+        const k = clamp((t - 0.85) / 0.15)
+        const dx = cx - pos[0], dy = cy - pos[1], dd = Math.hypot(dx, dy) || 1
+        drawBot(b.shape, b.color, b.size, false, 0.6 * (1 - k) + (dx / dd) * Math.sign(b.face || 1) * 0.8 * k, (dy / dd) * 0.7 * k)
         ctx.restore()
       })
 

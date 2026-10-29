@@ -4,7 +4,7 @@ import { MAIN_MINT, MAIN_NAME, MAIN_TICKER, X_HANDLE, buyUrl } from './config'
 import { stats, useFeed } from './data/useFeed'
 import type { View } from './scene/Scene'
 import { pct } from './lib/format'
-import { BotMark, HOUSE_EYES, type Shape } from './ui/BotMark'
+import { BotMark, type Shape } from './ui/BotMark'
 import { LiveBot, type Habit } from './ui/LiveBot'
 import { CallCard } from './ui/CallCard'
 import { CallsPanel } from './ui/Panels'
@@ -260,25 +260,11 @@ function useTuck() {
   return { on, open: () => setOn(false) }
 }
 
-// The folded bar's bot: floats slowly in its box, blinks and glances now and then.
+// The folded bar's bot: floats slowly in its box and looks around like the others.
 function MiniBot() {
   return (
     <span className="mb">
-      <svg viewBox="0 0 100 100" aria-hidden="true">
-        <defs>
-          <radialGradient id="mb-g" cx="0.4" cy="0.34" r="0.72">
-            <stop offset="0" stopColor="#ffffff" />
-            <stop offset="0.7" stopColor="#e7e7e7" />
-            <stop offset="1" stopColor="#bcbcbc" />
-          </radialGradient>
-        </defs>
-        <circle cx="50" cy="50" r="44" fill="url(#mb-g)" />
-        <g className="mb-eyes" fill="#0a0a0a">
-          {HOUSE_EYES.map(([cx, cy]) => (
-            <rect key={cx} x={cx - 5.5} y={cy - 12.5} width="11" height="25" rx="5.5" transform={`rotate(-27 ${cx} ${cy})`} />
-          ))}
-        </g>
-      </svg>
+      <LiveBot color="house" shape="sphere" habit="look" size={32} />
       <i className="mb-shadow" />
     </span>
   )
