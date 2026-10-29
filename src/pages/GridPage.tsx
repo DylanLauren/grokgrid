@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { MAIN_TICKER } from '../config'
 import { STEPS, launchBot, svgToImage, toImage } from '../data/launch'
 import { fetchLaunchStatus, unavailableLaunchStatus, type LaunchStatus } from '../data/launchStatus'
@@ -7,23 +7,23 @@ import type { AgentWalletSession } from '../data/agentWallet'
 import { AgentWalletSetup } from '../ui/AgentWalletSetup'
 import type { AgentsFeed } from '../data/types'
 import { BODY, FAMILY, type Shape } from '../ui/BotMark'
-import { eyeInk, eyePaths, type Face } from '../ui/eyes'
+import { eyeInk, eyePaths } from '../ui/eyes'
 import { LiveBot, type Habit } from '../ui/LiveBot'
 import { Roll } from '../ui/Roll'
 import { Page, Section } from './Page'
 
 // What each one of the family does while it waits, and what it says when you point at it.
-// each one has its own idle habit, its own hover trick and the face it pulls doing it
-const CAST: { habit: Habit; say: string; trick: string; face: Face }[] = [
-  { habit: 'look', say: 'i watch the whales', trick: 'backflip', face: 'wink' },
-  { habit: 'bounce', say: 'pick me pick me', trick: 'boing', face: 'squint' },
-  { habit: 'float', say: 'i only buy dips', trick: 'wobble', face: 'wide' },
-  { habit: 'sway', say: 'steady hands', trick: 'turn', face: 'wink' },
-  { habit: 'tilt', say: 'hmm, that chart', trick: 'roll', face: 'squint' },
-  { habit: 'flip', say: 'full send', trick: 'frontflip', face: 'wide' },
-  { habit: 'hop', say: 'up only', trick: 'twirl', face: 'wink' },
-  { habit: 'squish', say: 'i hold forever', trick: 'squash', face: 'squint' },
-  { habit: 'doze', say: 'wake me at 2x', trick: 'wake', face: 'wide' },
+// each one has its own idle habit and its own hover move
+const CAST: { habit: Habit; say: string; trick: string }[] = [
+  { habit: 'look', say: 'i watch the whales', trick: 'backflip' },
+  { habit: 'bounce', say: 'pick me pick me', trick: 'boing' },
+  { habit: 'float', say: 'i only buy dips', trick: 'wobble' },
+  { habit: 'sway', say: 'steady hands', trick: 'turn' },
+  { habit: 'tilt', say: 'hmm, that chart', trick: 'roll' },
+  { habit: 'flip', say: 'full send', trick: 'frontflip' },
+  { habit: 'hop', say: 'up only', trick: 'twirl' },
+  { habit: 'squish', say: 'i hold forever', trick: 'squash' },
+  { habit: 'doze', say: 'wake me at 2x', trick: 'wake' },
 ]
 
 // Everything pump.fun asks for when a coin is created, plus how the bot should trade.
@@ -156,13 +156,12 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             role="radio"
             aria-checked={i === d.look}
             className={`gd-pick gd-${CAST[i].trick} ${i === d.look ? 'on' : ''}`}
-            style={{ '--c': f.color === '#0b0b0b' ? '#6b6b6b' : f.color } as CSSProperties}
             onClick={() => {
               set('look', i)
               setCheer((n) => n + 1)
             }}
           >
-            <LiveBot color={f.color} shape={f.shape} habit={CAST[i].habit} say={CAST[i].say} size={120} delay={i * -0.37} hoverFace={CAST[i].face} />
+            <LiveBot color={f.color} shape={f.shape} habit={CAST[i].habit} say={CAST[i].say} size={120} delay={i * -0.37} still />
             <span className="gd-name">{f.name}</span>
           </button>
         ))}

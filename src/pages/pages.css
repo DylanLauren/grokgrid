@@ -110,48 +110,42 @@
 .gd-line::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 46px; background: #dfe2e8; border-top: 1px solid #0000000d; }
 .gd-pick { position: relative; z-index: 1; display: grid; justify-items: center; gap: 4px; padding-bottom: 10px; }
 .gd-pick .lb { width: 100% !important; height: auto !important; aspect-ratio: 1; }
-/* hover: the bot lights up in its own colour (--c), a ring ripples out from under it,
-   the others ease back a touch, and each one does its own trick (gd-<trick>) */
-.gd-pick { transition: opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
-.gd-line:hover .gd-pick:not(:hover) { opacity: 0.6; }
-.gd-pick .lb-body { transition: scale 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
-.gd-pick:hover .lb-body { scale: 1.1; transform-origin: 50% 50%; }
-.gd-pick:hover .lb-shadow { transform: scale(0.65); opacity: 0.08; }
-/* a soft pool of the bot's colour behind it */
-.gd-pick::after {
-  content: ''; position: absolute; left: 50%; top: 44%; width: 92%; aspect-ratio: 1; translate: -50% -50%; z-index: -1; pointer-events: none;
-  border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 34%, transparent), color-mix(in srgb, var(--c) 10%, transparent) 55%, transparent);
-  opacity: 0; scale: 0.6; transition: opacity 0.45s, scale 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.gd-pick:hover::after { opacity: 1; scale: 1; }
-/* one ring ripples out on the way in */
-.gd-pick > .lb::after {
-  content: ''; position: absolute; left: 50%; top: 50%; width: 70%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%;
-  border: 2px solid var(--c); opacity: 0; pointer-events: none;
-}
-.gd-pick:hover > .lb::after { animation: gd-ring 0.7s cubic-bezier(0.22, 1, 0.36, 1); }
-@keyframes gd-ring { 0% { opacity: 0.7; scale: 0.7; } 100% { opacity: 0; scale: 1.5; } }
+/* hover: the bot eases forward and grows a little, then does its own move (gd-<trick>)
+   and says its line. Nothing else on the line changes. Leaving eases it back the same way. */
+.gd-pick > .lb { transition: translate 0.45s cubic-bezier(0.22, 1, 0.36, 1), scale 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+.gd-pick:hover > .lb { translate: 0 -6%; scale: 1.08; z-index: 2; }
+.gd-pick .lb:hover .lb-body { scale: 1; }
+.gd-pick .lb-shadow { transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s; }
+.gd-pick:hover .lb-shadow { transform: scale(0.8); opacity: 0.12; }
+/* the line comes out just after the lift, smoothly, no pop */
+.gd-pick .lb-say { background: #0a0a0a; color: #fff; box-shadow: 0 6px 16px #0000001f; transition: opacity 0.3s ease-out, scale 0.4s cubic-bezier(0.22, 1, 0.36, 1), translate 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+.gd-pick:hover .lb-say { transition-delay: 0.15s; }
+.gd-pick:first-child .lb-say { left: 0; translate: 0 4px; transform-origin: 10% 100%; }
+.gd-pick:first-child:hover .lb-say { translate: 0 -4px; }
+.gd-pick:last-child .lb-say { left: auto; right: 0; translate: 0 4px; border-radius: 12px 12px 3px 12px; transform-origin: 90% 100%; }
+.gd-pick:last-child:hover .lb-say { translate: 0 -4px; }
 
-/* their tricks */
-.gd-backflip:hover .lb-body { animation: gd-backflip 0.75s cubic-bezier(0.22, 1, 0.36, 1); }
-.gd-frontflip:hover .lb-body { animation: gd-frontflip 0.75s cubic-bezier(0.22, 1, 0.36, 1); }
-.gd-boing:hover .lb-body { animation: gd-boing 0.7s cubic-bezier(0.3, 0, 0.3, 1); }
-.gd-wobble:hover .lb-body { animation: gd-wobble 0.7s ease-in-out; }
-.gd-turn:hover .lb-body { animation: gd-turn 0.7s cubic-bezier(0.22, 1, 0.36, 1); }
-.gd-roll:hover .lb-body { animation: gd-roll 0.8s cubic-bezier(0.22, 1, 0.36, 1); }
-.gd-twirl:hover .lb-body { animation: gd-twirl 0.85s cubic-bezier(0.22, 1, 0.36, 1); }
-.gd-squash:hover .lb-body { animation: gd-squash 0.65s cubic-bezier(0.3, 0, 0.3, 1); }
-.gd-wake:hover .lb-body { animation: gd-wake 0.7s cubic-bezier(0.22, 1, 0.36, 1); }
-@keyframes gd-backflip { 0% { transform: none; } 20% { transform: scale(1.06, 0.9); } 55% { transform: translateY(-26%) rotate(-200deg); } 100% { transform: rotate(-360deg); } }
-@keyframes gd-frontflip { 0% { transform: none; } 20% { transform: scale(1.06, 0.9); } 55% { transform: translateY(-26%) rotate(200deg); } 100% { transform: rotate(360deg); } }
+/* their tricks; spins turn about the middle so the bot stays in place */
+.gd-backflip .lb-body, .gd-frontflip .lb-body, .gd-roll .lb-body, .gd-twirl .lb-body, .gd-turn .lb-body, .gd-wobble .lb-body { transform-origin: 50% 50%; }
+.gd-backflip:hover .lb-body { animation: gd-backflip 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.12s both; }
+.gd-frontflip:hover .lb-body { animation: gd-frontflip 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.12s both; }
+.gd-boing:hover .lb-body { animation: gd-boing 0.9s cubic-bezier(0.3, 0, 0.3, 1) 0.12s both; }
+.gd-wobble:hover .lb-body { animation: gd-wobble 0.9s ease-in-out 0.12s both; }
+.gd-turn:hover .lb-body { animation: gd-turn 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both; }
+.gd-roll:hover .lb-body { animation: gd-roll 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.12s both; }
+.gd-twirl:hover .lb-body { animation: gd-twirl 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.12s both; }
+.gd-squash:hover .lb-body { animation: gd-squash 0.9s cubic-bezier(0.3, 0, 0.3, 1) 0.12s both; }
+.gd-wake:hover .lb-body { animation: gd-wake 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both; }
+@keyframes gd-backflip { 0% { transform: none; } 50% { transform: translateY(-22%) rotate(-180deg); } 100% { transform: rotate(-360deg); } }
+@keyframes gd-frontflip { 0% { transform: none; } 50% { transform: translateY(-22%) rotate(180deg); } 100% { transform: rotate(360deg); } }
 @keyframes gd-boing { 0%, 100% { transform: none; } 20% { transform: scale(1.14, 0.84); } 45% { transform: translateY(-24%) scale(0.9, 1.12); } 70% { transform: scale(1.08, 0.92); } 85% { transform: translateY(-5%); } }
 @keyframes gd-wobble { 0%, 100% { transform: none; } 20% { transform: rotate(-12deg); } 40% { transform: rotate(10deg); } 60% { transform: rotate(-6deg); } 80% { transform: rotate(3deg); } }
 @keyframes gd-turn { 0% { transform: none; } 50% { transform: scaleX(-1) translateY(-8%); } 100% { transform: none; } }
 @keyframes gd-roll { 0% { transform: none; } 50% { transform: translateX(14%) rotate(180deg); } 100% { transform: rotate(360deg); } }
-@keyframes gd-twirl { 0% { transform: none; } 60% { transform: translateY(-14%) rotate(-560deg) scale(0.92); } 100% { transform: rotate(-720deg); } }
+@keyframes gd-twirl { 0% { transform: none; } 50% { transform: translateY(-14%) rotate(-180deg); } 100% { transform: rotate(-360deg); } }
 @keyframes gd-squash { 0%, 100% { transform: none; } 30% { transform: scale(1.22, 0.72); } 60% { transform: scale(0.88, 1.14); } 80% { transform: scale(1.04, 0.97); } }
 @keyframes gd-wake { 0% { transform: none; } 30% { transform: scale(0.94, 1.04) translateY(4%); } 55% { transform: translateY(-18%) scale(1.06, 1.08); } 100% { transform: none; } }
-@media (prefers-reduced-motion: reduce) { .gd-pick:hover .lb-body, .gd-pick:hover > .lb::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .gd-pick:hover .lb-body { animation: none; } .gd-pick > .lb { transition: none; } }
 .gd-name { font-size: 12px; color: #0a0a0a80; font-family: var(--mono); transition: color 0.2s; }
 .gd-pick:hover .gd-name, .gd-pick.on .gd-name { color: #0a0a0a; }
 .gd-pick.on::before { content: ''; position: absolute; left: 10%; right: 10%; bottom: 4px; height: 3px; border-radius: 2px; background: #0a0a0a; }
@@ -236,7 +230,7 @@
 .dc-body section:first-child { border-top: 0; padding-top: 0; }
 .dc-body h2 { margin: 0 0 10px; font-size: clamp(22px, 2.4vw, 30px); font-weight: 520; letter-spacing: -0.035em; }
 .dc-body p { margin: 0 0 10px; font-size: 16px; line-height: 1.65; color: var(--paper-70); }
-.dc-body .pn-flow { max-width: 520px; }
+.dc-body .mf { max-width: 620px; }
 .dc-fine { font-size: 13px !important; color: var(--paper-30) !important; }
 
 @media (max-width: 1000px) {

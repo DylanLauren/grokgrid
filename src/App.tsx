@@ -24,8 +24,8 @@ const CREW: [string, Shape, Habit][] = [
   ['#ff6a00', 'sphere', 'bounce'],
   ['#13b8a6', 'squircle', 'sway'],
   ['#9b5cff', 'tile', 'tilt'],
-  ['#ff2e9a', 'cone', 'hop'],
-  ['#1683ff', 'squircle', 'flip'],
+  ['#ff2e9a', 'drop', 'hop'],
+  ['#1683ff', 'sphere', 'flip'],
 ]
 
 // The callout you click in the dock glides into its place in the calls panel while the
@@ -131,7 +131,7 @@ export default function App() {
           <span>GrokGrid</span>
           <span className="crew" aria-hidden>
             {CREW.map(([color, shape, habit], i) => (
-              <LiveBot key={color} color={color} shape={shape} habit={habit} size={24} delay={i * -0.53} />
+              <LiveBot key={color} color={color} shape={shape} habit={habit} size={26} delay={i * -0.53} />
             ))}
           </span>
         </button>

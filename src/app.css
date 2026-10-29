@@ -44,7 +44,9 @@
 .brand { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 560; letter-spacing: -0.035em; justify-self: start; }
 .brand > svg { transition: transform 0.5s cubic-bezier(.3,1.6,.5,1); }
 .brand:hover > svg { transform: rotate(-14deg) scale(1.08); }
-.crew { display: flex; align-items: flex-end; gap: 1px; margin-left: 4px; height: 28px; }
+/* the family sits in its own little tray, evenly spaced on one baseline */
+.crew { display: flex; align-items: center; gap: 4px; margin-left: 6px; height: 34px; padding: 0 7px; border-radius: var(--r-pill); background: #ffffff0b; border: 1px solid var(--hair); }
+.crew .lb { flex: none; }
 .crew .lb-shadow { display: none; }
 .crew .lb { transition: transform 0.4s cubic-bezier(.3,1.6,.5,1); }
 /* hover the logo and the family does a wave, one after another */

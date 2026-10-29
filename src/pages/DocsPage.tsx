@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { MAIN_TICKER } from '../config'
-import { Addresses, CostTable, FlowDiagram } from '../ui/Panels'
+import { Addresses, CostTable } from '../ui/Panels'
+import { MoneyFlow } from '../ui/MoneyFlow'
 import { Roll } from '../ui/Roll'
 import { Page } from './Page'
 
@@ -20,7 +21,7 @@ const SECTIONS: [string, string, ReactNode][] = [
     'money',
     'Where the money goes',
     <Fragment key="b">
-      <FlowDiagram />
+      <MoneyFlow />
       <p>${MAIN_TICKER} creator fees split 80% to the treasury, which funds his trading, and 20% to the burn wallet. Once the burn wallet holds 0.05 SOL, it buys ${MAIN_TICKER} on the market (at most once per cycle, 5% slippage) and burns all of it. Buy-and-burn switches on once ${MAIN_TICKER} is live.</p>
       <p>Once ${MAIN_TICKER} is live, the stats page reads its numbers straight off the chain: supply and burns from the mint account (every pump.fun coin starts at one billion, so whatever is missing has been burned), and the treasury and burn wallet balances from Solana. None of these are reported by us.</p>
       <p>Every bot coin launched here sends 80% of its creator fees to that bot’s own trading wallet and 20% to the ${MAIN_TICKER} burn wallet. The split is written into the coin at launch and checked on chain before the bot joins the grid.</p>
