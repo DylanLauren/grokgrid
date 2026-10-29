@@ -46,7 +46,6 @@ const EMPTY: Draft = { look: 3, name: '', ticker: '', description: '', x: '', te
 const DRAFT_KEY = 'gg-launch-draft'
 const MAX_TRADE = 0.05 // the signer policy's per-buy cap: a higher max could never be used
 const LIMITS = { name: 32, ticker: 10, description: 600, strategy: 140 }
-const IMAGE_MAX = 4 * 1024 * 1024
 const bytes = (s: string) => new TextEncoder().encode(s).length
 
 // What a field says is wrong with it, or nothing.
@@ -202,12 +201,11 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
                   <Roll>{image ? 'Change image' : 'Upload image'}</Roll>
                   <input
                     type="file"
-                    accept="image/png,image/jpeg,image/gif,image/webp"
+                    accept="image/*"
                     onChange={(e) => {
                       const f = e.target.files?.[0]
                       e.target.value = ''
                       if (!f) return
-                      if (f.size > IMAGE_MAX) return setImgErr('4 MB at most')
                       setImgErr('')
                       toImage(f).then((url) => setImage({ url, name: f.name }), (err: Error) => setImgErr(err.message))
                     }}
@@ -218,7 +216,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
                     use my bot instead
                   </button>
                 )}
-                <small>{imgErr || (image ? image.name : 'png, jpg, gif or webp, up to 4 MB. your bot is the picture until you pick one.')}</small>
+                <small>{imgErr || (image ? image.name : 'any picture works. it’s cropped and sized for you. your bot is the picture until you pick one.')}</small>
               </div>
             </div>
             <div className="gd-row">
