@@ -41,3 +41,14 @@ test('the screenshot feed accepts a followed coin page in the same pinned window
   assert.throws(() => verifyWindow(snap({ ...onCoin, id: 1301 }), config, { mints: [A], updatedAt: now }, now), /window-identity-mismatch/)
   assert.throws(() => verifyWindow(snap({ title: 'Inbox' }), config, null, now), /window-identity-mismatch/)
 })
+
+test('a just-posted callout puts its coin on the phone for 30 seconds, only for a coin the house traded', async () => {
+  const { calloutMint, CALLOUT_SHOW_MS } = await import('../scripts/phone-follow-core.mjs')
+  const ledger = (outcome: string, at: number, mint = A) => ({ calls: [{ at, mint, outcome }] })
+  assert.equal(calloutMint(ledger('posted', now - 5000), [B, A], now), A)
+  assert.equal(targetPage([B, A], PROFILE, calloutMint(ledger('posted', now - 5000), [B, A], now)), coinUrl(A)) // ahead of the newest trade
+  assert.equal(calloutMint(ledger('posted', now - CALLOUT_SHOW_MS), [A], now), null) // shown long enough
+  assert.equal(calloutMint(ledger('verdict-INSUFFICIENT_BALANCE', now - 5000), [A], now), null) // refused callouts show nothing
+  assert.equal(calloutMint(ledger('posted', now - 5000, 'So11111111111111111111111111111111111111112'), [A], now), null) // not a coin the house traded
+  assert.equal(calloutMint(null, [A], now), null)
+})
