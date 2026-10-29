@@ -32,28 +32,30 @@ const LOOKUP_TABLE_PROGRAM = 'AddressLookupTab1e1111111111111111111111111'
 
 // Squares and shrinks a picture so uploads stay small. GIFs stay animated.
 export async function toImage(file: Blob): Promise<string> {
-  if (file.type === 'image/gif') {
-    if (file.size > MAX_IMAGE_BYTES) throw new Error('GIFs must be 400 KB or smaller.')
-    return new Promise((ok, no) => {
-      const r = new FileReader()
-      r.onload = () => ok(r.result as string)
-      r.onerror = () => no(new Error('could not read that file'))
-      r.readAsDataURL(file)
-    })
-  }
-  const bmp = await createImageBitmap(file)
+  // a small GIF keeps its animation; anything else is cropped and sized to fit on its own
+  if (file.type === 'image/gif' && file.size <= MAX_IMAGE_BYTES) return readAsDataUrl(file)
+  let bmp: ImageBitmap
+  try { bmp = await createImageBitmap(file) } catch { throw new Error('That file isn’t a picture we can read. Try a png or jpg.') }
+  // centre square crop, then the largest size and quality that fits pump.fun's limit
   const side = Math.min(bmp.width, bmp.height)
-  const size = Math.min(512, side)
   const canvas = document.createElement('canvas')
-  canvas.width = canvas.height = size
-  canvas.getContext('2d')!.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, size, size)
-  for (const q of [0.92, 0.8, 0.6]) {
-    const url = canvas.toDataURL('image/webp', q)
-    const out = url.startsWith('data:image/webp') ? url : canvas.toDataURL('image/png')
-    if ((out.length * 3) / 4 <= MAX_IMAGE_BYTES) return out
+  for (const size of [512, 400, 320, 256, 192]) {
+    canvas.width = canvas.height = Math.min(size, side)
+    canvas.getContext('2d')!.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, canvas.width, canvas.width)
+    for (const [type, q] of [['image/webp', 0.9], ['image/webp', 0.75], ['image/jpeg', 0.85], ['image/jpeg', 0.7], ['image/jpeg', 0.55]] as const) {
+      const url = canvas.toDataURL(type, q)
+      if (url.startsWith(`data:${type}`) && (url.length * 3) / 4 <= MAX_IMAGE_BYTES) return url
+    }
   }
-  throw new Error('That picture is too detailed, try a simpler one.')
+  return canvas.toDataURL('image/jpeg', 0.4)
 }
+
+const readAsDataUrl = (file: Blob) => new Promise<string>((ok, no) => {
+  const r = new FileReader()
+  r.onload = () => ok(r.result as string)
+  r.onerror = () => no(new Error('could not read that file'))
+  r.readAsDataURL(file)
+})
 
 // The bot drawing (an SVG) as a 512px PNG, since pump.fun and wallets want a raster picture.
 export async function svgToImage(svgUrl: string): Promise<string> {

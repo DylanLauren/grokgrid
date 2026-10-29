@@ -7,18 +7,17 @@ import type { WalletLike } from '../data/wallet'
 import type { AgentWalletSetupProps } from './AgentWalletSetup'
 
 // Sign-in is the owner's Phantom: connect it and sign one free message (no transaction).
-// Email and Google only show if they are still switched on in the Privy dashboard.
 const solanaWallets = toSolanaWalletConnectors({ shouldAutoConnect: false })
 
-export default function PrivyAgentWallet({ appId, onWalletChange }: AgentWalletSetupProps & { appId: string }) {
-  const props = { onWalletChange }
-  return <PrivyProvider appId={appId} config={{ loginMethods: ['wallet', 'email', 'google'], appearance: { theme: 'dark', accentColor: '#40bda6', walletChainType: 'solana-only', walletList: ['phantom', 'detected_solana_wallets'], showWalletLoginFirst: true }, externalWallets: { solana: { connectors: solanaWallets } }, embeddedWallets: { ethereum: { createOnLogin: 'off' }, solana: { createOnLogin: 'off' } }, plugins: [defaultSolanaRpcsPlugin()] }}><WalletControls {...props} /></PrivyProvider>
+export default function PrivyAgentWallet({ appId, onWalletChange, onSignedIn }: AgentWalletSetupProps & { appId: string; onSignedIn: (phantom: string | null) => void }) {
+  const props = { onWalletChange, onSignedIn }
+  return <PrivyProvider appId={appId} config={{ loginMethods: ['wallet'], appearance: { theme: 'dark', accentColor: '#40bda6', walletChainType: 'solana-only', walletList: ['phantom', 'detected_solana_wallets'], showWalletLoginFirst: true }, externalWallets: { solana: { connectors: solanaWallets } }, embeddedWallets: { ethereum: { createOnLogin: 'off' }, solana: { createOnLogin: 'off' } }, plugins: [defaultSolanaRpcsPlugin()] }}><WalletControls {...props} /></PrivyProvider>
 }
 
 // Connect, and everything else happens on its own: the bot's wallet is created on first sign-in
 // and its setup is checked. The Grok Bot signer is added when the owner presses Launch, after
 // the same fresh policy check as before; that press is the owner's approval.
-function WalletControls({ onWalletChange }: AgentWalletSetupProps) {
+function WalletControls({ onWalletChange, onSignedIn }: AgentWalletSetupProps & { onSignedIn: (phantom: string | null) => void }) {
   const { ready, authenticated, user, login, logout, getAccessToken } = usePrivy()
   const { wallets } = useWallets()
   const { createWallet } = useCreateWallet()
@@ -37,6 +36,9 @@ function WalletControls({ onWalletChange }: AgentWalletSetupProps) {
   useLayoutEffect(() => { current.current = { authenticated, address: account?.address, wallet: connected } })
   const address = account?.address
   const walletId = account?.walletId
+  // the Phantom that signed in is the owner: no second connect
+  const phantom = authenticated ? (user?.linkedAccounts ?? []).find((a): a is typeof a & { address: string } => a.type === 'wallet' && a.chainType === 'solana' && a.connectorType !== 'embedded')?.address ?? null : null
+  useEffect(() => { onSignedIn(phantom) }, [phantom, onSignedIn])
 
   const verify = useCallback(async () => {
     if (!address || !walletId) return
@@ -105,7 +107,7 @@ function WalletControls({ onWalletChange }: AgentWalletSetupProps) {
         {address && <p>Your bot trades from this wallet. Launching funds it from Phantom in the same approval{r?.walletAuthorizationReady ? '' : ' and lets Grok Bot trade it inside the limits below'}.</p>}
         {!address && hasUnreadyWallet && <p>This account’s wallet needs a manual check before it can trade. Contact us on X.</p>}
       </div>
-      <button type="button" className="btn ghost" disabled={busy} onClick={() => void act(async () => { setChecked(null); onWalletChange(null); await logout() })}>Sign out</button>
+      <button type="button" className="btn ghost" disabled={busy} onClick={() => void act(async () => { setChecked(null); onWalletChange(null); onSignedIn(null); await logout() })}>Sign out</button>
     </div>
     {address && <div className="gd-addr">
       <span className="mono"><small>bot wallet</small> {address}</span>
