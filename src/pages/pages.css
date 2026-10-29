@@ -220,16 +220,45 @@
 
 /* docs */
 .dc { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: clamp(24px, 4vw, 64px); align-items: start; }
-.dc-toc { position: sticky; top: calc(var(--bar) + 24px); display: grid; gap: 2px; }
-.dc-toc a { display: flex; gap: 10px; padding: 7px 0; font-size: 14px; color: var(--paper-50); transition: color 0.2s; }
+.dc-toc { position: sticky; top: calc(var(--bar) + 24px); display: grid; gap: 2px; padding: 14px 16px 16px; background: #0f0f10e6; border: 1px solid var(--hair); border-radius: 18px; backdrop-filter: blur(10px); }
+.dc-toc a { display: flex; gap: 10px; padding: 6px 0; font-size: 14px; color: var(--paper-50); transition: color 0.2s; }
 .dc-toc a .mono { font-size: 11px; color: var(--paper-30); padding-top: 2px; }
 .dc-toc a:hover, .dc-toc a.on { color: var(--paper); }
-.dc-toc .btn { margin-top: 14px; height: 38px; font-size: 14px; justify-content: center; }
-.dc-body { max-width: 760px; }
-.dc-body section { padding: 26px 0; border-top: 1px solid var(--hair); scroll-margin-top: calc(var(--bar) + 16px); }
-.dc-body section:first-child { border-top: 0; padding-top: 0; }
-.dc-body h2 { margin: 0 0 10px; font-size: clamp(22px, 2.4vw, 30px); font-weight: 520; letter-spacing: -0.035em; }
-.dc-body p { margin: 0 0 10px; font-size: 16px; line-height: 1.65; color: var(--paper-70); }
+.dc-toc .btn { margin-top: 8px; height: 38px; font-size: 14px; justify-content: center; }
+.dc-toc .btn + .btn { margin-top: 6px; }
+.dc-body { max-width: 780px; display: grid; gap: 12px; }
+/* each section sits on its own panel so the grid behind never crosses the text */
+.dc-sec { padding: 24px 28px 18px; background: #0f0f10f0; border: 1px solid var(--hair); border-radius: 18px; scroll-margin-top: calc(var(--bar) + 16px); }
+.dc-body h2 { margin: 0 0 12px; font-size: clamp(22px, 2.4vw, 30px); font-weight: 520; letter-spacing: -0.035em; }
+.dc-body p { margin: 0 0 12px; font-size: 16px; line-height: 1.65; color: var(--paper-70); }
+
+/* titles: a slim mark slides in, the words lean right and an underline draws under them */
+.dc-body h2 a { position: relative; display: inline-flex; flex-wrap: wrap; padding-left: 0; transition: padding-left 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+.dc-body h2 a::before { content: ''; position: absolute; left: 0; top: 50%; width: 10px; height: 2px; border-radius: 2px; background: var(--paper); opacity: 0; translate: -8px -50%; transition: opacity 0.3s, translate 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+.dc-body h2 a::after { content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 1px; background: var(--paper-30); transform: scaleX(0); transform-origin: left; transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
+.dc-body h2 a:hover { padding-left: 20px; }
+.dc-body h2 a:hover::before { opacity: 1; translate: 0 -50%; }
+.dc-body h2 a:hover::after { transform: scaleX(1); left: 20px; }
+
+/* load-in: title words rise one by one, then the content follows */
+.dc-w { display: inline-block; white-space: pre; }
+.dc-sec .dc-w { opacity: 0; translate: 0 0.4em; transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1), translate 0.7s cubic-bezier(0.22, 1, 0.36, 1); transition-delay: calc(var(--i) * 60ms); }
+.dc-sec > :not(h2) { opacity: 0; translate: 0 14px; transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), translate 0.8s cubic-bezier(0.22, 1, 0.36, 1); }
+.dc-sec > :nth-child(2) { transition-delay: 0.18s; }
+.dc-sec > :nth-child(3) { transition-delay: 0.26s; }
+.dc-sec > :nth-child(4) { transition-delay: 0.34s; }
+.dc-sec > :nth-child(n + 5) { transition-delay: 0.42s; }
+.dc-sec.in .dc-w, .dc-sec.in > :not(h2) { opacity: 1; translate: 0 0; }
+@media (prefers-reduced-motion: reduce) { .dc-sec .dc-w, .dc-sec > :not(h2) { opacity: 1; translate: none; transition: none; } }
+
+/* questions */
+.dc-faq { margin: 0; display: grid; border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; }
+.dc-faq > div { padding: 12px 16px; transition: background 0.25s; }
+.dc-faq > div + div { border-top: 1px solid var(--hair); }
+.dc-faq > div:hover { background: #ffffff06; }
+.dc-faq dt { font-size: 15px; font-weight: 520; color: var(--paper); }
+.dc-faq dd { margin: 3px 0 0; font-size: 14.5px; line-height: 1.55; color: var(--paper-70); }
+.dc-gh { margin: 4px 0 14px; height: 40px; font-size: 14px; }
 .dc-fine { font-size: 13px !important; color: var(--paper-30) !important; }
 
 @media (max-width: 1000px) {
@@ -257,3 +286,4 @@
   .gd-split, .gd-row, .gd-row.three, .gd-row:has(.narrow) { grid-template-columns: 1fr; }
 }
 @media (max-width: 900px) { .pg { padding-top: calc(var(--bar) + 80px); } }
+.dc-sec .addr { margin-bottom: 14px; }

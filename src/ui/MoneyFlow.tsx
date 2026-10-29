@@ -10,7 +10,7 @@ const ROWS = [
   {
     from: `$${MAIN_TICKER} creator fees`,
     split: [
-      { pct: 80, to: 'treasury', note: 'funds Grok Bot and creates new bots' },
+      { pct: 80, to: 'treasury', note: 'Grok Bot’s own trading wallet' },
       { pct: 20, to: 'buy and burn', note: `buys $${MAIN_TICKER} and burns it` },
     ],
   },
