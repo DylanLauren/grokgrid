@@ -144,3 +144,13 @@ test('missing pinned CG window waits without capture or failure exhaustion and r
   await captureAndSend(config, { token, now: () => now, inspect: async () => snapshot, capture: async () => jpeg, send: async () => { sent++ } })
   assert.equal(sent, 1)
 })
+test('a live pump.fun title change on the same page keeps the frame; a different page or title kind does not', async () => {
+  const coin = 'https://pump.fun/coin/ANVLA6eKiAq4nstD2Sg3SZhfVkSEwfnGccn12UQWpump'
+  const follow = async () => ({ mints: ['ANVLA6eKiAq4nstD2Sg3SZhfVkSEwfnGccn12UQWpump'], updatedAt: now })
+  const onCoin = { ...snapshot, title: 'HEXN $790K | Pump', browserUrl: coin, viewport: { ...snapshot.viewport, href: coin } }
+  const run = (after: Record<string, unknown>) => { let n = 0, sent = 0
+    return captureAndSend(config, { token, now: () => now, follow, inspect: async () => n++ ? { ...onCoin, ...after } : onCoin, capture: async () => jpeg, send: async () => { sent++ } }).then(() => sent) }
+  assert.equal(await run({ title: 'HEXN $792K | Pump' }), 1) // market cap ticked between reads
+  await assert.rejects(run({ title: 'Inbox' }))
+  await assert.rejects(run({ title: 'HEXN $792K | Pump', browserUrl: 'https://pump.fun/', viewport: { ...snapshot.viewport } }))
+})
