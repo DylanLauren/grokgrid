@@ -9,13 +9,14 @@ import { Roll } from '../ui/Roll'
 import { Page } from './Page'
 
 const FAQ: [string, string][] = [
-  [`Do I need $${MAIN_TICKER} to launch a bot?`, 'No. Connect Phantom with enough SOL for the launch (about 0.03 SOL) plus what you want your bot to trade with.'],
+  [`Do I need $${MAIN_TICKER} to launch a bot?`, 'No. Connect Phantom with enough SOL for the launch (about 0.03 SOL), your bot’s funding (at least 0.03 SOL) and any dev buy.'],
   ['Does Grok Bot give my bot money?', `No. Your bot runs on 80% of its own coin’s fees plus anything you deposit. Grok Bot trades only with the $${MAIN_TICKER} treasury.`],
   ['Can I take money out of my bot’s wallet?', 'Yes. It’s your Privy wallet. GrokGrid’s signer can’t move funds out, but you can.'],
   ['Can GrokGrid take my funds?', 'No. The signer can only buy and sell on pump.fun under the policy, with no transfers. You can remove it at any time.'],
   ['How do I stop my bot?', 'Remove the signer from your wallet. It stops trading on the next cycle, and the coin and wallet stay yours.'],
   ['Can my bot lose money?', 'Yes. Memecoins are risky. Limits cap each trade and the daily loss, and Grok Bot’s size only grows as fees come in, but a bot can still lose what it trades with.'],
-  ['When does trading go live?', 'After a funded test of the house bot. Until then the bots run in practice mode. The workers section on the stats page always shows the current mode.'],
+  ['Who gets my coin’s fees?', 'Your bot’s trading wallet gets 80% of its coin’s creator fees and trades with them; 20% goes to the $'+MAIN_TICKER+' burn wallet. Your Phantom gets none: it only signs the launch and holds your dev buy.'],
+  ['What is the dev buy?', 'An optional buy of your own coin by your Phantom, made in the same approval that creates it. Those tokens stay in your Phantom; the bot never trades or sells them.'],
   ['Where can I check all of this?', 'Every coin, wallet and trade links to pump.fun and Solscan. The addresses are at the bottom of this page.'],
   ['Is this made by xAI?', 'No. GrokGrid is an unofficial fan project.'],
 ]
@@ -37,7 +38,7 @@ const SECTIONS: [string, string, ReactNode][] = [
     <Fragment key="b">
       <p>He scans new pump.fun coins and skips anything that fails his safety checks: thin liquidity, low volume, few real buyers, too few holders, a top-10 that holds too much, a risky dev wallet, or a mint or freeze authority still set. When he buys, he exits on take-profit, stop-loss, a trailing stop or a maximum hold time.</p>
       <p>His budget grows with what comes in. Each trade is 10% of the last 24 hours’ creator fees or 2% of his spare balance, whichever is bigger, up to a cap set by those fees: 0.02 SOL per trade under 1 SOL of daily fees, 0.05 SOL from 1 SOL, 0.1 SOL from 5 SOL and 0.5 SOL from 10 SOL, the hard maximum. Open positions stay under three times the cap and a quarter of his spare balance. The daily loss stop is two and a half times the cap, and never more than a fifth of his wallet. When fees slow down, his size shrinks again. On top of that, slippage is capped at 15%, he holds at most 3 coins, and a 0.02 SOL reserve is never spent. A stop switch halts him instantly, and an exit switch sells everything. Real trades show on the calls page with links to their transactions. Every coin he buys also gets a pump.fun Callout from his GrokGrid profile while he holds it.</p>
-      <p>Before real trading he runs in practice mode: he picks and exits coins on live data but spends nothing. Real trading switches on after a funded test. The workers section on the stats page shows which parts are online and in which mode.</p>
+      <p>He trades real SOL, and every bot launched here trades the same way. The workers section on the stats page shows which parts are online and in which mode.</p>
     </Fragment>,
   ],
   [
@@ -63,7 +64,7 @@ const SECTIONS: [string, string, ReactNode][] = [
     'How the bots are funded',
     <Fragment key="b">
       <p>There is no shared pot. Grok Bot trades from the treasury, which only ${MAIN_TICKER} fees fill. He does not send SOL to the other bots, and no bot can reach another bot’s wallet.</p>
-      <p>Every other bot pays its own way. Its money comes from two places: 80% of its own coin’s creator fees, which land in its wallet with every trade on that coin, and anything its owner chooses to deposit, including an optional first buy at launch. A bot whose coin trades more has more to trade with. A bot whose coin goes quiet slows down, and never pulls from anyone else.</p>
+      <p>Every other bot pays its own way. Its money comes from two places: 80% of its own coin’s creator fees, which land in its wallet with every trade on that coin, and anything its owner deposits, starting with the funding sent at launch. A dev buy is different: those tokens stay in the owner’s Phantom and the bot never touches them. A bot whose coin trades more has more to trade with. A bot whose coin goes quiet slows down, and never pulls from anyone else.</p>
       <p>What ties the family together is the burn. Every bot coin sends 20% of its fees to the ${MAIN_TICKER} burn wallet, so each new bot that trades adds to ${MAIN_TICKER} buy-and-burns. ${MAIN_TICKER} feeds Grok Bot, and the grid feeds ${MAIN_TICKER}.</p>
     </Fragment>,
   ],
@@ -71,15 +72,15 @@ const SECTIONS: [string, string, ReactNode][] = [
     'launch',
     'Launching a bot',
     <Fragment key="b">
-      <p>Connect Phantom and sign one free message (no transaction, no cost); that is your login. Your bot’s own trading wallet is made for you. Then pick a look, name, ticker, description, links, a one-line strategy and limits (max SOL per trade, take-profit, stop-loss). Pressing Launch gives Grok Bot its limited signer on the bot’s wallet and asks you to approve one transaction in Phantom. It creates the coin with the 80/20 split, funds the bot’s wallet with the amount you chose, and makes an optional first buy.</p>
-      <p>The wallet needs at least 0.03 SOL to launch, to cover Solana network fees and pump.fun’s coin-creation rent; your wallet shows the exact amount before you sign. Each wallet runs one bot. Your bot trades from its own wallet by your rules, never past the platform limits above, and runs in practice mode until real trading is switched on. Launches open once the bot runner is online.</p>
+      <p>Connect Phantom and sign one free message (no transaction, no cost); that is your login. Your bot’s own trading wallet is made for you. Then pick a look, name, ticker, description, links, a bot name, a one-line tagline and limits (max SOL per trade, take-profit up to 60%, stop-loss up to 25%). Pressing Launch gives Grok Bot its limited signer on the bot’s wallet and asks you to approve one transaction in Phantom. That one approval creates the coin with the 80/20 split, funds the bot’s wallet with the amount you chose, and makes your optional dev buy. Afterwards the grid page shows your bot, its status and a stop switch.</p>
+      <p>The launch itself costs about 0.03 SOL in Solana network fees and pump.fun’s coin-creation rent, and your bot needs at least 0.03 SOL of funding; your wallet shows the exact total before you sign. Fund it with 0.25 SOL or more for real trade sizes, since each buy starts at about 2% of what it can spend. Each wallet runs one bot. Your Phantom launches and holds your dev buy; your bot’s own wallet collects 80% of its coin’s fees and does all the trading, by your rules and never past the platform limits above.</p>
     </Fragment>,
   ],
   [
     'grid',
     'The matrix and the grid',
     <Fragment key="b">
-      <p>The matrix lists every bot with its coin’s market cap, volume and fees, its wallet balance, realised profit and loss, win rate and latest trades, updating live. Hover any coin for its stats; click a bot to open its profile with its coin, wallet and every trade. Profit and loss is worked out from the bot’s own checked trades, so a first buy’s one-time account rent counts as cost. Every coin launched here links to its bot’s profile as its website. Until the first bots launch it shows clearly marked sample rows. Rows link to the coin on pump.fun and the wallet on Solscan, so every number can be checked. Bots with a coin that was not launched here, or whose fee split doesn’t match, are left off.</p>
+      <p>The matrix lists every bot with its coin’s market cap, volume and fees, its wallet balance, realised profit and loss, win rate and latest trades, updating live. Hover any coin for its stats; click a bot to open its profile with its coin, wallet and every trade. Profit and loss is worked out from the bot’s own checked trades, so the one-time account rent paid on its first buy of each coin counts as cost. Every coin launched here links to its bot’s profile as its website. Until the first bots launch it shows clearly marked sample rows. Rows link to the coin on pump.fun and the wallet on Solscan, so every number can be checked. Bots with a coin that was not launched here, or whose fee split doesn’t match, are left off.</p>
       <p>The grid is where you pick a look and launch. Each of the nine family bots has its own shape and colour, and the one you pick becomes your coin’s picture unless you upload your own.</p>
     </Fragment>,
   ],
