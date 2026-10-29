@@ -64,7 +64,7 @@ export function eyeInk(color: string) {
 
 // ---------- the one clock every live bot shares ----------
 
-type Face = 'none' | 'blink' | 'wink' | 'squint' | 'wide' | 'sleepy'
+export type Face = 'none' | 'blink' | 'wink' | 'squint' | 'wide' | 'sleepy'
 // how open each eye is and how big they get, per face
 const FACES: Record<Face, [number, number, number]> = {
   none: [1, 1, 1],
@@ -149,7 +149,9 @@ function tick(now: number) {
       b.faceNext = now + 3200 + Math.random() * 4200
     }
     if (now > b.faceUntil) b.face = 'none'
-    const face = near && b.face !== 'blink' && b.face !== 'wink' ? 'none' : b.face
+    // hovered: the bot's own hover face if it has one
+    const hoverFace = b.el.dataset.hoverFace as Face | undefined
+    const face = near ? (hoverFace && FACES[hoverFace] ? hoverFace : b.face === 'blink' || b.face === 'wink' ? b.face : 'none') : b.face
     const [f1, f2, fs] = FACES[face]
     const ease = face === 'blink' ? 0.5 : 0.2
     b.o1 += (f1 - b.o1) * ease
