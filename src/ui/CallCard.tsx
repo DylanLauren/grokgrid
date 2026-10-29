@@ -72,7 +72,7 @@ function Body({ call, compact }: { call: Call; compact?: boolean }) {
           <div className="cc-acts">
             {call.sample && <span className="cc-tag">sample trade</span>}
             {/* the whole card already links to the transaction, so this reads as its button */}
-            {!compact && call.verified && call.verification === 'wallet-balance-movements' && call.sig && <span className="cc-tx" title="Open this transaction on Solscan"><img src="/brands/solscan.svg" alt="" width={14} height={14} />check tx</span>}
+            {!compact && call.verified && call.verification === 'wallet-balance-movements' && call.sig && <span className="cc-tx" title="Open this transaction on Solscan"><img src="/brands/solscan.png" alt="" width={14} height={14} />check tx</span>}
           </div>
         )}
       </div>

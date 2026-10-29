@@ -111,12 +111,12 @@ function Profile({ a, now, solUsd, onBack }: { a: Agent; now: number; solUsd: nu
               {a.coin.mint ? (
                 <>
                   <a href={`https://pump.fun/coin/${a.coin.mint}`} target="_blank" rel="noreferrer"><img src="/brands/pumpfun.svg" alt="" width={14} height={14} />pump.fun</a>
-                  <a href={solscan('token', a.coin.mint)} target="_blank" rel="noreferrer">{short(a.coin.mint)}</a>
+                  <a href={solscan('token', a.coin.mint)} target="_blank" rel="noreferrer" title="View on Solscan"><img src="/brands/solscan.png" alt="" width={14} height={14} />{short(a.coin.mint)}</a>
                 </>
               ) : (
                 <span className="dim">not minted yet</span>
               )}
-              {a.wallet && !sample && <a href={solscan('account', a.wallet)} target="_blank" rel="noreferrer"><img src="/brands/solana.svg" alt="" width={12} height={12} />wallet</a>}
+              {a.wallet && !sample && <a href={solscan('account', a.wallet)} target="_blank" rel="noreferrer" title="View on Solscan"><img src="/brands/solscan.png" alt="" width={14} height={14} />wallet</a>}
             </div>
           </div>
 
@@ -213,7 +213,7 @@ function TradeRow({ t, i, now, solUsd, avg, round }: { t: BotTrade; i: number; n
       <span className="r mono dim">{ago(t.ts, now)}</span>
       <span className="r">
         {t.sig && (
-          <a className="sx" href={solscan('tx', t.sig)} target="_blank" rel="noreferrer" title="View on Solscan" aria-label="View on Solscan"><img src="/brands/solscan.svg" alt="" width={16} height={16} /></a>
+          <a className="sx" href={solscan('tx', t.sig)} target="_blank" rel="noreferrer" title="View on Solscan" aria-label="View on Solscan"><img src="/brands/solscan.png" alt="" width={16} height={16} /></a>
         )}
       </span>
     </div>

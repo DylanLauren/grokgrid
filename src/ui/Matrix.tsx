@@ -191,7 +191,7 @@ function Row({ a, i, solUsd, now, onOpen }: { a: Agent; i: number; solUsd: numbe
         )}
         {a.wallet && !sample && (
           <a href={solscan('account', a.wallet)} target="_blank" rel="noreferrer" title="bot wallet on Solscan" aria-label={`${a.name} wallet on Solscan`}>
-            <img src="/brands/solana.svg" alt="" width={14} height={14} />
+            <img src="/brands/solscan.png" alt="" width={16} height={16} />
           </a>
         )}
       </span>

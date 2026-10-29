@@ -111,7 +111,7 @@ export function StatsPage({ feed }: { feed: Feed }) {
               )}
               <span className="r mono dim">{ago(c.ts)}</span>
               {c.sig ? (
-                <a className="sx" href={solscan('tx', c.sig)} target="_blank" rel="noreferrer" title="View on Solscan" aria-label="View on Solscan"><img src="/brands/solscan.svg" alt="" width={16} height={16} /></a>
+                <a className="sx" href={solscan('tx', c.sig)} target="_blank" rel="noreferrer" title="View on Solscan" aria-label="View on Solscan"><img src="/brands/solscan.png" alt="" width={16} height={16} /></a>
               ) : (
                 <span />
               )}
