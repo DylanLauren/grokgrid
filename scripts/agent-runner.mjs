@@ -120,8 +120,9 @@ async function runLive(dir, agent, policy, c, market, ctx) {
     if (executes(policy)) {
       const signed = await signNext(s, policy, { stopFilePresent, signatureOf: signedSignature, sign: signerFor(agent),
         build: async i => { const { tokenProgram } = await readMint(conn, i.mint);
-          return i.side === 'buy' ? buildBuy(conn, { wallet: policy.wallet, mint: i.mint, spendLamports: i.spendLamports, slippageBps: i.slippageBps, tokenProgram })
-            : buildSell(conn, { wallet: policy.wallet, mint: i.mint, tokenUnits: i.tokenUnits, minimumReceiveLamports: i.minimumReceiveLamports, slippageBps: i.slippageBps, tokenProgram }); } }, now);
+          // The Privy policy allows no SOL wrap or CloseAccount: curve buys only, pool sells keep WSOL.
+          return i.side === 'buy' ? buildBuy(conn, { wallet: policy.wallet, mint: i.mint, spendLamports: i.spendLamports, slippageBps: i.slippageBps, tokenProgram, pool: false })
+            : buildSell(conn, { wallet: policy.wallet, mint: i.mint, tokenUnits: i.tokenUnits, minimumReceiveLamports: i.minimumReceiveLamports, slippageBps: i.slippageBps, tokenProgram, unwrap: false }); } }, now);
       s = signed.state; execution = { reason: signed.reason };
       if (signed.tx) pending = signed.tx;
     }

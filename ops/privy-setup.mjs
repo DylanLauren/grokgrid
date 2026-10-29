@@ -35,22 +35,20 @@ const arg = (idl, field, operator, value) => ({ field_source: 'solana_instructio
 /** Default deny. Each rule names its program; IDL limits sit in the same rule as the program check. */
 export function buildRules(maxTrade = MAX_TRADE_LAMPORTS) {
   const pump = trimIdl(require('@pump-fun/pump-sdk').pumpIdl, ['buy', 'sell']);
-  const amm = trimIdl(require('@pump-fun/pump-swap-sdk').pumpAmmJson, ['buy', 'sell']);
+  const amm = trimIdl(require('@pump-fun/pump-swap-sdk').pumpAmmJson, ['sell']);
   const rule = (name, conditions) => ({ name, method: 'signTransaction', action: 'ALLOW', conditions });
   return [
     rule('compute budget', [program(COMPUTE_BUDGET)]),
     rule('create token accounts', [program(ATA)]),
     rule('pump.fun curve buy, capped', [program(PUMP), arg(pump, 'buy.args.max_sol_cost', 'lte', maxTrade)]),
     rule('pump.fun curve sell', [program(PUMP), arg(pump, 'sell.args.min_sol_output', 'gte', '1')]),
-    rule('PumpSwap buy, capped', [program(AMM), arg(amm, 'buy.args.max_quote_amount_in', 'lte', maxTrade)]),
     rule('PumpSwap sell', [program(AMM), arg(amm, 'sell.args.min_quote_amount_out', 'gte', '1')]),
-    // PumpSwap wraps SOL into the wallet's WSOL account first. Bounded by the trade cap.
-    rule('wrap SOL for PumpSwap, capped', [{ field_source: 'solana_system_program_instruction', field: 'Transfer.lamports', operator: 'lte', value: maxTrade }]),
-    rule('sync and close WSOL', [{ field_source: 'solana_token_program_instruction', field: 'instructionName', operator: 'in', value: ['SyncNative', 'CloseAccount'] }]),
+    // Deliberately absent: System Program transfers, SyncNative and CloseAccount. Their recipient
+    // can't be pinned to the agent's own accounts here, so a stolen key could drain through them.
   ];
 }
 
-export const summary = maxTrade => `GrokGrid agent signer may only sign: pump.fun/PumpSwap buys up to ${Number(maxTrade) / 1e9} SOL each, sells, compute budget, token-account creation, SOL wrap up to the same cap, WSOL sync/close. Nothing else; no message signing or key export.`;
+export const summary = maxTrade => `GrokGrid agent signer may only sign: pump.fun curve buys up to ${Number(maxTrade) / 1e9} SOL per instruction, curve and PumpSwap sells, compute budget, token-account creation. No SOL transfers, WSOL close, message signing or key export.`;
 
 function secretFile(name) {
   const path = join(RUNTIME, name);

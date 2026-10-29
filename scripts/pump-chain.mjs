@@ -56,11 +56,13 @@ const priority = () => [ComputeBudgetProgram.setComputeUnitLimit({ units: 300_00
  * lands on the limit. Uses the bonding curve, or the canonical PumpSwap pool once graduated.
  * Both are exact-out buys, so `minTokenUnits` is what the transaction must deliver.
  */
-export async function buildBuy(conn, { wallet, mint, spendLamports, slippageBps, tokenProgram }) {
+export async function buildBuy(conn, { wallet, mint, spendLamports, slippageBps, tokenProgram, pool = true }) {
   const online = new OnlinePumpSdk(conn), user = new PublicKey(wallet), mintKey = new PublicKey(mint);
   const [global, feeConfig, state] = await Promise.all([online.fetchGlobal(), online.fetchFeeConfig(), online.fetchBuyState(mintKey, user, tokenProgram)]);
   const quote = new BN((BigInt(spendLamports) * 10000n / BigInt(10000 + slippageBps)).toString());
   let ixs, minTokenUnits;
+  // Privy-signed agents can't wrap SOL under their policy, so they skip pool buys.
+  if (state.bondingCurve.complete && !pool) return null;
   if (state.bondingCurve.complete) {
     const pooled = await poolBuy(conn, user, mintKey, quote, slippageBps);
     if (!pooled) return null; // migrated somewhere other than a canonical PumpSwap pool
@@ -96,7 +98,7 @@ async function poolBuy(conn, user, mint, quote, slippageBps) {
  * Sell `tokenUnits` for at least `minimumReceiveLamports` (the program enforces the floor).
  * Bonding curve, or the canonical PumpSwap pool once graduated; null if neither exists.
  */
-export async function buildSell(conn, { wallet, mint, tokenUnits, minimumReceiveLamports, slippageBps, tokenProgram }) {
+export async function buildSell(conn, { wallet, mint, tokenUnits, minimumReceiveLamports, slippageBps, tokenProgram, unwrap = true }) {
   const online = new OnlinePumpSdk(conn), user = new PublicKey(wallet), mintKey = new PublicKey(mint);
   const [global, state] = await Promise.all([online.fetchGlobal(), online.fetchSellState(mintKey, user, tokenProgram)]);
   const amount = new BN(tokenUnits), floor = new BN(minimumReceiveLamports);
@@ -107,6 +109,8 @@ export async function buildSell(conn, { wallet, mint, tokenUnits, minimumReceive
     const swap = await new amm.OnlinePumpAmmSdk(conn).swapSolanaState(pool, user);
     if (!swap.pool.quoteMint.equals(NATIVE_MINT)) throw Error('Pool is not SOL-quoted');
     ixs = await amm.PUMP_AMM_SDK.sellInstructions(swap, amount, floor); route = 'pumpswap';
+    // Without unwrap the proceeds stay as WSOL in the wallet's own account: no CloseAccount.
+    if (!unwrap) ixs = ixs.filter(ix => !([TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID].some(p => ix.programId.equals(p)) && ix.data[0] === 9));
   } else {
     // sellInstructions applies `slippage` below `solAmount`; size it so the floor is exactly the minimum.
     const solAmount = new BN((BigInt(minimumReceiveLamports) * 10000n / BigInt(10000 - slippageBps)).toString());
