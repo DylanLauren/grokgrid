@@ -110,15 +110,18 @@ test('expiry retry requires changed capability metadata and never repins the sou
   const result=JSON.parse(await readFile(join(root,'local-phone-supervisor-status.json'),'utf8'));assert.equal(result.reason,'publisher-completed')
  }finally{await rm(root,{recursive:true,force:true})}
 })
+// A real publisher process keeps the event loop alive; these fake children don't, and the
+// supervisor's parent watcher is unref'd. Hold the loop open while a supervisor run is awaited.
+const alive = async <T>(run: Promise<T>): Promise<T> => { const keep = setInterval(() => {}, 1000); try { return await run } finally { clearInterval(keep) } }
 test('an unchanged expired capability waits without restarting and can be stopped',async()=>{
  const root=await realpath(await mkdtemp(join(tmpdir(),'phone-supervisor-expired-'))),configPath=join(root,'config.json'),tokenPath=join(root,'token'),statusPath=join(root,'publisher-status.json')
  try{
   await writeFile(configPath,JSON.stringify({source:'grok-bot-actual-window',windowId:99,ownerPid:123,bundleId:'com.google.Chrome',title:'Pump',browserUrl:'https://pump.fun/',tokenFile:tokenPath,statusFile:statusPath}),{mode:0o600});await writeFile(tokenPath,'opaque',{mode:0o600});let launches=0
-  await runPhoneSupervisor(configPath,{spawnPublisher:()=>{
+  await alive(runPhoneSupervisor(configPath,{spawnPublisher:()=>{
    launches++;const child=new EventEmitter() as any;child.pid=9876;child.kill=()=>true
    setTimeout(async()=>{await writeFile(statusPath,JSON.stringify({state:'stopped-error',reason:'screen-credential-invalid-or-expiring',observedAt:new Date().toISOString()}),{mode:0o600});child.emit('exit',1,null);setTimeout(()=>process.emit('SIGTERM'),50)},30)
    return child
-  }})
+  }}))
   assert.equal(launches,1);assert.equal(JSON.parse(await readFile(join(root,'local-phone-supervisor-status.json'),'utf8')).state,'stopped')
  }finally{await rm(root,{recursive:true,force:true})}
 })
@@ -127,9 +130,9 @@ test('losing the native parent stops and awaits only its publisher, without resp
  try{
   await writeFile(configPath,JSON.stringify({source:'grok-bot-actual-window',windowId:99,ownerPid:123,bundleId:'com.google.Chrome',title:'Pump',browserUrl:'https://pump.fun/',tokenFile:tokenPath,statusFile:join(root,'publisher-status.json')}),{mode:0o600});await writeFile(tokenPath,'opaque',{mode:0o600})
   let launches=0,parentPid=1234,exited=false;const signals:string[]=[]
-  await runPhoneSupervisor(configPath,{parentPid:1234,getParentPid:()=>parentPid,spawnPublisher:()=>{
+  await alive(runPhoneSupervisor(configPath,{parentPid:1234,getParentPid:()=>parentPid,spawnPublisher:()=>{
    launches++;const child=new EventEmitter() as any;child.pid=9876;child.kill=(signal:string)=>{signals.push(signal);setTimeout(()=>{exited=true;child.emit('exit',null,'SIGTERM')},20);return true};setTimeout(()=>{parentPid=1},30);return child
-  }})
+  }}))
   assert.equal(launches,1);assert.ok(exited);assert.ok(signals.length>0);assert.ok(signals.every(x=>x==='SIGTERM'))
   const status=JSON.parse(await readFile(join(root,'local-phone-supervisor-status.json'),'utf8'));assert.equal(status.state,'stopped');assert.equal(status.reason,'parent-exited');assert.equal(status.childPid,null)
   await assert.rejects(lstat(join(root,'local-phone-supervisor-status.json.lock')))
@@ -140,11 +143,11 @@ test('an already missing parent never starts a publisher',async()=>{
  try{
   await writeFile(configPath,JSON.stringify({source:'grok-bot-actual-window',windowId:99,ownerPid:123,bundleId:'com.google.Chrome',title:'Pump',browserUrl:'https://pump.fun/',tokenFile:tokenPath,statusFile:join(root,'publisher-status.json')}),{mode:0o600});await writeFile(tokenPath,'opaque',{mode:0o600})
   let launches=0
-  await runPhoneSupervisor(configPath,{parentPid:1234,getParentPid:()=>1,spawnPublisher:()=>{launches++;throw Error('must not spawn')}})
+  await alive(runPhoneSupervisor(configPath,{parentPid:1234,getParentPid:()=>1,spawnPublisher:()=>{launches++;throw Error('must not spawn')}}))
   assert.equal(launches,0);assert.equal(JSON.parse(await readFile(join(root,'local-phone-supervisor-status.json'),'utf8')).reason,'parent-exited')
   await assert.rejects(runPhoneSupervisor(configPath,{parentPid:0}),/invalid-parent-pid/)
   if(process.ppid>1){
-   await runPhoneSupervisor(configPath,{getParentPid:()=>1,spawnPublisher:()=>{launches++;throw Error('must not spawn')}})
+   await alive(runPhoneSupervisor(configPath,{getParentPid:()=>1,spawnPublisher:()=>{launches++;throw Error('must not spawn')}}))
    assert.equal(launches,0);assert.equal(JSON.parse(await readFile(join(root,'local-phone-supervisor-status.json'),'utf8')).reason,'parent-exited')
   }
  }finally{await rm(root,{recursive:true,force:true})}
