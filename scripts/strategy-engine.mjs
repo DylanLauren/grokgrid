@@ -111,7 +111,12 @@ export function livePlan({ tradingState, policy, c, peaks, entries: entryPrices 
     break;
   }
   let allowlist = pruneAllowlist(tradingState.allowlist, now);
-  const held = new Set([...(positions.positions || []).filter(p => BigInt(p.tokenUnits) > 0n).map(p => p.mint), ...busy]);
+  // The finalized positions snapshot can lag a just-reconciled buy by a minute or more, so a
+  // coin whose latest reconciled trade is a buy counts as held too: never buy it twice.
+  const lastDone = new Map();
+  for (const i of [...tradingState.intents].filter(i => i.state === 'reconciled-confirmed').sort((a, b) => a.createdAt - b.createdAt)) lastDone.set(i.mint, i.side);
+  const held = new Set([...(positions.positions || []).filter(p => BigInt(p.tokenUnits) > 0n).map(p => p.mint), ...busy,
+    ...[...lastDone].filter(([, side]) => side === 'buy').map(([mint]) => mint)]);
   if (!liquidating && held.size < c.maxOpenPositions) {
     const cooling = new Set(tradingState.intents.filter(i => i.side === 'sell' && ['reconciled-confirmed', 'held-ambiguous'].includes(i.state) && now - i.createdAt < c.reentryCooldownMinutes * 60000).map(i => i.mint));
     const [pick] = entries(market, c, now, held, cooling);

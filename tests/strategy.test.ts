@@ -127,3 +127,17 @@ test('live exits measure from the decision price, not a first-buy cost inflated 
   assert.equal(buy.entries[MINT].priceSol, good.priceSol) // a new buy records its decision price
   assert.deepEqual(livePlan({ ...args, positions, tradingState: emptyTradingState(policy), market: { metrics: new Map(), facts: new Map() }, entries: { [MINT]: { priceSol: 1, at: now - 11 * 60000 } } }).entries, {})
 })
+
+test('never plans a second buy of a coin just bought, held, or with a pending intent', () => {
+  const buy = (state: string, at = now - 60000) => ({ id: `buy-${state}`, agentId: 'house', wallet: policy.wallet, mint: MINT, side: 'buy', state, createdAt: at, spendLamports: '1000000', receipt: { spentLamports: '1000000', receivedTokenUnits: '1000000' } })
+  const plan = (intents: unknown[], pos = positions) => livePlan({ tradingState: { ...emptyTradingState(policy), intents }, policy, c, peaks: {}, positions: pos, market: market(), now, liquidating: false })
+  assert.equal(plan([]).proposals.filter(p => p.side === 'buy').length, 1)
+  assert.equal(plan([buy('reconciled-confirmed')]).proposals.length, 0) // snapshot has not caught up yet
+  assert.equal(plan([buy('held-ambiguous')]).proposals.length, 0)
+  assert.equal(plan([buy('planned')]).proposals.length, 0)
+  const held = { ...positions, positions: [{ mint: MINT, tokenUnits: '5', spendableTokenUnits: '0', decimals: 6, tokenProgram: 'x' }] }
+  assert.equal(plan([], held).proposals.length, 0)
+  const sold = { id: 'sell-1', agentId: 'house', wallet: policy.wallet, mint: MINT, side: 'sell', state: 'reconciled-confirmed', createdAt: now - 30000, receipt: { soldTokenUnits: '1000000', receivedLamports: '900000' } }
+  assert.equal(plan([buy('reconciled-confirmed'), sold]).proposals.length, 0) // sold, but inside the re-entry cooldown
+  assert.equal(livePlan({ tradingState: { ...emptyTradingState(policy), intents: [buy('reconciled-confirmed', now - 999 * 60000), { ...sold, createdAt: now - 998 * 60000 }] }, policy, c, peaks: {}, positions, market: market(), now, liquidating: false }).proposals.filter(p => p.side === 'buy').length, 1)
+})
