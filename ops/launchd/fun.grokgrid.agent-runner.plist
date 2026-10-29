@@ -19,7 +19,7 @@
 	<key>StandardOutPath</key>
 	<string>/dev/null</string>
 	<key>StartInterval</key>
-	<integer>60</integer>
+	<integer>45</integer>
 	<key>WorkingDirectory</key>
 	<string>__REPO__</string>
 </dict>
