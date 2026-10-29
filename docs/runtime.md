@@ -61,3 +61,22 @@ An always-awake execution host is required for continuous capture. Do not label
 a local pump.fun window as Grok's real trading screen unless Grok actually uses
 that window. Screen capability expiry and process restart remain explicit
 operational requirements; no paid keep-alive was enabled.
+
+## Installing the launchd jobs
+
+`ops/install-launchd.sh` (run it yourself) points every `fun.grokgrid.*` job at this checkout:
+- the runtime observer, trading worker and phone renewal;
+- new jobs for buy-and-burn (off), strategy (paper) and agent runner (paper).
+
+Before it installs anything, it:
+- runs the test suite;
+- creates any missing config, all execution-off;
+- **refuses to install** if any config would sign: trading not `observe-only`, buyback flags on, or runner/strategy not `paper`;
+- runs one tick of each worker.
+
+It backs up the old plists and prints the revert command (`ops/install-launchd.sh --revert <backup>`).
+
+- `--check` runs everything except the install.
+- `--apply-limits` writes the placeholder trading limits, still observe-only. It sets aside the trading journal only if the journal has no history.
+
+The phone helper and keep-awake jobs are left as they are.
