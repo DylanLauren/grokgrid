@@ -42,8 +42,9 @@ interface Draft {
   firstBuy: string
 }
 
-const EMPTY: Draft = { look: 3, name: '', ticker: '', description: '', website: '', x: '', telegram: '', strategy: '', maxSol: '0.25', takeProfit: '100', stopLoss: '30', firstBuy: '' }
+const EMPTY: Draft = { look: 3, name: '', ticker: '', description: '', website: '', x: '', telegram: '', strategy: '', maxSol: '0.05', takeProfit: '100', stopLoss: '30', firstBuy: '' }
 const DRAFT_KEY = 'gg-launch-draft'
+const MAX_TRADE = 0.05 // the signer policy's per-buy cap: a higher max could never be used
 const LIMITS = { name: 32, ticker: 10, description: 600, strategy: 140 }
 const IMAGE_MAX = 4 * 1024 * 1024
 const bytes = (s: string) => new TextEncoder().encode(s).length
@@ -61,7 +62,7 @@ function check(d: Draft) {
   if (d.telegram && !/^https:\/\/t\.me\/[A-Za-z0-9_+]{3,}\/?$/.test(d.telegram)) e.telegram = 'a t.me link'
   if (!d.strategy.trim()) e.strategy = 'one line on how it trades'
   const n = (v: string, lo: number, hi: number) => v !== '' && !(Number(v) >= lo && Number(v) <= hi)
-  if (n(d.maxSol, 0.01, 10)) e.maxSol = '0.01 to 10 SOL'
+  if (n(d.maxSol, 0.01, MAX_TRADE)) e.maxSol = `0.01 to ${MAX_TRADE} SOL`
   if (n(d.takeProfit, 5, 10000)) e.takeProfit = '5% to 10,000%'
   if (n(d.stopLoss, 1, 95)) e.stopLoss = '1% to 95%'
   if (d.firstBuy && !(Number(d.firstBuy) === 0 || (Number(d.firstBuy) >= 0.001 && Number(d.firstBuy) <= 10))) e.firstBuy = '0, or 0.001 to 10 SOL'
@@ -87,8 +88,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
   const [agentWallet, setAgentWallet] = useState<AgentWalletSession | null>(null)
   const me = agentWallet?.address ?? ''
   const onWalletChange = useCallback((wallet: AgentWalletSession | null) => setAgentWallet(wallet), [])
-  const walletCheck = 0
-  const status = useLaunchStatus(me, walletCheck)
+  const status = useLaunchStatus(me)
   const [connecting, setConnecting] = useState(false)
   const [step, setStep] = useState<number | null>(null)
   const [fail, setFail] = useState('')
@@ -132,7 +132,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
         accessToken: agentWallet.accessToken,
         image: picture,
         onStep: setStep,
-        draft: { ...d, maxSol: Number(d.maxSol || 0.25), takeProfit: Number(d.takeProfit || 100), stopLoss: Number(d.stopLoss || 30) },
+        draft: { ...d, maxSol: Number(d.maxSol || MAX_TRADE), takeProfit: Number(d.takeProfit || 100), stopLoss: Number(d.stopLoss || 30) },
       })
       setMade({ mint: r.mint, name: d.name })
       setD(EMPTY)
@@ -263,7 +263,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
               <input value={d.strategy} placeholder="only buys coins under 30K, sells at 2x" onBlur={() => touch('strategy')} onChange={(e) => set('strategy', e.target.value)} />
             </Field>
             <div className="gd-row three">
-              <Field label="max per trade" unit="SOL" error={err('maxSol')}>
+              <Field label="max per trade" unit="SOL" hint={`signer cap: ${MAX_TRADE}`} error={err('maxSol')}>
                 <input inputMode="decimal" value={d.maxSol} onBlur={() => touch('maxSol')} onChange={(e) => set('maxSol', num(e.target.value))} />
               </Field>
               <Field label="take profit" unit="%" error={err('takeProfit')}>
@@ -292,7 +292,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             <p className="gd-note">Your bot can only trade inside the policy you approve for its signer, never past the platform limits, and you can remove the signer at any time.</p>
             <p className="gd-note mono">one agent per wallet · 80/20 split locked at creation · review the exact network fees, rent and optional first buy before signing</p>
             <button type="submit" className="btn" disabled={!ready}>
-              <Roll>{step !== null ? STEPS[step] : !status?.open ? 'Launches paused' : !agentWallet?.authorizationReady ? 'Set up your agent wallet' : 'Launch bot'}</Roll>
+              <Roll>{step !== null ? STEPS[step] : status === null ? 'Checking launchpad…' : !status.open ? 'Launches paused' : !agentWallet?.authorizationReady ? 'Set up your agent wallet' : 'Launch bot'}</Roll>
             </button>
             {me && <p className="gd-note mono">launcher + trading wallet: <span style={{ overflowWrap: 'anywhere' }}>{me}</span></p>}
             {step !== null && (
@@ -337,7 +337,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
         ) : (
           <div className="card gd-empty">
             <LiveBot color="#0b0b0b" shape="sphere" habit="doze" size={44} />
-            <span>no user bots yet. the first ones line up in the matrix, ranked by profit.</span>
+            <span>no user bots yet. the first ones line up in the matrix, ranked by market cap.</span>
           </div>
         )}
       </Section>
@@ -384,8 +384,8 @@ function botImage(look: number) {
 }
 
 // Recheck after each completed request; account changes never reuse the previous result.
-function useLaunchStatus(launcher: string, walletCheck: number) {
-  const [result, setResult] = useState<{ launcher: string; walletCheck: number; status: LaunchStatus } | null>(null)
+function useLaunchStatus(launcher: string) {
+  const [result, setResult] = useState<{ launcher: string; status: LaunchStatus } | null>(null)
   useEffect(() => {
     let live = true
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -394,7 +394,7 @@ function useLaunchStatus(launcher: string, walletCheck: number) {
       const status = await fetchLaunchStatus(launcher, AbortSignal.any([controller.signal, AbortSignal.timeout(8_000)]))
         .catch(() => unavailableLaunchStatus())
       if (!live) return
-      setResult({ launcher, walletCheck, status })
+      setResult({ launcher, status })
       timer = setTimeout(load, 20_000)
     }
     void load()
@@ -403,6 +403,6 @@ function useLaunchStatus(launcher: string, walletCheck: number) {
       controller.abort()
       clearTimeout(timer)
     }
-  }, [launcher, walletCheck])
-  return result?.launcher === launcher && result.walletCheck === walletCheck ? result.status : null
+  }, [launcher])
+  return result?.launcher === launcher ? result.status : null
 }

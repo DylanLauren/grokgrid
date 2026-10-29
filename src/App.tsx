@@ -17,6 +17,7 @@ import { StatsPage } from './pages/StatsPage'
 import { MatrixPage } from './pages/MatrixPage'
 import { GridPage } from './pages/GridPage'
 import { DocsPage } from './pages/DocsPage'
+import { ErrorBoundary } from './ui/ErrorBoundary'
 import './app.css'
 
 // his family, hanging around next to the logo
@@ -55,14 +56,16 @@ type Tab = 'desk' | 'calls' | 'stats' | 'matrix' | 'grid' | 'docs'
 const TABS: Tab[] = ['desk', 'calls', 'stats', 'matrix', 'grid', 'docs']
 // desk and calls live in the room; the rest are pages of their own
 const ROOM: Tab[] = ['desk', 'calls']
+// #docs/how opens the docs at a section; anything unknown is his desk
+const hashTab = (): Tab => {
+  const h = location.hash.slice(1).split('/')[0] as Tab
+  return TABS.includes(h) ? h : 'desk'
+}
 
 export default function App() {
   const feed = useFeed()
   const [view, setView] = useState<View>('third')
-  const [tab, setTab] = useState<Tab>(() => {
-    const h = location.hash.slice(1) as Tab
-    return TABS.includes(h) ? h : 'desk'
-  })
+  const [tab, setTab] = useState<Tab>(hashTab)
   const s = stats(feed)
   const onPage = !ROOM.includes(tab)
   const grid = useAgents(tab === 'matrix' || tab === 'grid')
@@ -96,30 +99,58 @@ export default function App() {
     }
   }, [tab, view])
 
+  // the tab lives in the hash, so back, forward and edited links all land on the right page
   useEffect(() => {
-    history.replaceState(null, '', tab === 'desk' ? location.pathname : `#${tab}`)
+    if (hashTab() === tab) return
+    // the tour flips through tabs; it shouldn't fill the back button
+    history[touring ? 'replaceState' : 'pushState'](null, '', tab === 'desk' ? location.pathname + location.search : `#${tab}`)
+  }, [tab, touring])
+
+  useEffect(() => {
+    const onHash = () => setTab(hashTab())
+    addEventListener('hashchange', onHash)
+    addEventListener('popstate', onHash)
+    return () => {
+      removeEventListener('hashchange', onHash)
+      removeEventListener('popstate', onHash)
+    }
+  }, [])
+
+  // #docs/<id> scrolls to that section once the docs are up
+  useEffect(() => {
+    if (tab !== 'docs') return
+    const go = () => {
+      const id = location.hash.slice(1).split('/')[1]
+      if (id) requestAnimationFrame(() => document.getElementById(`dc-${id}`)?.scrollIntoView())
+    }
+    go()
+    addEventListener('hashchange', go)
+    return () => removeEventListener('hashchange', go)
   }, [tab])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).tagName === 'INPUT') return
+      if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]')) return
       if (e.key === 'Escape') {
         setTab('desk')
         setView('third')
       }
+      if (!ROOM.includes(tab)) return
       if (e.key === '1') setView('third')
       if (e.key === '2') { setTab('desk'); setFocusCall(undefined); setView('phone') }
     }
     addEventListener('keydown', onKey)
     return () => removeEventListener('keydown', onKey)
-  }, [])
+  }, [tab])
 
   return (
     <div className={`app ${tab === 'calls' ? 'has-panel' : ''} ${onPage ? 'on-page' : ''} view-${view}`}>
       <div className="stage" aria-hidden={onPage}>
-        <Suspense fallback={<Boot />}>
-          <Scene feed={feed} live={live} view={view} paused={onPage} onPhone={() => { setTab('desk'); setFocusCall(undefined); setView('phone') }} />
-        </Suspense>
+        <ErrorBoundary fallback={<NoRoom />}>
+          <Suspense fallback={<Boot />}>
+            <Scene feed={feed} live={live} view={view} paused={onPage} onPhone={() => { setTab('desk'); setFocusCall(undefined); setView('phone') }} />
+          </Suspense>
+        </ErrorBoundary>
       </div>
 
       <button className={`mini ${tucked.on ? 'on' : ''}`} onClick={tucked.open} aria-label="show menu" tabIndex={tucked.on ? 0 : -1}>
@@ -137,17 +168,19 @@ export default function App() {
         </button>
         <nav className="tabs">
           {TABS.map((t) => (
-            <button key={t} className={`${t === tab ? 'on' : ''} ${t === 'stats' ? 'split' : ''}`} onClick={() => setTab(t)}>
+            <button key={t} className={`${t === tab ? 'on' : ''} ${t === 'stats' ? 'split' : ''}`} aria-current={t === tab ? 'page' : undefined} onClick={() => setTab(t)}>
               <Roll>{t}</Roll>
             </button>
           ))}
         </nav>
         <div className="bar-right">
-          {feed.mode === 'live' && (
+          {feed.mode === 'live' ? (
             <span className="status mono live">
               <i />
               live
             </span>
+          ) : (
+            <span className="status mono" title="sample trades until his first real trade">sample data</span>
           )}
           {X_HANDLE && (
             <a className="chip mono" href={`https://x.com/${X_HANDLE}`} target="_blank" rel="noreferrer">@{X_HANDLE}</a>
@@ -173,11 +206,11 @@ export default function App() {
         ))}
       </section>
 
-      <div className="views" role="tablist" aria-label="camera">
-        <button role="tab" aria-selected={view === 'third'} className={view === 'third' ? 'on' : ''} onClick={() => setView('third')}>
+      <div className="views" role="group" aria-label="camera">
+        <button aria-pressed={view === 'third'} className={view === 'third' ? 'on' : ''} onClick={() => setView('third')}>
           <Roll>his room</Roll> <kbd>1</kbd>
         </button>
-        <button role="tab" aria-selected={view === 'phone'} className={view === 'phone' ? 'on' : ''} onClick={() => { setTab('desk'); setFocusCall(undefined); setView('phone') }}>
+        <button aria-pressed={view === 'phone'} className={view === 'phone' ? 'on' : ''} onClick={() => { setTab('desk'); setFocusCall(undefined); setView('phone') }}>
           <Roll>his phone</Roll> <kbd>2</kbd>
         </button>
       </div>
@@ -186,7 +219,7 @@ export default function App() {
         <div><dt>wallet</dt><dd>{s.solNow.toFixed(2)} SOL</dd></div>
         <div><dt>24h</dt><dd className={s.pnl24h >= 0 ? 'gain' : 'loss'}>{pct(s.pnl24h)}</dd></div>
         <div><dt>trades</dt><dd>{s.trades}</dd></div>
-        <div><dt>win</dt><dd>{(s.winRate === null ? '–' : s.winRate.toFixed(0))}%</dd></div>
+        <div><dt>win</dt><dd>{s.winRate === null ? '–' : `${s.winRate.toFixed(0)}%`}</dd></div>
       </dl>
 
       <aside className="panel" aria-hidden={tab !== 'calls'}>
@@ -291,6 +324,16 @@ function BuyButton() {
       </button>
       <a className="buy" href={buyUrl()} target="_blank" rel="noreferrer"><Roll>{`Buy $${MAIN_TICKER}`}</Roll></a>
     </span>
+  )
+}
+
+// no WebGL (or the room crashed): a still placeholder, the pages and calls carry on
+function NoRoom() {
+  return (
+    <div className="boot still">
+      <BotMark size={64} />
+      <span className="mono">3D room unavailable on this device. The pages still work.</span>
+    </div>
   )
 }
 

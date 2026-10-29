@@ -105,3 +105,4 @@ button.cc:hover .cc-ago::after { opacity: 1; }
   .cc:hover .cc-pos::after { transform: translateX(-120%); }
 }
 .cc-foot span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 600px) { .cc-foot { flex-wrap: wrap; row-gap: 4px; } }

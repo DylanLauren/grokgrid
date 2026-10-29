@@ -6,6 +6,8 @@
 .boot { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 14px; color: var(--paper-50); font-size: 12px; }
 .boot svg { animation: boot-bob 1.4s ease-in-out infinite; }
 @keyframes boot-bob { 50% { transform: translateY(-6px); } }
+.boot.still svg { animation: none; }
+.boot.still span { padding: 0 24px; text-align: center; }
 
 /* one surface for everything that floats on the room */
 

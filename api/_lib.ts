@@ -75,10 +75,12 @@ export interface Market { mcUsd: number; vol24hUsd: number; change24h: number; i
 export async function markets(mints: string[]): Promise<Record<string, Market>> {
   const out: Record<string, Market> = {}
   const list = [...new Set(mints.filter(isAddress))]
-  for (let i = 0; i < list.length; i += 30) {
+  const batches = Array.from({ length: Math.ceil(list.length / 30) }, (_, i) => list.slice(i * 30, i * 30 + 30))
+  // batches run side by side so a big grid doesn't wait 8s per 30 coins
+  await Promise.all(batches.map(async (batch) => {
     try {
-      const res = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${list.slice(i, i + 30).join(',')}`, { signal: AbortSignal.timeout(8000) })
-      if (!res.ok) continue
+      const res = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${batch.join(',')}`, { signal: AbortSignal.timeout(8000) })
+      if (!res.ok) return
       const pairs = (await res.json()) as {
         baseToken: { address: string; symbol?: string; name?: string }
         marketCap?: number
@@ -99,7 +101,7 @@ export async function markets(mints: string[]): Promise<Record<string, Market>> 
     } catch {
       /* one bad batch should not blank the page */
     }
-  }
+  }))
   return out
 }
 

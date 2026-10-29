@@ -53,7 +53,6 @@ export function MonitorScreen({ feed, live }: { feed: Feed; live: Live }) {
                 <b>{call.name}</b>
                 <span className="mono">{mc(call.nowMc)}</span>
                 <span className="mono">{call.nowMc !== null && call.entryMc !== null && call.entryMc > 0 ? pct(((call.nowMc - call.entryMc) / call.entryMc) * 100) : '–'}</span>
-                <span className="wc-tf mono"><i>1m</i><i className="on">5m</i><i>1h</i></span>
               </div>
               <span className="mono dim">illustrative chart{feed.mode === 'demo' ? ' · sample trades' : ''}</span>
               {call.entryMc !== null && call.nowMc !== null ? <Candles call={{ ...call, entryMc: call.entryMc, nowMc: call.nowMc }} /> : <p className="dim">Historical chart data unavailable.</p>}

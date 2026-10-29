@@ -19,3 +19,5 @@
 .pn-list { padding-bottom: 6px; }
 @media (hover: none) { .pn-list:has(.pn-item:hover) .pn-item:not(:hover) { opacity: 1; filter: none; } }
 @media (prefers-reduced-motion: reduce) { .pn-item { animation: none; } }
+.pn-none { margin: 0; padding: 14px 16px; border: 1px dashed var(--hair-strong); border-radius: 14px; font-size: 12.5px; color: var(--paper-50); }
+.pn-foot { margin: 14px 0 0; font-size: 11px; color: var(--paper-30); }

@@ -44,7 +44,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const [leaving, setLeaving] = useState(false)
   const done = useRef(onDone)
-  done.current = onDone
+  useEffect(() => { done.current = onDone })
 
   useEffect(() => {
     try { sessionStorage.setItem(KEY, '1') } catch { /* private window */ }
