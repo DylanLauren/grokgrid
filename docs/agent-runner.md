@@ -16,9 +16,10 @@
 { "version": 1, "mode": "paper", "stopFile": "/abs/STOP", "exitFile": "/abs/EXIT", "maxAgents": 100, "concurrency": 6,
   "privyServerFile": "/abs/privy-server.json", "privyAuthorizationKeyFile": "/abs/privy-authorization.key",
   "caps": { "maxTradeLamports": "50000000", "maxExposureLamports": "500000000", "maxDailyLossLamports": "250000000",
-`concurrency` (1–16, default 6) is how many agents run at once. They share one market read per tick; each keeps its own wallet, journal and directory, and one agent's error never stops the others.
             "reserveLamports": "20000000", "maxSlippageBps": 1500 } }
 ```
+
+`concurrency` (1–16, default 6) is how many agents run at once. They share one market read per tick; each keeps its own wallet, journal and directory, and one agent's error never stops the others.
 
 ## Execute mode
 
