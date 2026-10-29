@@ -29,3 +29,18 @@ export function tally(calls: Trade[]): Tally {
   }
   return { trades: calls.length, closed: pnl.size, pnlSol: pnl.size ? realised : null, winRate: pnl.size ? (wins / pnl.size) * 100 : null, pnl }
 }
+
+/** A wallet curve from a bot's own verified trades, walked back from its balance now. Used
+ * when no wallet snapshots were posted. Each step is the exact SOL that trade moved; deposits
+ * and withdrawals are not trades, so the curve only covers the time since the first trade. */
+export function curveFrom(calls: Trade[], solNow: number, now = Date.now()) {
+  const pts: { ts: number; sol: number }[] = [{ ts: now, sol: solNow }]
+  let sol = solNow
+  for (const c of [...calls].sort((a, b) => b.ts - a.ts)) {
+    pts.push({ ts: c.ts, sol: Math.max(0, sol) }) // just after this trade
+    const v = Number(c.spentSol) || 0
+    sol += c.side === 'buy' ? v : -v
+  }
+  if (calls.length) pts.push({ ts: pts[pts.length - 1].ts - 1, sol: Math.max(0, sol) }) // before the first
+  return pts.reverse()
+}

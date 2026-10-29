@@ -1,4 +1,4 @@
-import { tally } from './_tally.js'
+import { curveFrom, tally } from './_tally.js'
 import { balances, hasStore, HOUSE_WALLET, json, markets, parse, redis, solUsd, toHash } from './_lib.js'
 
 // The house bot's calls and wallet curve. Answers mode "demo" until Grok Bot has
@@ -12,7 +12,10 @@ export async function GET() {
   const points = ((curve as string[]) ?? []).map((p) => parse<{ ts: number; sol: number }>(p)).filter((p): p is { ts: number; sol: number } => !!p)
   // the last point always comes from the chain, not from the bot
   const [bal, price] = await Promise.all([HOUSE_WALLET ? balances([HOUSE_WALLET]) : Promise.resolve({} as Record<string, number>), solUsd()])
-  if (HOUSE_WALLET && bal[HOUSE_WALLET] !== undefined) points.push({ ts: Date.now(), sol: bal[HOUSE_WALLET] })
+  const solNow = HOUSE_WALLET ? bal[HOUSE_WALLET] : undefined
+  // no snapshots posted: rebuild the history from his own verified trades
+  if (points.length < 2 && solNow !== undefined) points.splice(0, points.length, ...curveFrom(list, solNow))
+  else if (solNow !== undefined) points.push({ ts: Date.now(), sol: solNow })
   if (!points.length) points.push({ ts: Date.now(), sol: 0 })
 
   const metadata = await markets(list.map((call) => call.mint))
