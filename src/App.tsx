@@ -187,12 +187,6 @@ export default function App() {
           ))}
         </nav>
         <div className="bar-right">
-          {feed.mode === 'live' && (
-            <span className="status mono live">
-              <i />
-              live
-            </span>
-          )}
           {LINKS.map((l) => (
             <a key={l.href} className="soc" href={l.href} target="_blank" rel="noreferrer" aria-label={l.label} title={l.label}>{l.icon}</a>
           ))}

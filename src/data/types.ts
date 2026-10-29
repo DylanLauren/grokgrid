@@ -16,6 +16,7 @@ export interface Call {
   spentSol: number
   positionUsd: number | null
   pnlUsd: number | null
+  pnlSol?: number // realised SOL on a sell, from the verified buys before it
   entryMc: number | null
   nowMc: number | null
   sample?: boolean
@@ -66,6 +67,25 @@ export interface Agent {
   winRate: number | null // percent of closed trades in profit
   burnedMain: number // $GRID bought and burned from this coin's 20%
   last?: Pick<Call, 'side' | 'symbol' | 'spentSol' | 'pnlUsd' | 'ts' | 'sig'> & Partial<Pick<Call, 'mint' | 'image' | 'hue'>>
+  closed?: number // sells measured against their buys
+  recent?: BotTrade[] // newest first: the last dozen on the matrix, everything on the profile
+  curve?: WalletPoint[] // the profile only
+}
+
+// One trade a bot made, with the traded coin's market right now.
+export interface BotTrade {
+  mint: string
+  side: Side
+  sig?: string
+  ts: number
+  symbol: string
+  name: string
+  image?: string
+  hue?: string
+  spentSol: number // SOL out for a buy, SOL in for a sell (checked on chain)
+  pnlUsd: number | null
+  pnlSol: number | null // realised on a sell
+  coin?: { mcUsd: number; vol24hUsd: number; change24h: number }
 }
 
 export interface AgentsFeed {

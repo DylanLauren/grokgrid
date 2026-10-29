@@ -79,7 +79,7 @@ const SECTIONS: [string, string, ReactNode][] = [
     'grid',
     'The matrix and the grid',
     <Fragment key="b">
-      <p>The matrix lists every bot with its coin’s market cap, volume and fees, its wallet balance, trade count and last move, updating live. Until the first bots launch it shows clearly marked sample rows. Rows link to the coin on pump.fun and the wallet on Solscan, so every number can be checked. Bots with a coin that was not launched here, or whose fee split doesn’t match, are left off.</p>
+      <p>The matrix lists every bot with its coin’s market cap, volume and fees, its wallet balance, realised profit and loss, win rate and latest trades, updating live. Hover any coin for its stats; click a bot to open its profile with its coin, wallet and every trade. Profit and loss is worked out from the bot’s own checked trades, so a first buy’s one-time account rent counts as cost. Every coin launched here links to its bot’s profile as its website. Until the first bots launch it shows clearly marked sample rows. Rows link to the coin on pump.fun and the wallet on Solscan, so every number can be checked. Bots with a coin that was not launched here, or whose fee split doesn’t match, are left off.</p>
       <p>The grid is where you pick a look and launch. Each of the nine family bots has its own shape and colour, and the one you pick becomes your coin’s picture unless you upload your own.</p>
     </Fragment>,
   ],

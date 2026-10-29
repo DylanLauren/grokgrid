@@ -1,0 +1,25 @@
+/* the floating coin card (CoinPeek.tsx): one card that glides from coin to coin */
+.peek {
+  position: fixed; left: 0; top: 0; z-index: 60; width: 236px; padding: 12px; pointer-events: none;
+  background: #111113f2; border: 1px solid var(--hair-strong); border-radius: 14px;
+  box-shadow: 0 18px 44px #000a, 0 0 0 1px #0006; backdrop-filter: blur(10px);
+  opacity: 0; scale: 0.94; transform-origin: 50% 100%;
+  transition: opacity 0.18s ease, scale 0.28s cubic-bezier(.3,1.4,.5,1), transform 0.32s cubic-bezier(.2,.8,.2,1);
+}
+.peek.below { transform-origin: 50% 0; }
+.peek.on { opacity: 1; scale: 1; }
+.peek.snap { transition: opacity 0.18s ease, scale 0.28s cubic-bezier(.3,1.4,.5,1); }
+.peek-top { display: flex; align-items: center; gap: 10px; }
+.peek-top > div { display: grid; min-width: 0; line-height: 1.25; }
+.peek-top em { font-style: normal; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--paper-50); }
+.peek-top b { font-size: 15px; font-weight: 580; letter-spacing: -0.01em; }
+.peek-top span { font-size: 12px; color: var(--paper-50); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.peek-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0 0; padding: 8px 0 0; border-top: 1px solid var(--hair); }
+.peek-stats dt, .peek-rows dt { font-size: 9.5px; color: var(--paper-50); text-transform: uppercase; letter-spacing: 0.06em; }
+.peek-stats dd { margin: 2px 0 0; font-size: 12.5px; }
+.peek-rows { display: grid; gap: 4px; margin: 8px 0 0; padding: 8px 0 0; border-top: 1px solid var(--hair); }
+.peek-rows div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.peek-rows dd { margin: 0; font-size: 12px; }
+.peek .gain { color: var(--gain); }
+.peek .loss { color: var(--loss); }
+@media (prefers-reduced-motion: reduce) { .peek, .peek.snap { transition: opacity 0.15s; scale: 1; } }

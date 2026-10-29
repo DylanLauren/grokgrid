@@ -75,7 +75,10 @@ export function stats(feed: Feed) {
   const now = Date.now()
   const solNow = feed.curve.at(-1)?.sol ?? 0
   const at = (ms: number) => feed.curve.find((p) => p.ts >= now - ms)?.sol ?? feed.curve[0]?.sol ?? 0
-  const sells = feed.calls.filter((c): c is Call & { pnlUsd: number } => c.side === 'sell' && c.pnlUsd !== null && Number.isFinite(c.pnlUsd))
+  // a live sell carries its realised SOL; the recorded USD figure wins when there is one
+  const sells = feed.calls
+    .map((c) => (c.pnlUsd === null && typeof c.pnlSol === 'number' ? { ...c, pnlUsd: c.pnlSol * feed.solUsd } : c))
+    .filter((c): c is Call & { pnlUsd: number } => c.side === 'sell' && c.pnlUsd !== null && Number.isFinite(c.pnlUsd))
   const wins = sells.filter((c) => c.pnlUsd > 0)
   const best = sells.reduce((a, c) => (c.pnlUsd > (a?.pnlUsd ?? -Infinity) ? c : a), sells[0])
   const worst = sells.reduce((a, c) => (c.pnlUsd < (a?.pnlUsd ?? Infinity) ? c : a), sells[0])
