@@ -1,4 +1,4 @@
-.mx-totals { display: grid; grid-template-columns: repeat(5, 1fr); margin: 14px 0 10px; background: #0f0f10; border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; }
+.mx-totals { display: grid; grid-template-columns: repeat(4, 1fr); margin: 14px 0 10px; background: #0f0f10; border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; }
 .mx-totals div { padding: 10px 14px; }
 .mx-totals div + div { border-left: 1px solid var(--hair); }
 .mx-totals dt { font-size: 11px; color: var(--paper-50); text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--mono); }
@@ -12,7 +12,7 @@
 .mx-table { background: #0f0f10; border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; }
 .mx-row {
   display: grid;
-  grid-template-columns: 26px minmax(180px, 1.4fr) minmax(130px, 1fr) repeat(7, minmax(56px, 0.5fr)) minmax(176px, 1.15fr) 56px;
+  grid-template-columns: 26px minmax(180px, 1.4fr) minmax(130px, 1fr) repeat(5, minmax(56px, 0.5fr)) minmax(176px, 1.15fr) 56px;
   gap: 12px; align-items: center;
   padding: 10px 14px; font-size: 13.5px;
 }
@@ -60,7 +60,7 @@
 
 /* narrow screens: each bot becomes a card, labels come from data-label */
 @media (max-width: 1100px) {
-  .mx-totals { grid-template-columns: repeat(4, 1fr); }
+  .mx-totals { grid-template-columns: repeat(3, 1fr); }
   .mx-totals div:first-child { display: none; }
   .mx-totals div:nth-child(2) { border-left: 0; }
   .mx-th { display: none; }
