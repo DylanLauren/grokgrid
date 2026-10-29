@@ -9,7 +9,7 @@ import './callcard.css'
 // A callout in the pump.fun position format: his note on top, the position under it.
 // onOpen turns the card into a button (the dock opens the calls panel with it);
 // otherwise a call with a signature links to its transaction.
-export function CallCard({ call, compact, onOpen, focus }: { call: Call; compact?: boolean; onOpen?: () => void; focus?: boolean }) {
+export function CallCard({ call, compact, onOpen, focus }: { call: Call; compact?: boolean; onOpen?: (card: HTMLElement) => void; focus?: boolean }) {
   const ref = useRef<HTMLElement>(null)
   useEffect(() => {
     if (focus) ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
@@ -17,7 +17,7 @@ export function CallCard({ call, compact, onOpen, focus }: { call: Call; compact
   const cls = `cc cc-${call.side} ${compact ? 'cc-compact' : ''} ${onOpen ? 'cc-open' : ''} ${focus ? 'cc-focus' : ''}`
   if (onOpen)
     return (
-      <button ref={ref as Ref<HTMLButtonElement>} type="button" className={cls} onClick={onOpen} onPointerMove={spotlight} aria-label={`open call: ${call.side} ${call.symbol}`}>
+      <button ref={ref as Ref<HTMLButtonElement>} type="button" className={cls} onClick={(e) => onOpen(e.currentTarget)} onPointerMove={spotlight} aria-label={`open call: ${call.side} ${call.symbol}`}>
         <Body call={call} compact={compact} />
       </button>
     )

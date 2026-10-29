@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { MAIN_MINT, MAIN_NAME, MAIN_TICKER, X_HANDLE, buyUrl } from './config'
 import { stats, useFeed } from './data/useFeed'
 import type { View } from './scene/Scene'
@@ -25,6 +26,27 @@ const CREW: [string, Shape, Habit][] = [
   ['#ff2e9a', 'cone', 'hop'],
   ['#1683ff', 'squircle', 'flip'],
 ]
+
+// The callout you click in the dock glides into its place in the calls panel while the
+// panel slides in around it. Browsers without view transitions just open the panel.
+function morphOpen(card: HTMLElement, id: string, open: () => void) {
+  const start = (document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } }).startViewTransition
+  if (!start || matchMedia('(prefers-reduced-motion: reduce)').matches) return open()
+  card.style.viewTransitionName = 'call-open'
+  document.documentElement.classList.add('vt-calls')
+  const vt = start.call(document, () => {
+    flushSync(open)
+    card.style.viewTransitionName = ''
+    const target = document.querySelector<HTMLElement>(`.panel [data-call="${CSS.escape(id)}"]`)
+    target?.scrollIntoView({ block: 'center' })
+    const cc = target?.querySelector<HTMLElement>('.cc')
+    if (cc) cc.style.viewTransitionName = 'call-open'
+  })
+  vt.finished.finally(() => {
+    document.documentElement.classList.remove('vt-calls')
+    document.querySelectorAll<HTMLElement>('.panel .cc').forEach((el) => (el.style.viewTransitionName = ''))
+  })
+}
 
 const Scene = lazy(() => import('./scene/Scene').then((m) => ({ default: m.Scene })))
 
@@ -138,10 +160,12 @@ export default function App() {
             <CallCard
               call={c}
               compact
-              onOpen={() => {
-                setFocusCall(c.id)
-                setTab('calls')
-              }}
+              onOpen={(card) =>
+                morphOpen(card, c.id, () => {
+                  setFocusCall(c.id)
+                  setTab('calls')
+                })
+              }
             />
           </div>
         ))}
