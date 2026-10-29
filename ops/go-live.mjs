@@ -18,7 +18,7 @@ import { loadSigner, connect, readMint } from '../scripts/pump-chain.mjs';
 import { validateTradingPolicy } from '../scripts/trading-policy.mjs';
 import { validateBuybackConfig } from '../scripts/buyback-policy.mjs';
 import { validateRunnerConfig } from '../scripts/agent-runner-core.mjs';
-import { validateStrategyConfig } from '../scripts/strategy-policy.mjs';
+import { DEFAULT_STRATEGY, validateStrategyConfig } from '../scripts/strategy-policy.mjs';
 
 const GG = join(homedir(), '.config/grokgrid'), R = process.env.GROKGRID_RUNTIME_DIR || join(GG, 'runtime');
 const f = n => join(R, n);
@@ -64,9 +64,12 @@ async function house() {
   if (balance < Number(t.reserveLamports) + Number(t.maxTradeLamports)) throw Error('Fund the house wallet first (at least one trade plus the reserve).');
   await confirm('The house bot will trade REAL SOL on its own (strategy is unvalidated).', 'go live house');
   const next = validateTradingPolicy({ ...t, mode: 'execute', executionEnabled: true, signingEnabled: true, stopFile: f('STOP'), keypairFile, allowedMints: 'dynamic' });
+  // Validate both before writing either, and fill settings added since the config was made
+  // (the workers do the same), so go-live never leaves trading on with the strategy in paper.
+  const strategy = validateStrategyConfig({ ...DEFAULT_STRATEGY, ...read('strategy-config.json'), mode: 'live' });
   resetJournalIfEmpty(f('trading'));
   write('trading-config.json', next);
-  write('strategy-config.json', validateStrategyConfig({ ...read('strategy-config.json'), mode: 'live' }));
+  write('strategy-config.json', strategy);
 }
 
 async function buyback(mint) {
