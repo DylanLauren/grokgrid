@@ -41,8 +41,11 @@ export function verifyWindow(snapshot, config, follow = null, now = Date.now()) 
   if (config.bundleId === 'com.google.Chrome') verifyViewport(snapshot)
   return snapshot
 }
+// pump.fun coin pages put the live market cap in the title ("HEXN $790K | Pump"), so on the same
+// page and window a pump.fun title may change between the two reads; anything else must not.
+const sameTitle = (a, b) => a.title === b.title || (a.bundleId === 'com.google.Chrome' && a.browserUrl === b.browserUrl && [a.title, b.title].every(t => typeof t === 'string' && t.length <= 200 && t.endsWith(' | Pump')))
 function sameWindow(a, b) {
-  return ['id', 'pid', 'bundleId', 'title', 'onScreen', 'layer', 'browserUrl'].every(k => a[k] === b[k]) && ['x', 'y', 'width', 'height'].every(k => a.bounds[k] === b.bounds[k]) && (a.bundleId !== 'com.google.Chrome' || ['innerWidth', 'innerHeight', 'outerWidth', 'outerHeight', 'devicePixelRatio', 'href'].every(k => a.viewport?.[k] === b.viewport?.[k]))
+  return ['id', 'pid', 'bundleId', 'onScreen', 'layer', 'browserUrl'].every(k => a[k] === b[k]) && sameTitle(a, b) && ['x', 'y', 'width', 'height'].every(k => a.bounds[k] === b.bounds[k]) && (a.bundleId !== 'com.google.Chrome' || ['innerWidth', 'innerHeight', 'outerWidth', 'outerHeight', 'devicePixelRatio', 'href'].every(k => a.viewport?.[k] === b.viewport?.[k]))
 }
 function verifyViewport(snapshot) {
   const v = snapshot?.viewport, bounds = snapshot?.bounds
