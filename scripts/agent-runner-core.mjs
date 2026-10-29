@@ -78,3 +78,11 @@ export function privySigner({ wallets, walletId, address, authorizationKey }) {
     return out;
   };
 }
+
+/** Launch-outbox reads that failed in a row. A few are a slow moment; four (about three minutes
+ *  at 45 s ticks) mean new bots aren't being picked up, so the runner reports itself down. */
+export const OUTBOX_FAILURE_LIMIT = 4;
+export function outboxHealth(previousFailures, failed) {
+  const failures = failed ? (Number.isSafeInteger(previousFailures) && previousFailures > 0 ? previousFailures : 0) + 1 : 0;
+  return { failures, healthy: failures < OUTBOX_FAILURE_LIMIT };
+}
