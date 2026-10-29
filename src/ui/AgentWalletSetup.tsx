@@ -5,17 +5,19 @@ export interface AgentWalletSetupProps { onWalletChange: (wallet: AgentWalletSes
 class WalletLoadBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
   static getDerivedStateFromError() { return { failed: true } }
-  render() { return this.state.failed ? <p role="alert">Wallet setup could not load. Reload this page to try again. Launches remain paused.</p> : this.props.children }
+  render() { return this.state.failed ? <p role="alert">Wallet connect could not load. Reload this page to try again.</p> : this.props.children }
 }
+// One step: connect. Signing in makes the bot's own wallet behind the scenes, and launching
+// gives Grok Bot permission to trade it inside fixed limits. No separate wallet setup screen.
 export function AgentWalletSetup(props: AgentWalletSetupProps) {
   const [open, setOpen] = useState(false)
   const appId = import.meta.env.VITE_PRIVY_APP_ID?.trim()
-  return <section className="card" style={{ padding: 24, marginBottom: 24 }} aria-label="Agent wallet setup">
-    <h2>Your agent wallet</h2>
-    <p>Create a wallet you own before launching. This same address will launch its coin, receive its 80% creator-fee share and trade for that agent. Phantom can fund this address; it is not the agent signer.</p>
-    <p>Creating a wallet does not fund it or authorize any spending.</p>
-    {!appId ? <p role="status">Agent wallet setup opens shortly, before launches do. Nothing to do yet.</p> : !open ?
-      <button type="button" className="btn ghost" onClick={() => setOpen(true)}>Set up agent wallet</button> :
-      <WalletLoadBoundary><Suspense fallback={<p role="status">Loading wallet setup…</p>}><PrivyAgentWallet {...props} appId={appId} /></Suspense></WalletLoadBoundary>}
+  return <section className="card gd-connect" aria-label="Connect">
+    {!appId ? <p role="status">Connecting opens shortly, before launches do. Nothing to do yet.</p> : !open ?
+      <div className="gd-connect-row">
+        <div><h2>Connect</h2><p>Sign in and your bot gets its own wallet. You fund it, it trades, you can withdraw any time.</p></div>
+        <button type="button" className="btn" onClick={() => setOpen(true)}>Connect wallet</button>
+      </div> :
+      <WalletLoadBoundary><Suspense fallback={<p role="status">Connecting…</p>}><PrivyAgentWallet {...props} appId={appId} /></Suspense></WalletLoadBoundary>}
   </section>
 }

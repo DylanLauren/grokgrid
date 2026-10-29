@@ -102,7 +102,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
   const botPic = useMemo(() => botImage(d.look), [d.look])
   const pic = image?.url ?? botPic
   // The server decides: launches open only with a live bot runner and the owner's switch on.
-  const ready = !!agentWallet?.authorizationReady && !!status?.open && Object.keys(errs).length === 0 && step === null && !connecting && !made
+  const ready = !!(agentWallet?.authorizationReady || agentWallet?.authorize) && !!status?.open && Object.keys(errs).length === 0 && step === null && !connecting && !made
   const mine = grid.mode === 'live' ? grid.agents.filter((a) => !a.house && a.coin.real !== false) : []
   const userBots = mine.length
   const err = (k: keyof Draft) => (touched[k] ? errs[k] : undefined)
@@ -114,12 +114,14 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
     setFail('')
     setMade(null)
     const w = agentWallet?.wallet
-    if (!w) return setFail('Set up your embedded agent wallet first.')
+    if (!w) return setFail('Connect your wallet first.')
     setConnecting(true)
     try {
       // Read the wallet's current account; a previously connected account may have changed.
       const addr = await connectWallet(w)
-      if (addr !== agentWallet?.address) throw Error('Agent wallet changed. Verify setup again.')
+      if (addr !== agentWallet?.address) throw Error('Your wallet changed. Connect again.')
+      // pressing Launch is the approval: Grok Bot gets its limited signer on this wallet now
+      if (!agentWallet.authorizationReady) await agentWallet.authorize?.()
       const current = await fetchLaunchStatus(addr, AbortSignal.timeout(8_000)).catch(() => unavailableLaunchStatus())
       if (!current.open) throw Error(current.reason ?? 'Launching is paused.')
       const picture = image?.url ?? (await svgToImage(botPic))
@@ -145,7 +147,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
   }
 
   return (
-    <Page say="make me a sibling" n={5} label="the grid" title="Launch a bot" sub={`one agent per wallet, with its own coin on pump.fun. create a wallet you own before launch. that same wallet launches and trades for its agent. ${status?.open ? 'launches are open.' : 'launches open once the bot runner is live.'}`}>
+    <Page say="make me a sibling" n={5} label="the grid" title="Launch a bot" sub={`one agent per wallet, with its own coin on pump.fun. connect, and your bot gets its own wallet that launches the coin and trades. ${status?.open ? 'launches are open.' : 'launches open once the bot runner is live.'}`}>
       <AgentWalletSetup onWalletChange={onWalletChange} />
       <div className="gd-line" role="radiogroup" aria-label="pick a bot">
         {FAMILY.map((f, i) => (
@@ -278,17 +280,17 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             <div className="gd-split">
               <div>
                 <b>80%</b>
-                <span>of creator fees go to your agent wallet — the same address that launches and trades</span>
+                <span>of creator fees go to your bot’s wallet, the same address that launches and trades</span>
               </div>
               <div>
                 <b>20%</b>
                 <span>of creator fees go to the ${MAIN_TICKER} burn wallet</span>
               </div>
             </div>
-            <p className="gd-note">Your bot can only trade inside the policy you approve for its signer, never past the platform limits, and you can remove the signer at any time.</p>
+            <p className="gd-note">Pressing Launch lets Grok Bot trade your bot’s wallet, only inside its fixed limits. You can stop it at any time.</p>
             <p className="gd-note mono">one agent per wallet · 80/20 split locked at creation · review the exact network fees, rent and optional first buy before signing</p>
             <button type="submit" className="btn" disabled={!ready}>
-              <Roll>{step !== null ? STEPS[step] : status === null ? 'Checking launchpad…' : !status.open ? 'Launches paused' : !agentWallet?.authorizationReady ? 'Set up your agent wallet' : 'Launch bot'}</Roll>
+              <Roll>{step !== null ? STEPS[step] : status === null ? 'Checking launchpad…' : !status.open ? 'Launches paused' : !agentWallet ? 'Connect your wallet' : !(agentWallet.authorizationReady || agentWallet.authorize) ? 'Checking your wallet…' : 'Launch bot'}</Roll>
             </button>
             {me && <p className="gd-note mono">launcher + trading wallet: <span style={{ overflowWrap: 'anywhere' }}>{me}</span></p>}
             {step !== null && (

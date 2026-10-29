@@ -9,7 +9,7 @@ import { Roll } from '../ui/Roll'
 import { Page } from './Page'
 
 const FAQ: [string, string][] = [
-  [`Do I need $${MAIN_TICKER} to launch a bot?`, 'No. You need an agent wallet with enough SOL for the launch, about 0.03 SOL.'],
+  [`Do I need $${MAIN_TICKER} to launch a bot?`, 'No. Connect, then send your bot’s wallet enough SOL for the launch, about 0.03 SOL.'],
   ['Does Grok Bot give my bot money?', `No. Your bot runs on 80% of its own coin’s fees plus anything you deposit. Grok Bot trades only with the $${MAIN_TICKER} treasury.`],
   ['Can I take money out of my bot’s wallet?', 'Yes. It’s your Privy wallet. GrokGrid’s signer can’t move funds out, but you can.'],
   ['Can GrokGrid take my funds?', 'No. The signer can only buy and sell on pump.fun under the policy, with no transfers. You can remove it at any time.'],
@@ -71,7 +71,7 @@ const SECTIONS: [string, string, ReactNode][] = [
     'launch',
     'Launching a bot',
     <Fragment key="b">
-      <p>Sign in, create your agent wallet, and approve GrokGrid’s limited signer for it. Then pick a look, name, ticker, description, links, a one-line strategy and limits (max SOL per trade, take-profit, stop-loss). You approve one transaction that creates the coin with the 80/20 split, plus an optional first buy.</p>
+      <p>Press Connect and sign in. Your bot’s own wallet is made for you, and you fund it from Phantom or any wallet. Then pick a look, name, ticker, description, links, a one-line strategy and limits (max SOL per trade, take-profit, stop-loss). Pressing Launch gives Grok Bot its limited signer on that wallet and asks you to approve one transaction that creates the coin with the 80/20 split, plus an optional first buy.</p>
       <p>The wallet needs at least 0.03 SOL to launch, to cover Solana network fees and pump.fun’s coin-creation rent; your wallet shows the exact amount before you sign. Each wallet runs one bot. Your bot trades from its own wallet by your rules, never past the platform limits above, and runs in practice mode until real trading is switched on. Launches open once the bot runner is online.</p>
     </Fragment>,
   ],
@@ -85,7 +85,7 @@ const SECTIONS: [string, string, ReactNode][] = [
   ],
   ['example', 'A worked example', <p key="b">Say your bot’s coin earns 1 SOL in creator fees. 0.8 SOL lands in your bot’s trading wallet to trade with, and 0.2 SOL goes to the burn wallet, which buys ${MAIN_TICKER} and burns it. Trading volume is separate: fees are a small share of each trade on your coin, so 1 SOL of fees means a lot more than 1 SOL was traded.</p>],
   ['cost', 'What it costs', <CostTable key="b" />],
-  ['trust', 'Wallet control', <p key="b">Your agent wallet is yours. It’s a Privy wallet that only you own, and GrokGrid can’t export its key. The signer you approve can only buy and sell on pump.fun within a fixed policy: no transfers out, no closing accounts, each buy capped at 0.05 SOL. You can remove it at any time. Before each launch the site checks that you own the wallet and that the signer is ours and scoped to that policy. No wallet key is ever stored on this website. Public addresses below let you inspect every balance on chain.</p>],
+  ['trust', 'Wallet control', <p key="b">Your bot’s wallet is yours. It’s a Privy wallet that only you own, and GrokGrid can’t export its key. The signer you approve when you launch can only buy and sell on pump.fun within a fixed policy: no transfers out, no closing accounts, each buy capped at 0.05 SOL. You can remove it at any time. Before each launch the site checks that you own the wallet and that the signer is ours and scoped to that policy. No wallet key is ever stored on this website. Public addresses below let you inspect every balance on chain.</p>],
   [
     'faq',
     'Questions',

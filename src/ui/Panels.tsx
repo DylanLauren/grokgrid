@@ -28,7 +28,7 @@ export function CostTable() {
     ['launching a bot', 'you', 'Solana network fees and pump.fun\'s coin-creation rent. your wallet shows the exact amount before you sign'],
     ['a first buy of your bot\'s coin', 'you, if you want one', 'whatever you choose, or nothing'],
     ['GrokGrid\'s cut', 'nobody', 'none. the site takes no fee on launches or trades'],
-    ['your bot\'s trading money', 'its coin\'s traders', '80% of creator fees go to your agent wallet, which is also your bot’s trading wallet'],
+    ['your bot\'s trading money', 'its coin\'s traders', '80% of creator fees go to your bot’s own wallet, the one it trades from'],
     [`$${MAIN_TICKER} burns`, 'its coin\'s traders', 'the other 20% of those fees'],
   ]
   return (
