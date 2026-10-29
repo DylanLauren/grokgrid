@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { capabilityExpiry, validateConfig, verifyWindow, browserViewportCrop, encodePhoneCapture, captureAndSend, captureFailureState, safeFailure } from './phone-feed-core.mjs'
+import { FOLLOW_FILE } from './phone-follow-core.mjs'
 const run = promisify(execFile)
 const args = process.argv.slice(2)
 const help = 'Usage: node scripts/phone-feed.mjs --config /absolute/private/config.json [--check | --once]. Requires a screen-only token and pinned actual bot window; rectangle capture is unsupported.'
@@ -33,15 +34,17 @@ async function main() {
   let token = (await privateFile(config.tokenFile)).trim()
   let expiresAt = null
   const swift = fileURLToPath(new URL('./phone-window.swift', import.meta.url))
+  // The guardian's list of coin pages the phone may show (written by scripts/phone-guardian.mjs).
+  const follow = async () => { try { return JSON.parse(await readFile(join(dirname(config.statusFile), FOLLOW_FILE), 'utf8')) } catch { return null } }
   async function inspect() {
     try {
       const { stdout } = await run('/usr/bin/swift', [swift, String(config.windowId)], { timeout: 15_000, maxBuffer: 16_384 })
       const snapshot = JSON.parse(stdout)
       if (snapshot && config.bundleId === 'com.google.Chrome') {
-        // Find the selected Chrome window by matching its exact title and bounds.
+        // Find the selected Chrome window by its bounds and a pinned or pump.fun page title.
         // Never activate, navigate, or read unrelated tab contents.
         const pageMetrics = 'JSON.stringify({innerWidth:window.innerWidth,innerHeight:window.innerHeight,outerWidth:window.outerWidth,outerHeight:window.outerHeight,devicePixelRatio:window.devicePixelRatio,href:window.location.href})'
-        const js = `const app=Application('Google Chrome'); const windows=app.windows(); const matches=windows.filter(w=>{const b=w.bounds();return w.name()===${JSON.stringify(config.title)}&&Math.abs(b.x-${snapshot.bounds.x})<2&&Math.abs(b.y-${snapshot.bounds.y})<2&&Math.abs(b.width-${snapshot.bounds.width})<2&&Math.abs(b.height-${snapshot.bounds.height})<2}); if(matches.length!==1){JSON.stringify({browserUrl:'',viewport:null})}else{const tab=matches[0].activeTab();JSON.stringify({browserUrl:tab.url(),viewport:${snapshot.onScreen === true ? `JSON.parse(tab.execute({javascript:${JSON.stringify(pageMetrics)}}))` : 'null'}})}`
+        const js = `const app=Application('Google Chrome'); const windows=app.windows(); const matches=windows.filter(w=>{const b=w.bounds();const n=w.name();return (n===${JSON.stringify(config.title)}||(n.length<=200&&n.endsWith(' | Pump')))&&Math.abs(b.x-${snapshot.bounds.x})<2&&Math.abs(b.y-${snapshot.bounds.y})<2&&Math.abs(b.width-${snapshot.bounds.width})<2&&Math.abs(b.height-${snapshot.bounds.height})<2}); if(matches.length!==1){JSON.stringify({browserUrl:'',viewport:null})}else{const tab=matches[0].activeTab();JSON.stringify({browserUrl:tab.url(),viewport:${snapshot.onScreen === true ? `JSON.parse(tab.execute({javascript:${JSON.stringify(pageMetrics)}}))` : 'null'}})}`
         const details = JSON.parse((await run('/usr/bin/osascript', ['-l', 'JavaScript', '-e', js], { timeout: 5000, maxBuffer: 8192 })).stdout.trim())
         snapshot.browserUrl = details.browserUrl
         snapshot.viewport = details.viewport
@@ -51,7 +54,7 @@ async function main() {
   }
   if (args.includes('--check')) {
     expiresAt = capabilityExpiry(token)
-    verifyWindow(await inspect(), config)
+    verifyWindow(await inspect(), config, await follow())
     console.log(JSON.stringify({ state: 'window-check-passed', publishing: false, credentialExpiresAt: new Date(expiresAt).toISOString() }))
     return
   }
@@ -124,7 +127,7 @@ async function main() {
         // read the full ingest credential, and never retain an expired token.
         token = (await privateFile(config.tokenFile)).trim()
         expiresAt = capabilityExpiry(token)
-        await captureAndSend(config, { token, now: Date.now, inspect, capture, send })
+        await captureAndSend(config, { token, now: Date.now, inspect, capture, send, follow })
         lastSentAt = new Date().toISOString(); failures = 0; lastFailureReason = null
         await status(args.includes('--once') ? 'sent-once' : 'sending')
         if (args.includes('--once')) break

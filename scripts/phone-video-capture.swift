@@ -11,7 +11,36 @@ struct Pin: Decodable {
     let title: String, browserUrl: String, width: Int, fps: Int
     let expectedWidth: Int?, expectedHeight: Int?
     let expectedWindowWidth: Int?, expectedWindowHeight: Int?
+    let followFile: String?
 }
+// BEGIN_PAGE_RULES
+// Pages the pinned window may show: the house profile, or a coin page on the guardian's fresh
+// follow list (see scripts/phone-follow-core.mjs, which this mirrors). Window identity is pinned
+// separately and never changes.
+struct Follow: Decodable { let mints: [String]; let updatedAt: Int64 }
+final class PageRules {
+    let pin: Pin
+    var cached: (at: Date, follow: Follow?) = (Date.distantPast, nil)
+    init(_ pin: Pin) { self.pin = pin }
+    func titleAllowed(_ title: String) -> Bool { title == pin.title || (title.count <= 200 && title.hasSuffix(" | Pump")) }
+    func follow() -> Follow? {
+        if Date().timeIntervalSince(cached.at) > 1, let path = pin.followFile {
+            cached = (Date(), (try? Data(contentsOf: URL(fileURLWithPath: path))).flatMap { try? JSONDecoder().decode(Follow.self, from: $0) })
+        }
+        return cached.follow
+    }
+    func urlAllowed(_ url: String) -> Bool {
+        if url == pin.browserUrl { return true }
+        let prefix = "https://pump.fun/coin/"
+        guard url.hasPrefix(prefix) else { return false }
+        let mint = String(url.dropFirst(prefix.count))
+        guard (32...44).contains(mint.count), mint.allSatisfy({ "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".contains($0) }),
+              let f = follow() else { return false }
+        let age = Int64(Date().timeIntervalSince1970 * 1000) - f.updatedAt
+        return age >= 0 && age <= 120_000 && f.mints.contains(mint)
+    }
+}
+// END_PAGE_RULES
 struct Page: Decodable, Equatable {
     let innerWidth: Double, innerHeight: Double, outerWidth: Double, outerHeight: Double, devicePixelRatio: Double
     let href: String, documentTitle: String
@@ -49,7 +78,7 @@ enum SourceOriginPolicy {
 // END_ORIGIN_POLICY
 
 final class SourceGuard {
-    let pin: Pin, script: NSAppleScript, binding: NSAppleScript
+    let pin: Pin, script: NSAppleScript, binding: NSAppleScript, rules: PageRules
     var baseline: String?
     var expectedBounds: CGRect?
     var failure = "source-check-failed"
@@ -66,17 +95,19 @@ final class SourceGuard {
         }
     }
     init(_ pin: Pin) {
-        self.pin=pin
+        self.pin=pin; self.rules=PageRules(pin)
         let js="JSON.stringify({innerWidth:innerWidth,innerHeight:innerHeight,outerWidth:outerWidth,outerHeight:outerHeight,devicePixelRatio:devicePixelRatio,href:location.href,documentTitle:document.title})"
         let code="tell application \"Google Chrome\" to execute active tab of window id \(pin.chromeWindowId) javascript \(quoted(js))"
         let bind="""
         tell application "Google Chrome"
             set chosen to window id \(pin.chromeWindowId)
-            if name of chosen is not \(quoted(pin.title)) then error "source" number 9101
+            set chosenName to name of chosen
+            if chosenName is not \(quoted(pin.title)) and not (chosenName ends with " | Pump") then error "source" number 9101
             set chosenBounds to bounds of chosen
             set matching to 0
             repeat with candidate in windows
-                if (name of candidate is \(quoted(pin.title))) and ((bounds of candidate) is chosenBounds) then set matching to matching + 1
+                set candidateName to name of candidate
+                if (candidateName is \(quoted(pin.title)) or candidateName ends with " | Pump") and ((bounds of candidate) is chosenBounds) then set matching to matching + 1
             end repeat
             if matching is not 1 then error "source" number 9102
             return chosenBounds
@@ -110,7 +141,7 @@ final class SourceGuard {
             guard let owner=item[kCGWindowOwnerPID as String] as? Int32 else {return failed("source-native-owner-unavailable")}
             guard owner==pin.ownerPid else {return failed("source-native-owner-mismatch")}
             guard let title=item[kCGWindowName as String] as? String else {return failed("source-native-title-unavailable")}
-            guard title==pin.title else {return failed("source-native-title-mismatch")}
+            guard rules.titleAllowed(title) else {return failed("source-native-title-mismatch")}
             guard let raw=item[kCGWindowBounds as String] as? [String:Any],let rect=CGRect(dictionaryRepresentation:raw as CFDictionary) else {return failed("source-native-bounds-unavailable")}
             guard rect.size==bounds.size else {return failed("source-native-size-changed")}
             if rect.origin != bounds.origin || forceBinding {
@@ -119,7 +150,7 @@ final class SourceGuard {
                 freshBrowserBounds=browser;bounds=rect
             }
             func matches(_ entry:[String:Any])->Bool {
-                guard entry[kCGWindowOwnerPID as String] as? Int32==pin.ownerPid,entry[kCGWindowName as String] as? String==pin.title,
+                guard entry[kCGWindowOwnerPID as String] as? Int32==pin.ownerPid,let name=entry[kCGWindowName as String] as? String,rules.titleAllowed(name),
                       let raw=entry[kCGWindowBounds as String] as? [String:Any],let rect=CGRect(dictionaryRepresentation:raw as CFDictionary) else {return false}
                 return rect==bounds
             }
@@ -130,8 +161,9 @@ final class SourceGuard {
         if let error=error{return failed(appleEventFailure("page",error))}
         guard let text=record.stringValue,let data=text.data(using:.utf8) else {return failed("source-page-response-unavailable")}
         guard let page=try? JSONDecoder().decode(Page.self,from:data) else {return failed("source-page-response-invalid")}
-        guard page.href==pin.browserUrl else {return failed("source-url-mismatch")}
-        guard page.documentTitle==pin.title else {return failed("source-page-title-mismatch")}
+        guard rules.urlAllowed(page.href) else {return failed("source-url-mismatch")}
+        guard rules.titleAllowed(page.documentTitle) else {return failed("source-page-title-mismatch")}
+        let pageUnchanged=baseline==text
         if let baseline=baseline,baseline != text {
             if let prior=try? JSONDecoder().decode(Page.self,from:Data(baseline.utf8)) {
                 if prior.innerWidth != page.innerWidth{return failed("source-viewport-width-changed")}
@@ -139,11 +171,12 @@ final class SourceGuard {
                 if prior.outerWidth != page.outerWidth{return failed("source-window-width-changed")}
                 if prior.outerHeight != page.outerHeight{return failed("source-window-height-changed")}
                 if prior.devicePixelRatio != page.devicePixelRatio{return failed("source-device-scale-changed")}
-            }
-            return failed("source-page-snapshot-changed")
+            } else {return failed("source-page-snapshot-changed")}
+            // Same viewport, another allowed page (the guardian followed a trade): keep capturing it.
+            self.baseline=text
         }
         if let previous=previousBounds,previous.origin != bounds.origin {
-            guard let browser=freshBrowserBounds,SourceOriginPolicy.accepts(previous:previous,native:bounds,browser:browser,uniqueMatches:uniqueMatches,pageUnchanged:baseline==text) else {return failed("source-native-position-changed")}
+            guard let browser=freshBrowserBounds,SourceOriginPolicy.accepts(previous:previous,native:bounds,browser:browser,uniqueMatches:uniqueMatches,pageUnchanged:pageUnchanged) else {return failed("source-native-position-changed")}
             // Commit only after the unchanged URL/title/viewport/DPR checks pass.
             expectedBounds=bounds
             FileHandle.standardError.write(Data("source-origin-rebound\n".utf8))
@@ -230,9 +263,9 @@ final class Frames: NSObject, SCStreamOutput, SCStreamDelegate {
         do {
             let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
             guard let window = content.windows.first(where: { $0.windowID == pin.windowId }), window.owningApplication?.processID == pin.ownerPid,
-                  window.owningApplication?.bundleIdentifier == "com.google.Chrome", window.title == pin.title, window.windowLayer == 0 else { stop("window-identity-mismatch") }
+                  window.owningApplication?.bundleIdentifier == "com.google.Chrome", source.rules.titleAllowed(window.title ?? ""), window.windowLayer == 0 else { stop("window-identity-mismatch") }
             let bounds = window.frame
-            guard bounds == chromeBounds, content.windows.filter({$0.owningApplication?.processID == pin.ownerPid && $0.title == pin.title && $0.frame == bounds}).count == 1 else { stop("window-binding-ambiguous") }
+            guard bounds == chromeBounds, content.windows.filter({$0.owningApplication?.processID == pin.ownerPid && source.rules.titleAllowed($0.title ?? "") && $0.frame == bounds}).count == 1 else { stop("window-binding-ambiguous") }
             source.expectedBounds = bounds
             if CommandLine.arguments.contains("--prepare") {
                 guard let desiredWidth=pin.expectedWindowWidth,let desiredHeight=pin.expectedWindowHeight,
@@ -245,8 +278,9 @@ final class Frames: NSObject, SCStreamOutput, SCStreamDelegate {
                 let resize="""
                 tell application "Google Chrome"
                     set chosen to window id \(pin.chromeWindowId)
-                    if name of chosen is not \(quoted(pin.title)) then error "source"
-                    if URL of active tab of chosen is not \(quoted(pin.browserUrl)) then error "source"
+                    set chosenName to name of chosen
+                    if chosenName is not \(quoted(pin.title)) and not (chosenName ends with " | Pump") then error "source"
+                    if URL of active tab of chosen does not start with "https://pump.fun/" then error "source"
                     if bounds of chosen is not {\(left),\(top),\(Int(bounds.maxX)),\(Int(bounds.maxY))} then error "source"
                     set bounds of chosen to {\(left),\(top),\(left+desiredWidth),\(top+desiredHeight)}
                 end tell
@@ -262,12 +296,12 @@ final class Frames: NSObject, SCStreamOutput, SCStreamDelegate {
                     guard let (_,currentPage,currentBounds)=source.verifiedRead() else {continue}
                     let updated=try await SCShareableContent.excludingDesktopWindows(true,onScreenWindowsOnly:false)
                     if let current=updated.windows.first(where:{$0.windowID==pin.windowId}),current.owningApplication?.processID==pin.ownerPid,
-                       current.owningApplication?.bundleIdentifier=="com.google.Chrome",current.title==pin.title,current.windowLayer==0,
+                       current.owningApplication?.bundleIdentifier=="com.google.Chrome",source.rules.titleAllowed(current.title ?? ""),current.windowLayer==0,
                        current.frame==currentBounds,currentBounds.origin==bounds.origin,
                        Int(currentBounds.width)==desiredWidth,Int(currentBounds.height)==desiredHeight,
                        abs(currentPage.outerWidth-currentBounds.width)<=2,abs(currentPage.outerHeight-currentBounds.height)<=2,
                        currentPage.innerWidth>0,currentPage.innerHeight>0,currentPage.devicePixelRatio>0,
-                       updated.windows.filter({$0.owningApplication?.processID==pin.ownerPid && $0.title==pin.title && $0.frame==currentBounds}).count==1 {
+                       updated.windows.filter({$0.owningApplication?.processID==pin.ownerPid && source.rules.titleAllowed($0.title ?? "") && $0.frame==currentBounds}).count==1 {
                         let pixelScale=Double(SCContentFilter(desktopIndependentWindow:current).pointPixelScale)
                         let pageHeight=currentPage.innerHeight*currentBounds.width/currentPage.innerWidth
                         let pageTop=currentBounds.height-pageHeight
@@ -313,7 +347,7 @@ final class Frames: NSObject, SCStreamOutput, SCStreamDelegate {
                 source.requireValid()
                 let fresh = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
                 guard let current = fresh.windows.first(where: {$0.windowID == pin.windowId}), current.owningApplication?.processID == pin.ownerPid,
-                      current.owningApplication?.bundleIdentifier == "com.google.Chrome", current.title == pin.title, current.frame.size == bounds.size, current.windowLayer == 0, fresh.windows.filter({$0.owningApplication?.processID == pin.ownerPid && $0.title == pin.title && $0.frame == current.frame}).count == 1 else { stop("window-identity-mismatch") }
+                      current.owningApplication?.bundleIdentifier == "com.google.Chrome", source.rules.titleAllowed(current.title ?? ""), current.frame.size == bounds.size, current.windowLayer == 0, fresh.windows.filter({$0.owningApplication?.processID == pin.ownerPid && source.rules.titleAllowed($0.title ?? "") && $0.frame == current.frame}).count == 1 else { stop("window-identity-mismatch") }
                 // The async SCK snapshot may predate a verified move. Validate
                 // current Chrome/CG binding before ignoring that stale origin.
                 source.requireValid(forceBinding:current.frame.origin != source.expectedBounds?.origin)

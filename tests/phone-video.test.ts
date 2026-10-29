@@ -189,3 +189,28 @@ precondition(!SourceOriginPolicy.accepts(previous:old,native:resized,browser:res
     await promisify(execFile)('/usr/bin/swift',[file],{timeout:20000,maxBuffer:4096})
   }finally{await rm(dir,{recursive:true,force:true})}
 })
+
+test('actual native page rules allow only the profile or a coin on a fresh follow list',{skip:process.platform!=='darwin'},async()=>{
+  const {readFile}=await import('node:fs/promises'),{execFile}=await import('node:child_process'),{promisify}=await import('node:util')
+  const source=await readFile(new URL('../scripts/phone-video-capture.swift',import.meta.url),'utf8')
+  const rules=source.split('// BEGIN_PAGE_RULES')[1].split('// END_PAGE_RULES')[0]
+  const dir=await mkdtemp(join(tmpdir(),'phone-page-rules-'))
+  try{
+    const file=join(dir,'check.swift'), follow=join(dir,'follow.json')
+    const A='ANVLA6eKiAq4nstD2Sg3SZhfVkSEwfnGccn12UQWpump'
+    await writeFile(follow,JSON.stringify({mints:[A],updatedAt:Date.now()}))
+    await writeFile(file,'import Foundation\nstruct Pin { let title: String; let browserUrl: String; let followFile: String? }\n'+rules+`
+let r=PageRules(Pin(title:"GrokGrid | Pump",browserUrl:"https://pump.fun/profile/GrokGrid",followFile:${JSON.stringify(follow)}))
+precondition(r.urlAllowed("https://pump.fun/profile/GrokGrid"))
+precondition(r.urlAllowed("https://pump.fun/coin/${A}"))
+precondition(!r.urlAllowed("https://pump.fun/coin/9KhzhyM1BwgW6myZRcqdzQvemKjVrjck8kaevTkMpump"))
+precondition(!r.urlAllowed("https://pump.fun/coin/${A}?x=1"))
+precondition(!r.urlAllowed("https://evil.example/coin/${A}"))
+precondition(r.titleAllowed("Hexncoin (HEXN) Price, Chart & Market Cap | Pump"))
+precondition(!r.titleAllowed("Inbox"))
+let stale=PageRules(Pin(title:"GrokGrid | Pump",browserUrl:"https://pump.fun/profile/GrokGrid",followFile:nil))
+precondition(!stale.urlAllowed("https://pump.fun/coin/${A}"))
+`)
+    await promisify(execFile)('/usr/bin/swift',[file],{timeout:30000,maxBuffer:4096})
+  }finally{await rm(dir,{recursive:true,force:true})}
+})

@@ -8,8 +8,12 @@ const w = (patch: Record<string, unknown> = {}) => ({ fullScreen: false, url: UR
 test('puts the pinned window back: out of full screen, phone size, on the house profile', () => {
   assert.deepEqual(windowFixes(w(), URL, B), [])
   assert.deepEqual(windowFixes(w({ fullScreen: true, bounds: { x: 0, y: 33, width: 1470, height: 923 } }), URL, B), ['exit-full-screen', 'restore-bounds'])
-  assert.deepEqual(windowFixes(w({ url: URL + '?tab=closed' }), URL, B), ['reset-url'])
-  assert.deepEqual(windowFixes(w({ url: 'https://pump.fun/board' }), URL, B), []) // never navigates away from another page
+  assert.deepEqual(windowFixes(w({ url: URL + '?tab=closed' }), URL, B), ['show-target'])
+  assert.deepEqual(windowFixes(w({ url: 'https://example.com/' }), URL, B), []) // never navigates away from another site
+  const coin = 'https://pump.fun/coin/ANVLA6eKiAq4nstD2Sg3SZhfVkSEwfnGccn12UQWpump'
+  assert.deepEqual(windowFixes(w(), URL, B, coin), ['show-target']) // follow the house to the coin it trades
+  assert.deepEqual(windowFixes(w({ url: coin }), URL, B, coin), [])
+  assert.deepEqual(windowFixes(w({ url: coin }), URL, B), ['show-target']) // back to the profile when idle
   assert.deepEqual(windowFixes(w({ bounds: { ...B, x: B.x + 1 } }), URL, B), []) // within 2 points
   assert.deepEqual(windowFixes(null as unknown as Record<string, unknown>, URL, B), [])
 })

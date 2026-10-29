@@ -2,7 +2,7 @@
 // Starts screen/video work only while authorized viewers are in the fixed room.
 import { spawn } from 'node:child_process'
 import { open, rename, unlink, lstat } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -10,6 +10,7 @@ import { RoomServiceClient } from 'livekit-server-sdk'
 import { readPrivateVideoFile, validateVideoConfig, preparePhoneVideoSource, countPhoneViewers, videoDemand, videoRestartDecision, videoStartupFailure, safeCaptureFailure, ffmpegPhoneArgs } from './phone-video-core.mjs'
 import { createWhipProxy } from './phone-video-whip.mjs'
 import { recoverPhoneLock } from './phone-supervisor.mjs'
+import { FOLLOW_FILE } from './phone-follow-core.mjs'
 
 async function writePrivate(path, body) {
   const temp = path + '.' + randomUUID()
@@ -41,7 +42,7 @@ export async function runPhoneVideo(configPath, checkOnly = true) {
   const c = validateVideoConfig(JSON.parse(await readPrivateVideoFile(configPath)))
   const source = JSON.parse(await readPrivateVideoFile(c.sourceConfigFile))
   if (source.bundleId !== 'com.google.Chrome') throw Error('source-check-failed')
-  const pin = { windowId: source.windowId, ownerPid: source.ownerPid, chromeWindowId: c.chromeWindowId, title: source.title, browserUrl: source.browserUrl, width: c.width, fps: c.fps, expectedWindowWidth:c.expectedWindowSize?.width,expectedWindowHeight:c.expectedWindowSize?.height }
+  const pin = { windowId: source.windowId, ownerPid: source.ownerPid, chromeWindowId: c.chromeWindowId, title: source.title, browserUrl: source.browserUrl, width: c.width, fps: c.fps, expectedWindowWidth:c.expectedWindowSize?.width,expectedWindowHeight:c.expectedWindowSize?.height, followFile: join(dirname(c.statusFile), FOLLOW_FILE) }
   const prepareSource = readOnly => preparePhoneVideoSource(c,{checkOnly:readOnly,prepare:()=>inspectSource(c,pin,'--prepare'),inspect:()=>inspectSource(c,pin)})
   if (checkOnly) { const dimensions = await prepareSource(true); return { state: 'source-check-passed', publishing: false, ...dimensions } }
   const root = await lstat(dirname(c.statusFile))
