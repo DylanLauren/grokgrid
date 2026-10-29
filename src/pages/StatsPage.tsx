@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { MAIN_TICKER, solscan } from '../config'
 import type { Feed } from '../data/types'
 import { stats } from '../data/useFeed'
+import { useToken, type GridToken } from '../data/useToken'
 import { ago, mc, pct, signedUsd, usd } from '../lib/format'
 import { CoinChip } from '../ui/CoinChip'
 import { Addresses } from '../ui/Panels'
@@ -9,13 +10,15 @@ import { Page, Section } from './Page'
 
 export function StatsPage({ feed }: { feed: Feed }) {
   const s = stats(feed)
+  const token = useToken(true)
+  const burned = token?.burned ?? feed.burnedMain
   const tiles: [string, string, string?, string?][] = [
     ['trades', `${s.trades}`, `${feed.calls.filter((c) => c.side === 'sell').length} closed`],
     ['win rate', `${(s.winRate === null ? '–' : s.winRate.toFixed(0))}%`, 'of closed trades'],
     ['best trade', s.best ? signedUsd(s.best.pnlUsd) : '–', s.best?.symbol, 'gain'],
     ['worst trade', s.worst ? signedUsd(s.worst.pnlUsd) : '–', s.worst?.symbol, 'loss'],
     ['fees in', `${feed.feesSol.toFixed(2)}`, 'SOL from creator fees'],
-    [`$${MAIN_TICKER} burned`, feed.burnedMain ? compact(feed.burnedMain) : '0', 'bought and burned'],
+    [`$${MAIN_TICKER} burned`, burned ? compact(burned) : '0', token?.burned != null ? 'gone from supply, on chain' : 'bought and burned'],
   ]
   return (
     <Page
@@ -89,10 +92,38 @@ export function StatsPage({ feed }: { feed: Feed }) {
         </div>
       </Section>
 
+      {token?.onChain && <GridSection token={token} />}
+
       <Section title="Addresses">
         <Addresses />
       </Section>
     </Page>
+  )
+}
+
+// $GRID itself, every number read off the chain (price from DexScreener).
+function GridSection({ token }: { token: GridToken }) {
+  const pct = token.burned !== null ? (token.burned / token.startSupply) * 100 : null
+  const rows: [string, string, string?][] = [
+    ['market cap', token.market ? mc(token.market.mcUsd) : '–', token.market ? `24h ${token.market.change24h >= 0 ? '+' : ''}${token.market.change24h.toFixed(1)}%` : 'no market yet'],
+    ['24h volume', token.market ? mc(token.market.vol24hUsd) : '–'],
+    ['supply', token.supply !== null ? compact(token.supply) : '–', `of ${compact(token.startSupply)} at launch`],
+    ['burned', token.burned !== null ? compact(token.burned) : '–', pct !== null ? `${pct < 0.01 && pct > 0 ? '<0.01' : pct.toFixed(2)}% of supply` : undefined],
+    ['treasury', token.treasury?.sol != null ? `${token.treasury.sol.toFixed(3)} SOL` : '–', '80% of fees, funds the bots'],
+    ['burn wallet', token.burnWallet?.sol != null ? `${token.burnWallet.sol.toFixed(3)} SOL` : '–', '20% of fees, waiting to buy and burn'],
+  ]
+  return (
+    <Section title={`$${MAIN_TICKER} on chain`} note={token.locked ? 'mint and freeze revoked' : token.locked === false ? 'mint authority still set' : undefined}>
+      <div className="st-tiles">
+        {rows.map(([k, v, sub]) => (
+          <div className="card st-tile" key={k}>
+            <span className="st-k mono">{k}</span>
+            <b>{v}</b>
+            {sub && <small className="mono">{sub}</small>}
+          </div>
+        ))}
+      </div>
+    </Section>
   )
 }
 
