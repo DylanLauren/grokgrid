@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { address } from './runtime-policy.mjs';
 
 // Buy-and-burn rules. Pure functions; amounts are integer strings, never floats.
@@ -10,7 +9,7 @@ const id = x => typeof x === 'string' && /^[a-zA-Z0-9_-]{1,96}$/.test(x);
 const signature = x => typeof x === 'string' && /^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(x);
 const timestamp = x => Number.isSafeInteger(x) && x > 0;
 const height = x => Number.isSafeInteger(x) && x > 0;
-export const TERMINAL = ['burned', 'buy-failed', 'buy-expired', 'nothing-to-burn'];
+const TERMINAL = ['burned', 'buy-failed', 'buy-expired', 'nothing-to-burn'];
 const STATES = ['buy-pending', 'buy-finalized', 'burn-pending', ...TERMINAL];
 
 export function validateBuybackConfig(c) {
@@ -23,12 +22,6 @@ export function validateBuybackConfig(c) {
   if (BigInt(c.triggerLamports) <= 0n || BigInt(c.maxSpendLamports) < BigInt(c.triggerLamports) || BigInt(c.maxSpendLamports) > 10_000_000_000n) throw Error('Invalid spend limits');
   if (!Number.isSafeInteger(c.maxSlippageBps) || c.maxSlippageBps < 1 || c.maxSlippageBps > 2000) throw Error('Invalid slippage limit');
   return c;
-}
-
-export function configFingerprint(c) {
-  validateBuybackConfig(c);
-  const pinned = ['burnWallet', 'officialMint', 'triggerLamports', 'maxSpendLamports', 'reserveLamports', 'feeAllowanceLamports', 'maxSlippageBps'];
-  return createHash('sha256').update(JSON.stringify(pinned.map(k => [k, c[k]]))).digest('hex');
 }
 
 export function emptyBuybackState(c) {

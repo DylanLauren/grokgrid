@@ -53,7 +53,7 @@ async function dasHolders(rpcUrl, mint, enough, fetchImpl) {
 }
 
 /** Authorities, holder floor, top-10 share among wallet holders, creator share. */
-export async function chainFacts(conn, rpcUrl, mint, minHolders, fetchImpl = fetch) {
+async function chainFacts(conn, rpcUrl, mint, minHolders, fetchImpl = fetch) {
   const key = new PublicKey(mint), account = await conn.getAccountInfo(key, 'confirmed');
   if (!account || ![TOKEN_PROGRAM_ID.toBase58(), TOKEN_2022_PROGRAM_ID.toBase58()].includes(account.owner.toBase58())) return null;
   const info = await getMint(conn, key, 'confirmed', account.owner);

@@ -65,7 +65,7 @@ export function paperSummary(s, market) {
 }
 
 /** Weighted cost basis per mint from finalized, reconciled buys (SOL per UI token). */
-export function costBasis(tradingState, decimalsByMint) {
+function costBasis(tradingState, decimalsByMint) {
   const acc = new Map();
   for (const i of tradingState.intents) {
     if (i.state !== 'reconciled-confirmed' || i.side !== 'buy') continue;

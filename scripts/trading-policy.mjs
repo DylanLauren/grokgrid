@@ -40,7 +40,7 @@ export function validateTradingPolicy(p) {
   if (!Number.isSafeInteger(p.maxSlippageBps) || p.maxSlippageBps < 0 || p.maxSlippageBps > 2000 || !Number.isSafeInteger(p.maxPendingIntents) || p.maxPendingIntents < 1 || p.maxPendingIntents > 100 || !Number.isSafeInteger(p.maxIntentAgeMs) || p.maxIntentAgeMs < 1000 || p.maxIntentAgeMs > 3600000) throw Error('Invalid timing or execution limits');
   return p;
 }
-export function policyFingerprint(p) {
+function policyFingerprint(p) {
   validateTradingPolicy(p);
   return createHash('sha256').update(JSON.stringify(Object.fromEntries(Object.keys(p).sort().map(k => [k, p[k]])))).digest('hex');
 }
