@@ -28,7 +28,7 @@ async function tick() {
   // Follow the house: the coins it holds or just traded may be shown. Written before navigating,
   // so the feed and the video capture already accept the page when it loads.
   const now = Date.now(), journal = await read('trading/trading-journal.json', null);
-  const mints = followMints(journal?.state, await read('trading-positions.json', null), now);
+  const mints = followMints(journal?.state, now);
   const follow = { mints, updatedAt: now };
   const ftmp = join(root, `.${FOLLOW_FILE}.tmp`);
   await writeFile(ftmp, JSON.stringify(follow) + '\n', { mode: 0o600 }); await rename(ftmp, join(root, FOLLOW_FILE));

@@ -7,12 +7,12 @@ const now = 1_800_000_000_000, PROFILE = 'https://pump.fun/profile/GrokGrid'
 const A = 'ANVLA6eKiAq4nstD2Sg3SZhfVkSEwfnGccn12UQWpump', B = '9KhzhyM1BwgW6myZRcqdzQvemKjVrjck8kaevTkMpump'
 const i = (side: string, mint: string, at: number, state = 'reconciled-confirmed') => ({ side, mint, createdAt: at, state })
 
-test('follows coins the house holds or just traded, newest first; idle shows the profile', () => {
-  assert.deepEqual(followMints({ intents: [i('buy', A, now - 60000), i('buy', B, now - 1000)] }, null, now), [B, A])
-  assert.deepEqual(followMints({ intents: [i('buy', A, now - 60000), i('sell', A, now - 1000)] }, null, now), [A]) // just sold: still on screen
-  assert.deepEqual(followMints({ intents: [i('buy', A, now - 600000), i('sell', A, now - RECENT_TRADE_MS - 1)] }, null, now), [])
-  assert.deepEqual(followMints({ intents: [i('buy', A, now, 'expired')] }, null, now), [])
-  assert.deepEqual(followMints({ intents: [] }, { positions: [{ mint: B, tokenUnits: '5' }] }, now), [B])
+test('follows only coins the house itself traded (never airdropped inventory), newest first; idle shows the profile', () => {
+  assert.deepEqual(followMints({ intents: [i('buy', A, now - 60000), i('buy', B, now - 1000)] }, now), [B, A])
+  assert.deepEqual(followMints({ intents: [i('buy', A, now - 60000), i('sell', A, now - 1000)] }, now), [A]) // just sold: still on screen
+  assert.deepEqual(followMints({ intents: [i('buy', A, now - 600000), i('sell', A, now - RECENT_TRADE_MS - 1)] }, now), [])
+  assert.deepEqual(followMints({ intents: [i('buy', A, now, 'expired')] }, now), [])
+  assert.deepEqual(followMints({ intents: [i('buy', 'not a mint', now)] }, now), []) // only real mints, only from the journal
   assert.equal(targetPage([B, A], PROFILE), coinUrl(B)); assert.equal(targetPage([], PROFILE), PROFILE)
 })
 
