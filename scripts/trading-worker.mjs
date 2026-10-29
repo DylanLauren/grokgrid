@@ -113,12 +113,16 @@ async function tick() {
 // stop file and journal-before-broadcast rules as tick().
 const SELL_WATCH_MS=25000, SELL_POLL_MS=2000;
 async function fastSells(until) {
-  const policy=validateTradingPolicy(await json(join(root,'trading-config.json')));
-  if(!executes(policy))return;
-  const {rpcUrl,houseWallet}=await json(join(root,'observer-config.json'));
-  if(houseWallet!==policy.wallet)throw Error('RPC wallet mismatch');
-  const conn=connect(rpcUrl);let signer=null;
+  let signer=null,signerWallet=null;
   while(!stop&&Date.now()<until){
+    // Re-read both configs every pass: switching off execution, or a wallet/RPC change, stops
+    // the fast path at once instead of after this slot.
+    const policy=validateTradingPolicy(await json(join(root,'trading-config.json')));
+    if(!executes(policy))return;
+    const {rpcUrl,houseWallet}=await json(join(root,'observer-config.json'));
+    if(houseWallet!==policy.wallet)throw Error('RPC wallet mismatch');
+    if(signerWallet!==policy.wallet){signer=null;signerWallet=policy.wallet;}
+    const conn=connect(rpcUrl);
     let pendingSend=null;
     const peek=(await json(join(root,'trading','trading-journal.json')).catch(()=>null))?.state;
     const wanted=peek?.intents?.some(i=>i.side==='sell'&&(i.state==='planned'||i.state==='held-ambiguous'));
