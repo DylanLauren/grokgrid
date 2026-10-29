@@ -29,6 +29,11 @@ Create `trading-config.json` in the existing protected runtime directory
 ```
 
 These numbers are illustrative offline limits, not approved spending amounts.
+
+Risk limits, all from the journal:
+- **`maxExposureLamports`:** the cost still open in coins held. Realised losses are not exposure.
+- **`maxDailyLossLamports`:** today's net outflow. Today's realised losses count here.
+- **`maxTotalLossLamports`** (optional, at least the daily stop): realised losses over the journal's life. When reached, buying stops (`total-loss-stop`); selling continues. Leaving it out means no lifetime stop. Setting or changing it changes the policy fingerprint, so do it only while the bot holds nothing, and archive the journal.
 The empty allowlist rejects every proposed token. Never use this example as
 live trading authorization.
 

@@ -37,6 +37,8 @@ export function validateTradingPolicy(p) {
   if (!id(p.agentId) || !publicAddress(p.wallet) || !(p.allowedMints === 'dynamic' || (Array.isArray(p.allowedMints) && p.allowedMints.every(publicAddress) && new Set(p.allowedMints).size === p.allowedMints.length))) throw Error('Invalid pinned identities');
   for (const field of ['maxTradeLamports', 'maxExposureLamports', 'maxDailyLossLamports', 'reserveLamports']) if (!integer(p[field])) throw Error('Invalid integer policy');
   if (BigInt(p.maxTradeLamports) <= 0n || BigInt(p.maxExposureLamports) < BigInt(p.maxTradeLamports) || BigInt(p.maxDailyLossLamports) <= 0n) throw Error('Invalid limits');
+  // Optional lifetime stop on realised losses. Absent means none (older configs and journals keep working).
+  if (p.maxTotalLossLamports !== undefined && (!integer(p.maxTotalLossLamports) || BigInt(p.maxTotalLossLamports) < BigInt(p.maxDailyLossLamports))) throw Error('Invalid limits');
   if (!Number.isSafeInteger(p.maxSlippageBps) || p.maxSlippageBps < 0 || p.maxSlippageBps > 2000 || !Number.isSafeInteger(p.maxPendingIntents) || p.maxPendingIntents < 1 || p.maxPendingIntents > 100 || !Number.isSafeInteger(p.maxIntentAgeMs) || p.maxIntentAgeMs < 1000 || p.maxIntentAgeMs > 3600000) throw Error('Invalid timing or execution limits');
   return p;
 }
@@ -102,7 +104,8 @@ export function planIntent(state, policy, proposal, observation, risk, now = Dat
   if (proposal.side === 'buy') {
     if (!risk || risk.wallet !== p.wallet || risk.complete !== true || !integer(risk.exposureLamports) || !integer(risk.dailyLossLamports) || risk.utcDay !== new Date(now).toISOString().slice(0,10) || !timestamp(risk.observedAt) || now - risk.observedAt > 90000 || risk.observedAt > now) throw Error('Current risk snapshot is required');
     const reserved = pending.filter(i=>i.side==='buy').reduce((sum, i) => sum + BigInt(i.spendLamports), 0n), spend = BigInt(proposal.spendLamports);
-    if (reserved + spend + BigInt(risk.exposureLamports) > BigInt(p.maxExposureLamports) || reserved + spend + BigInt(p.reserveLamports) > BigInt(observation.house.balanceLamports) || BigInt(risk.dailyLossLamports) >= BigInt(p.maxDailyLossLamports)) throw Error('Policy risk limit reached');
+    if (reserved + spend + BigInt(risk.exposureLamports) > BigInt(p.maxExposureLamports) || reserved + spend + BigInt(p.reserveLamports) > BigInt(observation.house.balanceLamports) || BigInt(risk.dailyLossLamports) >= BigInt(p.maxDailyLossLamports)
+      || (p.maxTotalLossLamports !== undefined && (!integer(risk.totalLossLamports) || BigInt(risk.totalLossLamports) >= BigInt(p.maxTotalLossLamports)))) throw Error('Policy risk limit reached');
   } else {
     if (!positions || positions.wallet !== p.wallet || positions.complete !== true || positions.source !== 'finalized-rpc-token-accounts' || positions.commitment !== 'finalized' || !timestamp(positions.observedAt) || now - positions.observedAt > 90000 || positions.observedAt > now || !Array.isArray(positions.positions) || !Array.isArray(positions.contextSlots) || positions.contextSlots.length !== 2 || positions.contextSlots.some(slot=>!Number.isSafeInteger(slot)||slot<1)) throw Error('Current finalized positions are required');
     if (positions.positions.some(x=>!publicAddress(x.mint) || !integer(x.tokenUnits) || !integer(x.spendableTokenUnits) || BigInt(x.spendableTokenUnits)>BigInt(x.tokenUnits)) || new Set(positions.positions.map(x=>x.mint)).size!==positions.positions.length) throw Error('Invalid position balances');

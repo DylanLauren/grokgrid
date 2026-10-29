@@ -19,7 +19,7 @@
             "reserveLamports": "20000000", "maxSlippageBps": 1500 } }
 ```
 
-`concurrency` (1–16, default 6) is how many agents run at once. They share one market read per tick; each keeps its own wallet, journal and directory, and one agent's error never stops the others.
+`caps.maxTotalLossLamports` (optional) gives each agent the same lifetime realised-loss stop as the house (see the trading worker doc). `concurrency` (1–16, default 6) is how many agents run at once. They share one market read per tick; each keeps its own wallet, journal and directory, and one agent's error never stops the others.
 
 ## Execute mode
 

@@ -27,6 +27,7 @@ export function validateRunnerConfig(c) {
   const k = c.caps || {};
   for (const f of ['maxTradeLamports', 'maxExposureLamports', 'maxDailyLossLamports', 'reserveLamports']) if (!integer(k[f])) throw Error(`Invalid caps.${f}`);
   if (!Number.isSafeInteger(k.maxSlippageBps) || k.maxSlippageBps < 1 || k.maxSlippageBps > 2000) throw Error('Invalid caps.maxSlippageBps');
+  if (k.maxTotalLossLamports !== undefined && !integer(k.maxTotalLossLamports)) throw Error('Invalid caps.maxTotalLossLamports');
   return c;
 }
 
@@ -44,6 +45,7 @@ export function agentTradingPolicy(c, agent) {
     agentId: agent.id, wallet: agent.wallet, allowedMints: 'dynamic',
     maxTradeLamports: trade, maxExposureLamports: k.maxExposureLamports, maxDailyLossLamports: k.maxDailyLossLamports,
     reserveLamports: k.reserveLamports, maxSlippageBps: k.maxSlippageBps, maxPendingIntents: 1, maxIntentAgeMs: 60000,
+    ...(k.maxTotalLossLamports !== undefined ? { maxTotalLossLamports: k.maxTotalLossLamports } : {}),
   });
 }
 
