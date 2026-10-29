@@ -2,23 +2,19 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { BOT_WALLET, MAIN_MINT, MAIN_NAME, MAIN_TICKER, solscan } from '../config'
 import type { Agent, AgentsFeed, BotTrade, Feed } from '../data/types'
 import { stats } from '../data/useFeed'
-import { ago, compact, mc, pct, short, sol, usd } from '../lib/format'
+import { ago, compact, mc, short, sol, usd } from '../lib/format'
 import { LiveBot, type Habit } from './LiveBot'
 import { CoinChip } from './CoinChip'
 import { peek, PeekLayer, type PeekCoin } from './CoinPeek'
 import './matrix.css'
 
-type Sort = 'mc' | 'volume' | 'change' | 'newest'
+type Sort = 'mc' | 'newest'
 const SORTS: [Sort, string][] = [
-  ['mc', 'market cap'],
-  ['volume', '24h volume'],
-  ['change', '24h move'],
+  ['mc', 'tokens & grok bots'],
   ['newest', 'newest'],
 ]
 const by: Record<Sort, (a: Agent) => number> = {
   mc: (a) => a.coin.mcUsd,
-  volume: (a) => a.coin.vol24hUsd,
-  change: (a) => a.coin.change24h,
   newest: (a) => a.launchedAt,
 }
 
@@ -87,7 +83,6 @@ export function MatrixPanel({ grid, feed, onOpen }: { grid: AgentsFeed; feed: Fe
   const totals: [string, string][] = [
     ['bots trading', `${all.length}`],
     ['combined mc', mc(sum((a) => a.coin.mcUsd))],
-    ['24h volume', mc(sum((a) => a.coin.vol24hUsd))],
     // sample bots never earned fees or burned anything: show those only once the grid is live
     ['fees earned', grid.mode === 'live' ? `${sum((a) => a.coin.feesSol).toFixed(2)} SOL` : '–'],
     [`$${MAIN_TICKER} burned`, grid.mode === 'live' ? compact(sum((a) => a.burnedMain)) : '–'],
@@ -118,8 +113,6 @@ export function MatrixPanel({ grid, feed, onOpen }: { grid: AgentsFeed; feed: Fe
           <span>bot</span>
           <span>coin</span>
           <span className="r">mc</span>
-          <span className="r">24h vol</span>
-          <span className="r">24h</span>
           <span className="r">fees</span>
           <span className="r">wallet</span>
           <span className="r">p&l</span>
@@ -173,8 +166,6 @@ function Row({ a, i, solUsd, now, onOpen }: { a: Agent; i: number; solUsd: numbe
         </span>
       </span>
       <Num className="r" v={a.coin.mcUsd} label="mc">{a.coin.mcUsd ? mc(a.coin.mcUsd) : '–'}</Num>
-      <Num className="r" v={a.coin.vol24hUsd} label="24h vol">{a.coin.vol24hUsd ? mc(a.coin.vol24hUsd) : '–'}</Num>
-      <Num className={`r ${a.coin.change24h >= 0 ? 'gain' : 'loss'}`} v={a.coin.change24h} label="24h">{a.coin.mcUsd ? pct(a.coin.change24h) : '–'}</Num>
       <Num className="r" v={a.coin.feesSol} label="fees">{sample ? '–' : <Sol n={a.coin.feesSol} />}</Num>
       <Num className="r" v={a.walletSol} label="wallet"><Sol n={a.walletSol} /></Num>
       <Num className={`r ${a.pnlSol === null ? 'dim' : a.pnlSol >= 0 ? 'gain' : 'loss'}`} v={a.pnlSol ?? 0} label="p&l" title={a.pnlSol === null ? 'Cost basis not verified' : usd(a.pnlSol * solUsd)}>

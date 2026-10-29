@@ -372,3 +372,15 @@
   .pos-row .pos-coin { grid-column: 1 / -2; }
   .pos-row .pos-pct { grid-column: -2; grid-row: 1; }
 }
+
+/* connect (grid launch) */
+.gd-connect { padding: 18px 22px; margin-bottom: 24px; }
+.gd-connect h2 { margin: 0 0 4px; font-size: 18px; }
+.gd-connect p { margin: 0; color: var(--paper-70); font-size: 14px; }
+.gd-connect-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.gd-connect-on { display: grid; gap: 12px; }
+.gd-addr { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border: 1px solid var(--hair); border-radius: 12px; background: #ffffff05; }
+.gd-addr .mono { flex: 1; overflow-wrap: anywhere; font-size: 13px; }
+.gd-limits summary { cursor: pointer; font-size: 12px; color: var(--paper-50); }
+.gd-limits p { margin: 8px 0; font-size: 13px; }
+@media (max-width: 600px) { .gd-connect-row { flex-direction: column; align-items: stretch; } }
