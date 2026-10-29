@@ -103,6 +103,7 @@
 }
 .pt-row b { color: #fff; font-weight: 600; }
 .pt-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pt-ago { flex: none; font-size: 10px; color: rgba(255,255,255,.55); }
 .pt-side { flex: none; padding: 2px 6px; border-radius: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
 .pt-row.buy .pt-side { background: color-mix(in srgb, var(--gain) 14%, transparent); color: var(--gain); }
 .pt-row.sell .pt-side { background: color-mix(in srgb, var(--loss) 14%, transparent); color: var(--loss); }
