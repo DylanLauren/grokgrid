@@ -141,3 +141,15 @@ test('never plans a second buy of a coin just bought, held, or with a pending in
   assert.equal(plan([buy('reconciled-confirmed'), sold]).proposals.length, 0) // sold, but inside the re-entry cooldown
   assert.equal(livePlan({ tradingState: { ...emptyTradingState(policy), intents: [buy('reconciled-confirmed', now - 999 * 60000), { ...sold, createdAt: now - 998 * 60000 }] }, policy, c, peaks: {}, positions, market: market(), now, liquidating: false }).proposals.filter(p => p.side === 'buy').length, 1)
 })
+
+test('live buys use the fee/balance budget and stop at its exposure limit', () => {
+  const small = validateStrategyConfig({ ...c, tradeLamports: '1000000' })
+  const plan = (sizing: Record<string, string> | null, intents: unknown[] = []) => livePlan({ tradingState: { ...emptyTradingState(policy), intents }, policy, c: small, peaks: {}, positions, market: market(), now, liquidating: false, sizing })
+  assert.equal(plan(null).proposals[0].spendLamports, '1000000') // no sizing inputs: configured size
+  assert.equal(plan({ walletLamports: '1000000000', feesLamports24h: '0' }).proposals[0].spendLamports, '19600000') // 2% of 0.98 spendable
+  const rich = plan({ walletLamports: '5000000000', feesLamports24h: '0' })
+  assert.equal(rich.proposals[0].spendLamports, '20000000') // clamped to the no-fees tier cap (0.02), below the policy's 0.05
+  assert.equal(rich.budget.reason, 'cap')
+  const open = { id: 'b', agentId: 'house', wallet: policy.wallet, mint: 'So11111111111111111111111111111111111111112', side: 'buy', state: 'reconciled-confirmed', createdAt: now - 1000, receipt: { spentLamports: '480000000', receivedTokenUnits: '1' } }
+  assert.equal(plan({ walletLamports: '1000000000', feesLamports24h: '0' }, [open]).proposals.filter(p => p.side === 'buy').length, 0) // 0.48 open > 25% of what is left: no room
+})

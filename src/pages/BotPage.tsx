@@ -5,6 +5,7 @@ import { ago, compact, mc, pct, short, usd } from '../lib/format'
 import { CoinChip } from '../ui/CoinChip'
 import { peek, PeekLayer } from '../ui/CoinPeek'
 import { BestWorst, rounds } from '../ui/BestWorst'
+import { positions, Positions } from '../ui/Positions'
 import { houseRow, tradeCoin } from '../ui/Matrix'
 import { Page } from './Page'
 import './botpage.css'
@@ -57,6 +58,7 @@ function Profile({ a, now, solUsd, onBack }: { a: Agent; now: number; solUsd: nu
   const sample = a.id.startsWith('demo')
   const trades = a.recent ?? []
   const done = useMemo(() => rounds(trades, !sample, solUsd), [trades, sample, solUsd])
+  const open = useMemo(() => positions(trades, solUsd), [trades, solUsd])
   const pnl = a.pnlSol
   const tiles: [string, React.ReactNode, string?, string?][] = [
     ['wallet', <Sol n={a.walletSol} d={4} />, '', a.wallet ? short(a.wallet) : ''],
@@ -118,6 +120,14 @@ function Profile({ a, now, solUsd, onBack }: { a: Agent; now: number; solUsd: nu
         </div>
 
         {a.curve && a.curve.length > 1 && <Curve points={a.curve} />}
+
+        <section className="card bp-bw">
+          <div className="bp-trades-head">
+            <h2>Open positions</h2>
+            <span className="mono">{open.length ? `${open.length} held · value from market cap now` : 'none right now'}</span>
+          </div>
+          {open.length ? <Positions open={open} solUsd={solUsd} now={now} /> : <p className="pos-empty mono">Not holding anything right now.</p>}
+        </section>
 
         {done.length > 0 && (
           <section className="card bp-bw">

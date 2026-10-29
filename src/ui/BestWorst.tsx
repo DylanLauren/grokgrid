@@ -5,7 +5,7 @@ import { peek, type PeekCoin } from './CoinPeek'
 
 // Every closed round trip: the sell, what it made, and how long he held.
 // Live sells carry the SOL that came back; the demo story records what went in.
-export interface Trade { ts: number; side: 'buy' | 'sell'; mint: string; symbol: string; name: string; image?: string; hue?: string; spentSol: number; pnlSol?: number | null; pnlUsd: number | null; sig?: string; coin?: { mcUsd: number; vol24hUsd: number; change24h: number } }
+export interface Trade { ts: number; side: 'buy' | 'sell'; mint: string; symbol: string; name: string; image?: string; hue?: string; spentSol: number; sizeTokens?: number; positionUsd?: number | null; pnlSol?: number | null; pnlUsd: number | null; sig?: string; coin?: { mcUsd: number; vol24hUsd: number; change24h: number } }
 export interface Round { sell: Trade; pnl: number; cost: number; pct: number; held: number | null }
 export function rounds(trades: Trade[], live: boolean, solUsd: number): Round[] {
   const open = new Map<string, number>() // mint to the first buy of the holding

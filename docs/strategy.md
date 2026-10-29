@@ -52,6 +52,28 @@ The market scan runs about once a minute, and a memecoin can fall through a −2
 - **Confirmed twice:** a quote-triggered exit is planned only when two checks in a row (5 seconds apart, within 20 seconds) agree, so one manipulated or glitched quote cannot force a sale.
 - **Sell at once:** a sell it plans goes into the house trading journal, and the trading worker is started immediately to sign it.
 - **Limits:** it never buys, never signs and changes no limits. It keeps its own peak prices in `exit-watcher-state.json`. It runs only when the strategy is live, the house is in execute mode with a dynamic allowlist and there is no STOP file. Status is in `exit-watcher-status.json`.
+## Trade size: budget follows fees and balance
+
+Each live buy is sized by `scripts/trade-budget.mjs`. The more creator fees a bot actually receives and the more spendable SOL it holds, the bigger it buys, up to a cap set by its fee tier. It never goes above the hard limits in its trading policy.
+
+**Fee tier.** Creator fees received in the last 24 hours (rolling, so the tier falls when fees dry up):
+
+| Fees in 24h | Per-trade cap |
+|---|---|
+| under 1 SOL | 0.02 SOL |
+| 1 SOL or more | 0.05 SOL |
+| 5 SOL or more | 0.1 SOL |
+| 10 SOL or more | 0.5 SOL (absolute maximum) |
+
+**Sizing.**
+- **Spendable:** wallet − reserve (0.02 SOL) − cost of coins still held.
+- **Per trade:** the larger of 10% of 24h fees and 2% of spendable. Never below the configured size (0.001 SOL) and never above min(tier cap, policy per-trade limit).
+- **Open exposure:** min(3 × tier cap, 25% of spendable, policy exposure limit).
+- **Daily loss stop:** min(2.5 × tier cap, 20% of wallet, policy daily loss limit).
+
+**What counts as fees.** Only payouts the fee router sent and saw finalized on chain for the bot's own coin, at its 80% share. That means $GRID for the house and its own coin for a launched bot. Unclaimed or estimated fees never count.
+
+**Always on top.** Slippage, the reserve, `maxOpenPositions` (3) and every executor check stay in force. The policy's hard limits are the ceiling, so a tier above them has no effect until the operator raises them. The strategy heartbeat and `strategy-status.json` (`budget`) report tier, fees in 24h, per-trade size, exposure and daily loss.
 
 ## Heartbeats
 
