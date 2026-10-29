@@ -11,7 +11,7 @@ export function CallsPanel({ feed, focus }: { feed: Feed; focus?: string }) {
       <PanelHead title="Calls" sub={`every trade he makes, called out as it happens. ${feed.mode === 'demo' ? 'sample calls until his wallet goes live.' : 'each one links to its transaction.'}`} />
       <div className="pn-list">
         {feed.calls.slice(0, 40).map((c, i) => (
-          <div key={c.id} className="pn-item" style={{ '--i': Math.min(i, 12) } as CSSProperties}>
+          <div key={c.id} className="pn-item" data-call={c.id} style={{ '--i': Math.min(i, 12) } as CSSProperties}>
             <CallCard call={c} focus={c.id === focus} />
           </div>
         ))}

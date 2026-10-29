@@ -148,3 +148,15 @@
   .view-phone .calls-dock { display: none; }
   .fine { display: none; }
 }
+
+/* opening a callout from the dock: the panel slides in as one piece while the clicked
+   card flies from the dock to its spot in the list (see morphOpen in App.tsx) */
+.vt-calls .panel { view-transition-name: calls-panel; transition: none; }
+.vt-calls .pn-item { animation: none; }
+::view-transition-group(calls-panel) { animation-duration: 0.55s; animation-timing-function: cubic-bezier(.2,.8,.2,1); }
+::view-transition-group(call-open) { animation-duration: 0.6s; animation-timing-function: cubic-bezier(.25,.9,.25,1.05); z-index: 2; }
+::view-transition-old(call-open), ::view-transition-new(call-open) { height: 100%; object-fit: cover; object-position: top; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.35s; }
+/* the closed panel still holds the same cards, so only its new picture is drawn while it slides */
+::view-transition-old(calls-panel) { animation: none; opacity: 0; }
+::view-transition-new(calls-panel) { animation: none; }
