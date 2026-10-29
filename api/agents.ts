@@ -1,3 +1,4 @@
+import { beats, fresh } from './_heartbeat.js'
 import { balances, hasStore, HOUSE_WALLET, json, MAIN_MINT, markets, parse, redis, solUsd, toHash } from './_lib.js'
 
 // Registry entry, written once by /api/ingest when Grok Bot launches an agent's coin.
@@ -28,18 +29,20 @@ export async function GET() {
 
   const perAgent = await redis(...ids.flatMap((id) => [['HGETALL', `gg:stats:${id}`], ['LINDEX', `gg:calls:${id}`, 0]]))
   const lastCalls = ids.map((_, i) => parse<CallLite>(perAgent[i * 2 + 1]))
-  const [bal, mkt, price] = await Promise.all([
+  const [bal, mkt, price, beat] = await Promise.all([
     balances([HOUSE_WALLET, ...records.map((r) => r.wallet)]),
     markets([MAIN_MINT, ...records.map((r) => r.coin.mint), ...lastCalls.flatMap((c) => c?.mint ? [c.mint] : [])]),
     solUsd(),
+    beats().then((b) => b.trading).catch(() => undefined),
   ])
+  const houseMode = fresh(beat) ? beat.mode : null
 
   const houseRecord: AgentRecord = {
     id: 'house',
     name: 'grok grid',
     color: '#ffffff',
     shape: 'sphere',
-    strategy: 'the house bot. wallet monitoring is active; automatic trading is paused',
+    strategy: houseMode === 'execute' ? 'the house bot. trading on his own, inside hard limits' : houseMode === 'paper' ? 'the house bot. paper trading: real signals, simulated fills' : 'the house bot. wallet monitoring is active; automatic trading is paused',
     launchedAt: 0,
     wallet: HOUSE_WALLET,
     coin: { mint: MAIN_MINT, symbol: process.env.VITE_MAIN_TICKER || 'GRID', name: 'Grok Grid', image: '/favicon.svg', hue: '#f4f4f2' },

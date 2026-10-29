@@ -2,6 +2,7 @@ import { ingestScope } from './_ingest-auth.js'
 import type { AgentRecord } from './agents.js'
 import { HOUSE_WALLET, isAddress, isSig, json, parse, redis } from './_lib.js'
 import { verifyTradeReceipt } from './_trade-receipt.js'
+import { readBeat, saveBeat } from './_heartbeat.js'
 
 // Grok Bot posts what it just did here, one event per request, with
 //   Authorization: Bearer <INGEST_TOKEN>
@@ -13,6 +14,7 @@ import { verifyTradeReceipt } from './_trade-receipt.js'
 //   { "type": "fees",   "agent": "house", "feesSol": 1.2, "burnedMain": 350000 }   (running totals)
 //   { "type": "wallet", "agent": "house", "sol": 2.31 }
 //   { "type": "action", "text": "reading the trader list" }           (what he is doing right now)
+//   { "type": "runtime", "worker": "agent-runner", "mode": "execute", "healthy": true, "agents": 3, "note": "" }
 //   { "type": "screen", "jpeg": "<base64 jpeg of his phone screen>" }  (live view, about one every 2s)
 //   Agent registration happens only through verified launch confirmation.
 //   GET /api/launch/events (same token) delivers durable observation pages.
@@ -57,6 +59,12 @@ export async function POST(req: Request) {
       return action(ev)
     case 'screen':
       return screen(ev)
+    case 'runtime': {
+      const beat = readBeat(ev)
+      if (!beat) return json({ error: 'A runtime beat needs worker, mode and healthy.' }, 400)
+      await saveBeat(beat)
+      return json({ ok: true })
+    }
     default:
       return json({ error: 'unknown type' }, 400)
   }
