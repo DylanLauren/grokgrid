@@ -6,10 +6,11 @@ import { useWhep } from './useWhep'
 import { useLivePhone } from './useLivePhone'
 import type { LivePhoneState } from './livePhoneSession'
 import { fetchPhoneFrame } from './phoneFrame'
+import { PhoneTrades } from './PhoneTrades'
 import './phone.css'
 
 // Show only actual broadcast frames. An offline feed must never impersonate a live screen.
-export function PhoneScreen({ live, watching }: { feed: Feed; live: Live; watching: boolean }) {
+export function PhoneScreen({ feed, live, watching }: { feed: Feed; live: Live; watching: boolean }) {
   const [now, setNow] = useState(() => Date.now())
   const { video: liveVideo, state: videoState, playing: livePlaying } = useLivePhone(watching)
   const { video, playing } = useWhep(PHONE_STREAM, watching && videoState === 'unavailable')
@@ -35,6 +36,7 @@ export function PhoneScreen({ live, watching }: { feed: Feed; live: Live; watchi
           <span className="ph-live mono"><i aria-hidden="true" />live video</span>
         </div>
       )}
+      <PhoneTrades feed={feed} watching={watching} />
     </div>
   )
 }
