@@ -11,15 +11,22 @@ const font = name => `data:font/woff2;base64,${readFileSync(fileURLToPath(new UR
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export const FFMPEG = ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'].find(p => existsSync(p)) || null;
 
-/** The coin picture as a data URI (https only, image types only, 2 MB max), or null. */
+// Same hosts the site accepts for coin pictures. Anything else, any redirect, or more than
+// 2 MB is refused; the body is read with a running byte cap.
+const IMAGE_HOSTS = /^([a-z0-9-]+\.)*(ipfs\.io|pump\.fun|mypinata\.cloud|dexscreener\.com|arweave\.net|nftstorage\.link|irys\.xyz)$/i;
+const MAX_IMAGE = 2_000_000;
+
+/** The coin picture as a data URI (allowlisted https hosts, image types, 2 MB max), or null. */
 export async function coinImage(url, fetchImpl = fetch) {
   try {
-    if (typeof url !== 'string' || !url.startsWith('https://')) return null;
-    const r = await fetchImpl(url, { redirect: 'follow', signal: AbortSignal.timeout(8000) });
+    const u = new URL(url);
+    if (u.protocol !== 'https:' || u.username || u.password || u.port || !IMAGE_HOSTS.test(u.hostname)) return null;
+    const r = await fetchImpl(u.href, { redirect: 'error', signal: AbortSignal.timeout(8000) });
     const type = r.headers.get('content-type') || '';
-    if (!r.ok || !/^image\/(png|jpe?g|webp|gif)/.test(type)) return null;
-    const buf = Buffer.from(await r.arrayBuffer());
-    return buf.length > 2_000_000 ? null : `data:${type.split(';')[0]};base64,${buf.toString('base64')}`;
+    if (!r.ok || !/^image\/(png|jpe?g|webp|gif)/.test(type) || Number(r.headers.get('content-length') || 0) > MAX_IMAGE || !r.body) return null;
+    const chunks = []; let size = 0;
+    for await (const chunk of r.body) { size += chunk.length; if (size > MAX_IMAGE) return null; chunks.push(chunk); }
+    return `data:${type.split(';')[0]};base64,${Buffer.concat(chunks).toString('base64')}`;
   } catch { return null; }
 }
 
