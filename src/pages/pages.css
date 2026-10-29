@@ -96,9 +96,9 @@
 .st-tr a:hover { color: var(--paper); }
 /* the Solscan mark that opens a trade's transaction: muted in the table, full on hover */
 .sx { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--hair); background: #ffffff05; vertical-align: middle; transition: background 0.2s, border-color 0.2s; }
-.sx img { display: block; opacity: 0.55; filter: grayscale(1); transition: opacity 0.2s, filter 0.2s; }
+.sx img { display: block; opacity: 0.85; transition: opacity 0.2s, transform 0.2s; }
 .sx:hover, .sx:focus-visible { background: #c4f5e914; border-color: #c4f5e955; }
-.sx:hover img, .sx:focus-visible img { opacity: 1; filter: none; }
+.sx:hover img, .sx:focus-visible img { opacity: 1; transform: scale(1.08); }
 .st-coin { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .st-coin b { font-weight: 540; }
 .st-coin small { color: var(--paper-50); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

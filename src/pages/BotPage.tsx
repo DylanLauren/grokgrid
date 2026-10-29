@@ -213,7 +213,7 @@ function TradeRow({ t, i, now, solUsd, avg, round }: { t: BotTrade; i: number; n
       <span className="r mono dim">{ago(t.ts, now)}</span>
       <span className="r">
         {t.sig && (
-          <a className="sx" href={solscan('tx', t.sig)} target="_blank" rel="noreferrer" title="View on Solscan" aria-label="View on Solscan"><img src="/brands/solscan.svg" alt="" width={16} height={16} /></a>
+          <a className="sx" href={solscan('tx', t.sig)} target="_blank" rel="noreferrer" title="View on Solscan" aria-label="View on Solscan"><img src="/brands/solscan.png" alt="" width={16} height={16} /></a>
         )}
       </span>
     </div>

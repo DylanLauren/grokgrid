@@ -79,7 +79,7 @@ export function BestWorst({ done, solUsd, avg }: { done: Round[]; solUsd: number
                 {(r.buy?.tradeMc || c.tradeMc) && <span>{atMc(r.buy)} → {atMc(c)} mc</span>}
                 <span>{usd(Math.abs(r.pnl * solUsd))}</span>
                 {r.held !== null && <span>held {dur(r.held)}</span>}
-                {c.sig && <a className="sx" href={solscan('tx', c.sig)} target="_blank" rel="noreferrer" title="View on Solscan" aria-label="View on Solscan"><img src="/brands/solscan.svg" alt="" width={14} height={14} /></a>}
+                {c.sig && <a className="sx" href={solscan('tx', c.sig)} target="_blank" rel="noreferrer" title="View on Solscan" aria-label="View on Solscan"><img src="/brands/solscan.png" alt="" width={14} height={14} /></a>}
               </span>
             </div>
           )
