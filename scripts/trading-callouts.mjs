@@ -10,8 +10,8 @@ export function pendingCallouts(state, ledger) {
   return state.intents.filter(i => i.state === 'reconciled-confirmed' && i.signature && !done.has(i.signature));
 }
 
-export async function postCallouts(root, state, { agent, max = 5, fetchImpl, lookup = marketMetrics } = {}) {
-  const file = join(root, 'trading-callouts.json');
+export async function postCallouts(root, state, { agent, max = 5, fetchImpl, lookup = marketMetrics, ledgerDir = root } = {}) {
+  const file = join(ledgerDir, 'trading-callouts.json');
   let ledger = { version: 1, posted: {} };
   try { ledger = JSON.parse(await readPrivateText(file)); } catch {}
   const todo = pendingCallouts(state, ledger).slice(0, max);

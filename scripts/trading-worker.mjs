@@ -83,7 +83,7 @@ async function tick() {
       const stopFilePresent=await access(policy.stopFile).then(()=>true,()=>false);
       let signer=null;
       const signed=await signNext(s,policy,{stopFilePresent,signatureOf:signedSignature,
-        sign:tx=>tx.sign([signer]),
+        sign:tx=>{tx.sign([signer]);},
         build:async intent=>{
           signer??=await loadSigner(policy.keypairFile,policy.wallet);
           const {tokenProgram}=await readMint(conn,intent.mint);
