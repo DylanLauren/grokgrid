@@ -60,6 +60,10 @@ function number(v: unknown, lo: number, hi: number, what: string) {
   return n
 }
 
+// Names only the house bot and the site itself may use, so nobody can pass as them.
+const RESERVED = ['house', 'housetrader', 'housebot', 'grokgrid', 'grokgridofficial', 'official', 'admin']
+export const reservedName = (name: string) => RESERVED.includes(name.toLowerCase().replace(/[^a-z0-9]/g, ''))
+
 // Cleans and checks a draft. Throws a message fit to show the launcher.
 export function cleanDraft(value: unknown): Draft {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Fill in the bot.')
@@ -81,6 +85,7 @@ export function cleanDraft(value: unknown): Draft {
   }
   if (!d.name || bytes(d.name) > 32 || CONTROL.test(d.name)) throw Error('Name needs 1 to 32 characters.')
   if (bytes(d.botName) > 32 || CONTROL.test(d.botName)) throw Error('Bot name needs 32 characters at most.')
+  if (reservedName(d.botName)) throw Error('That bot name belongs to the house. Pick another.')
   if (!/^[A-Z0-9]{2,10}$/.test(d.ticker)) throw Error('Ticker needs 2 to 10 letters or numbers.')
   if (bytes(d.description) > 600 || CONTROL.test(d.description)) throw Error('Description must be 600 bytes or fewer.')
   if (!d.strategy || bytes(d.strategy) > 140 || CONTROL.test(d.strategy)) throw Error('Strategy needs one line, 140 bytes at most.')
