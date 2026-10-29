@@ -211,6 +211,7 @@
 .gd-sign dd { margin: 0; white-space: nowrap; }
 .gd-sign .sum { padding-top: 6px; border-top: 1px solid var(--hair); }
 .gd-sign .sum dt, .gd-sign .sum dd { color: var(--paper); font-weight: 520; }
+.gd-edge:focus::placeholder { color: transparent; } /* the prompt clears as soon as you click in */
 .gd-note { margin: 0; font-size: 13px; color: var(--paper-50); }
 .gd-note.mono { font-size: 11.5px; }
 .gd-note.bad { color: var(--loss); }

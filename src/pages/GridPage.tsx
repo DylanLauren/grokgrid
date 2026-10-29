@@ -68,7 +68,7 @@ function check(d: Draft) {
   if (bytes(d.description) > LIMITS.description) e.description = `${LIMITS.description} bytes at most`
   if (d.x && !/^https:\/\/(x|twitter)\.com\/[A-Za-z0-9_]{1,15}(\/status\/\d+)?\/?$/.test(d.x)) e.x = 'an x.com link to a profile or post'
   if (d.telegram && !/^https:\/\/t\.me\/[A-Za-z0-9_+]{3,}\/?$/.test(d.telegram)) e.telegram = 'a t.me link'
-  if (!d.strategy.trim()) e.strategy = 'one line for its profile'
+  if (!d.strategy.trim()) e.strategy = 'describe its edge'
   const n = (v: string, lo: number, hi: number) => v !== '' && !(Number(v) >= lo && Number(v) <= hi)
   if (n(d.maxSol, 0.01, MAX_TRADE)) e.maxSol = `0.01 to ${MAX_TRADE} SOL`
   if (n(d.takeProfit, 5, HOUSE.takeProfit)) e.takeProfit = `5% to ${HOUSE.takeProfit}%`
@@ -185,7 +185,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
           <div className="card gd-preview">
             <LiveBot key={`${d.look}-${cheer}`} color={look.color} shape={look.shape} habit={CAST[d.look].habit} size={170} selected />
             <b>{d.botName.trim() || d.name || 'your bot'}</b>
-            <span>{d.strategy || 'its motto on the grid'}</span>
+            <span>{d.strategy || 'its edge'}</span>
           </div>
           {/* how the coin will look on pump.fun */}
           <div className="card gd-coin">
@@ -271,8 +271,8 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             <Field label="bot name" count={`${bytes(d.botName)}/${LIMITS.botName}`} error={err('botName')}>
               <input value={d.botName} placeholder={d.name ? `${d.name} (or give it its own)` : 'night owl'} onBlur={() => touch('botName')} onChange={(e) => set('botName', e.target.value)} />
             </Field>
-            <Field label="tagline" count={`${bytes(d.strategy)}/${LIMITS.strategy}`} error={err('strategy')} hint="its motto on the grid. every bot trades on the house engine and safety screen; the numbers below can only make it more careful.">
-              <input value={d.strategy} placeholder="patient, picky, never chases a pump" onBlur={() => touch('strategy')} onChange={(e) => set('strategy', e.target.value)} />
+            <Field label="edge" count={`${bytes(d.strategy)}/${LIMITS.strategy}`} error={err('strategy')} hint="shown on its card and profile. every bot trades inside the house safety rules.">
+              <input className="gd-edge" value={d.strategy} placeholder="configure your personal edge on our grok trading bots" onBlur={() => touch('strategy')} onChange={(e) => set('strategy', e.target.value)} />
             </Field>
             <div className="gd-row three">
               <Field label="max per trade" unit="SOL" hint={`signer cap: ${MAX_TRADE}`} error={err('maxSol')}>
