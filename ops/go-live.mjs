@@ -6,6 +6,7 @@
 //   npx tsx ops/go-live.mjs buyback <mint>   buy-and-burn on, for the official $GRID mint
 //   npx tsx ops/go-live.mjs runner           user agents sign through Privy
 //   npx tsx ops/go-live.mjs callouts on|off  pump.fun Callouts from the GrokGrid profile
+//   npx tsx ops/go-live.mjs fees on|off      route creator fees ($GRID and bot coins) to their shareholders
 //   npx tsx ops/go-live.mjs x on|off         post real trades to X
 //   npx tsx ops/go-live.mjs stop | resume    freeze / unfreeze all signing (STOP file)
 //   npx tsx ops/go-live.mjs exit | unexit    sell everything and stop buying (EXIT file)
@@ -51,6 +52,7 @@ function status() {
   show('agent-runner-config.json', a => a.mode);
   show('callout-config.json', c => c.pumpCalloutsEnabled ? 'ON' : 'off');
   show('x-config.json', c => c.xPostsEnabled ? 'ON' : 'off');
+  show('fee-distributor-config.json', c => c.enabled ? 'ON' : 'off');
   console.log(`  STOP file                  ${existsSync(f('STOP')) ? 'PRESENT (signing frozen)' : 'absent'}`);
   console.log(`  EXIT file                  ${existsSync(f('EXIT')) ? 'PRESENT (selling everything)' : 'absent'}`);
 }
@@ -125,6 +127,7 @@ try {
   if (cmd === 'house') await house();
   else if (cmd === 'buyback') await buyback(arg);
   else if (cmd === 'runner') await runner();
+  else if (cmd === 'fees') await flag('fee-distributor-config.json', 'enabled', arg, 'The house wallet will pay network fees to trigger pump.fun creator-fee payouts for $GRID and every bot coin.', 'go live fees');
   else if (cmd === 'callouts') await flag('callout-config.json', 'pumpCalloutsEnabled', arg, 'The GrokGrid pump.fun profile will make a public Callout for every coin the house really holds.', 'go live callouts');
   else if (cmd === 'x') await flag('x-config.json', 'xPostsEnabled', arg, 'Real trades will be posted publicly to X.', 'go live x');
   else if (cmd === 'stop') touch('STOP');
@@ -132,6 +135,6 @@ try {
   else if (cmd === 'exit') touch('EXIT');
   else if (cmd === 'unexit') remove('EXIT');
   else if (cmd === 'off') { await confirm('Every worker goes back to observe-only / paper.', 'all off'); off(); }
-  else if (cmd !== 'status') { console.log('Commands: status | house | buyback <mint> | runner | callouts on|off | x on|off | stop | resume | exit | unexit | off'); process.exit(1); }
+  else if (cmd !== 'status') { console.log('Commands: status | house | buyback <mint> | runner | callouts on|off | fees on|off | x on|off | stop | resume | exit | unexit | off'); process.exit(1); }
   console.log('\nNow:'); status();
 } catch (e) { console.error(`Not changed: ${String(e?.message || e).slice(0, 200)}`); process.exit(1); }

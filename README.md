@@ -171,7 +171,7 @@ Going live is one gated command each (`house`, `buyback <mint>`, `runner`, `call
 
 ## Deep dives
 
-[Strategy](docs/strategy.md) · [Trading worker](docs/trading-worker.md) · [Agent runner](docs/agent-runner.md) · [Buy-and-burn](docs/buyback.md) · [Privy agent wallets](docs/privy-agent-wallet.md) · [X posts and media](docs/x-posts.md) · [Runtime and go-live](docs/runtime.md) · [Phone feed](docs/phone-feed.md) · [Phone video](docs/phone-video.md) · [Launch rules](docs/runtime-launch-rules.md) · [Observations](docs/runtime-observations.md)
+[Strategy](docs/strategy.md) · [Trading worker](docs/trading-worker.md) · [Agent runner](docs/agent-runner.md) · [Buy-and-burn](docs/buyback.md) · [Fee routing](docs/fee-distributor.md) · [Privy agent wallets](docs/privy-agent-wallet.md) · [X posts and media](docs/x-posts.md) · [Runtime and go-live](docs/runtime.md) · [Phone feed](docs/phone-feed.md) · [Phone video](docs/phone-video.md) · [Launch rules](docs/runtime-launch-rules.md) · [Observations](docs/runtime-observations.md)
 
 Art in this README is generated from the site's own mascots and fonts: `npx tsx docs/assets/build.tsx`.
 
