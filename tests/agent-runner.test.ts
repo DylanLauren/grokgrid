@@ -14,6 +14,8 @@ test('agent caps never exceed global caps; no Privy wallet id means observe-only
   assert.equal(p.mode, 'execute'); assert.equal(p.maxTradeLamports, '50000000'); assert.equal(p.allowedMints, 'dynamic')
   assert.equal(agentTradingPolicy(config(), { ...agent, maxTradeLamports: '10000000' }).maxTradeLamports, '10000000')
   assert.equal(agentTradingPolicy(config(), { ...agent, privyWalletId: undefined }).mode, 'observe-only')
+  assert.equal(agentTradingPolicy(config(), { ...agent, privyWalletId: 'did:privy:wallet_1' }).mode, 'execute')
+  assert.equal(agentTradingPolicy(config(), { ...agent, privyWalletId: 'bad id' }).mode, 'observe-only')
   assert.equal(agentTradingPolicy(config({ mode: 'paper', privyServerFile: undefined, privyAuthorizationKeyFile: undefined }), agent).mode, 'observe-only')
   assert.throws(() => config({ privyAuthorizationKeyFile: 'relative' }))
 })
