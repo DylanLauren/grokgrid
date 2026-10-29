@@ -43,8 +43,10 @@ interface Draft {
   fund: string // SOL sent from the owner's wallet to the bot's trading wallet at launch
 }
 
-const EMPTY: Draft = { look: 3, name: '', botName: '', ticker: '', description: '', x: '', telegram: '', strategy: '', maxSol: '0.05', takeProfit: '100', stopLoss: '30', firstBuy: '', fund: '0.05' }
+const EMPTY: Draft = { look: 3, name: '', botName: '', ticker: '', description: '', x: '', telegram: '', strategy: '', maxSol: '0.05', takeProfit: '60', stopLoss: '25', firstBuy: '', fund: '0.05' }
 const DRAFT_KEY = 'gg-launch-draft'
+// the house exits every bot runs under: an owner can set them tighter, never looser
+const HOUSE = { takeProfit: 60, stopLoss: 25 }
 const MAX_TRADE = 0.05 // the signer policy's per-buy cap: a higher max could never be used
 const LIMITS = { name: 32, botName: 32, ticker: 10, description: 600, strategy: 140 }
 const RESERVED = ['house', 'housetrader', 'housebot', 'grokgrid', 'grokgridofficial', 'official', 'admin'] // matches api/_launch.ts
@@ -62,11 +64,11 @@ function check(d: Draft) {
   if (bytes(d.description) > LIMITS.description) e.description = `${LIMITS.description} bytes at most`
   if (d.x && !/^https:\/\/(x|twitter)\.com\/[A-Za-z0-9_]{1,15}(\/status\/\d+)?\/?$/.test(d.x)) e.x = 'an x.com link to a profile or post'
   if (d.telegram && !/^https:\/\/t\.me\/[A-Za-z0-9_+]{3,}\/?$/.test(d.telegram)) e.telegram = 'a t.me link'
-  if (!d.strategy.trim()) e.strategy = 'one line on how it trades'
+  if (!d.strategy.trim()) e.strategy = 'one line for its profile'
   const n = (v: string, lo: number, hi: number) => v !== '' && !(Number(v) >= lo && Number(v) <= hi)
   if (n(d.maxSol, 0.01, MAX_TRADE)) e.maxSol = `0.01 to ${MAX_TRADE} SOL`
-  if (n(d.takeProfit, 5, 10000)) e.takeProfit = '5% to 10,000%'
-  if (n(d.stopLoss, 1, 95)) e.stopLoss = '1% to 95%'
+  if (n(d.takeProfit, 5, HOUSE.takeProfit)) e.takeProfit = `5% to ${HOUSE.takeProfit}%`
+  if (n(d.stopLoss, 1, HOUSE.stopLoss)) e.stopLoss = `1% to ${HOUSE.stopLoss}%`
   if (!(Number(d.fund) >= 0.03 && Number(d.fund) <= 10)) e.fund = '0.03 to 10 SOL'
   if (d.firstBuy && !(Number(d.firstBuy) === 0 || (Number(d.firstBuy) >= 0.001 && Number(d.firstBuy) <= 10))) e.firstBuy = '0, or 0.001 to 10 SOL'
   return e
@@ -135,7 +137,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
         accessToken: agentWallet.accessToken,
         image: picture,
         onStep: setStep,
-        draft: { ...d, maxSol: Number(d.maxSol || MAX_TRADE), takeProfit: Number(d.takeProfit || 100), stopLoss: Number(d.stopLoss || 30) },
+        draft: { ...d, maxSol: Number(d.maxSol || MAX_TRADE), takeProfit: Number(d.takeProfit || HOUSE.takeProfit), stopLoss: Number(d.stopLoss || HOUSE.stopLoss) },
       })
       setMade({ mint: r.mint, name: d.name })
       setD(EMPTY)
@@ -176,7 +178,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
           <div className="card gd-preview">
             <LiveBot key={`${d.look}-${cheer}`} color={look.color} shape={look.shape} habit={CAST[d.look].habit} size={170} selected />
             <b>{d.botName.trim() || d.name || 'your bot'}</b>
-            <span>{d.strategy || 'one line on how it trades'}</span>
+            <span>{d.strategy || 'its motto on the grid'}</span>
           </div>
           {/* how the coin will look on pump.fun */}
           <div className="card gd-coin">
@@ -262,24 +264,24 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             <Field label="bot name" count={`${bytes(d.botName)}/${LIMITS.botName}`} error={err('botName')}>
               <input value={d.botName} placeholder={d.name ? `${d.name} (or give it its own)` : 'night owl'} onBlur={() => touch('botName')} onChange={(e) => set('botName', e.target.value)} />
             </Field>
-            <Field label="strategy" count={`${bytes(d.strategy)}/${LIMITS.strategy}`} error={err('strategy')}>
-              <input value={d.strategy} placeholder="only buys coins under 30K, sells at 2x" onBlur={() => touch('strategy')} onChange={(e) => set('strategy', e.target.value)} />
+            <Field label="tagline" count={`${bytes(d.strategy)}/${LIMITS.strategy}`} error={err('strategy')} hint="its motto on the grid. every bot trades on the house engine and safety screen; the numbers below can only make it more careful.">
+              <input value={d.strategy} placeholder="patient, picky, never chases a pump" onBlur={() => touch('strategy')} onChange={(e) => set('strategy', e.target.value)} />
             </Field>
             <div className="gd-row three">
               <Field label="max per trade" unit="SOL" hint={`signer cap: ${MAX_TRADE}`} error={err('maxSol')}>
                 <input inputMode="decimal" value={d.maxSol} onBlur={() => touch('maxSol')} onChange={(e) => set('maxSol', num(e.target.value))} />
               </Field>
-              <Field label="take profit" unit="%" error={err('takeProfit')}>
+              <Field label="take profit" unit="%" hint={`${HOUSE.takeProfit}% at most`} error={err('takeProfit')}>
                 <input inputMode="decimal" value={d.takeProfit} onBlur={() => touch('takeProfit')} onChange={(e) => set('takeProfit', num(e.target.value))} />
               </Field>
-              <Field label="stop loss" unit="%" error={err('stopLoss')}>
+              <Field label="stop loss" unit="%" hint={`${HOUSE.stopLoss}% at most`} error={err('stopLoss')}>
                 <input inputMode="decimal" value={d.stopLoss} onBlur={() => touch('stopLoss')} onChange={(e) => set('stopLoss', num(e.target.value))} />
               </Field>
             </div>
           </Group>
 
           <Group n="04" title="launch">
-            <Field label="fund your bot" unit="SOL" error={err('fund')} hint="sent from your Phantom to your bot’s trading wallet in the same approval. it keeps 0.02 in reserve and trades the rest.">
+            <Field label="fund your bot" unit="SOL" error={err('fund')} hint="sent from your Phantom to your bot’s trading wallet in the same approval. it keeps 0.02 in reserve and trades the rest. each buy is about 2% of that, so around 0.25 SOL or more gives real trades.">
               <input inputMode="decimal" value={d.fund} onBlur={() => touch('fund')} onChange={(e) => set('fund', num(e.target.value))} />
             </Field>
             <Field label="first buy" unit="SOL" error={err('firstBuy')} hint="optional. bought by your phantom in the same approval, so these tokens stay in your phantom (the bot doesn't trade them).">
