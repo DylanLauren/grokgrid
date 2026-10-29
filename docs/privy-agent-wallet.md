@@ -117,7 +117,7 @@ The three steps below never print a secret. The clipboard is cleared after each 
    - the policy ID, the policy SHA-256 (`privyPolicyFingerprint`) and the one-line summary;
    - the Vercel env names to set.
 
-   Set `PRIVY_APP_SECRET` and `PRIVY_AUTHORIZATION_PRIVATE_KEY` in Vercel yourself.
+   Set `PRIVY_APP_SECRET` in Vercel yourself. The authorization key never goes to Vercel: the site only verifies wallets and never signs, so the key stays on the Mac for the agent runner.
 
 **The policy** (`ops/privy-setup.mjs`, check offline with `--dry-build`) is default deny. It allows `signTransaction` only for:
 - compute-budget instructions;
@@ -129,4 +129,4 @@ The three steps below never print a secret. The clipboard is cleared after each 
 
 Every IDL check sits in the same rule as its program-id check. There is no message signing and no key export. The signer quorum owns the policy, so the app secret alone can't loosen it. Total size is about 23 KB.
 
-**Known limits.** A system transfer's recipient and a `CloseAccount` destination can't be pinned per wallet, so a stolen authorization key could move at most 0.05 SOL per transaction that way. The runner's caps, daily-loss stop and stop file still apply on top of the policy.
+**Known limits.** A system transfer's recipient and a `CloseAccount` destination can't be pinned per wallet, so a stolen authorization key could move up to 0.05 SOL per transaction that way, repeatedly. Keep the key file 0600 on the Mac only; remove the signer in Privy if it ever leaks. The runner's caps, daily-loss stop and stop file still apply on top of the policy.

@@ -92,7 +92,7 @@ async function main() {
     PRIVY_APP_ID: server.appId, PRIVY_AGENT_SIGNER_ID: state.signerId, PRIVY_AGENT_POLICY_ID: policy.id,
     PRIVY_AGENT_POLICY_SHA256: sha, PRIVY_AGENT_POLICY_SUMMARY: state.policySummary, PRIVY_AGENT_SIGNER_PUBLIC_KEY: publicKey,
     VITE_PRIVY_APP_ID: server.appId, VITE_PRIVY_AGENT_SIGNER_ID: state.signerId, VITE_PRIVY_AGENT_POLICY_ID: policy.id,
-    secretsToSetYourself: ['PRIVY_APP_SECRET', 'PRIVY_AUTHORIZATION_PRIVATE_KEY'],
+    secretsToSetYourself: ['PRIVY_APP_SECRET'], // the authorization key stays on this Mac only; the site never signs
   }, null, 2));
 }
 
