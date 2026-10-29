@@ -61,7 +61,7 @@ function number(v: unknown, lo: number, hi: number, what: string) {
 }
 
 // Names only the house bot and the site itself may use, so nobody can pass as them.
-const RESERVED = ['house', 'housetrader', 'housebot', 'grokgrid', 'grokgridofficial', 'official', 'admin']
+const RESERVED = ['house', 'housetrader', 'housebot', 'grokgrid', 'grokgridofficial', 'grok', 'grokbot', 'thegrokbot', 'official', 'admin']
 export const reservedName = (name: string) => RESERVED.includes(name.toLowerCase().replace(/[^a-z0-9]/g, ''))
 
 // Cleans and checks a draft. Throws a message fit to show the launcher.

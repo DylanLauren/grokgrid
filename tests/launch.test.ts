@@ -26,6 +26,8 @@ test('a bot can have its own name, and shares the coin name when left blank', ()
   assert.throws(() => cleanDraft({ ...good, botName: 'x'.repeat(33) }), /Bot name/)
   assert.throws(() => cleanDraft({ ...good, botName: 'House  Trader!' }), /belongs to the house/)
   assert.throws(() => cleanDraft({ ...good, name: 'GrokGrid' }), /belongs to the house/) // a blank bot name takes the coin's
+  assert.throws(() => cleanDraft({ ...good, name: 'House Trader', botName: '' }), /belongs to the house/) // a coin name can't sneak in either
+  assert.throws(() => cleanDraft({ ...good, botName: 'Grok Bot' }), /belongs to the house/)
   assert.equal(cleanDraft({ ...good, botName: 'House of Degens' }).botName, 'House of Degens')
 })
 
