@@ -67,7 +67,7 @@ function WalletControls({ onWalletChange }: AgentWalletSetupProps) {
     const adapter: WalletLike | null = address && connected ? privyWalletAdapter(address,
       () => current.current.authenticated && current.current.address === address && current.current.wallet === connected,
       async transaction => (await signTransaction({ wallet: connected, transaction, chain: 'solana:mainnet' })).signedTransaction) : null
-    const r = checked?.address === address ? checked.readiness : null
+    const r = checked && address && checked.address === address ? checked.readiness : null
     onWalletChange(address && walletId && adapter ? {
       address, walletId, wallet: adapter, accessToken: getAccessToken,
       authorizationReady: !!r?.walletAuthorizationReady,
@@ -92,7 +92,7 @@ function WalletControls({ onWalletChange }: AgentWalletSetupProps) {
     <div><h2>Connect</h2><p>Sign in and your bot gets its own wallet. You fund it, it trades, you can withdraw any time.</p></div>
     <button type="button" className="btn" onClick={() => login()}>Connect wallet</button>
   </div>
-  const r = checked?.address === address ? checked.readiness : null
+  const r = checked && address && checked.address === address ? checked.readiness : null
   return <div className="gd-connect-on">
     <div className="gd-connect-row">
       <div>
