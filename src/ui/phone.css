@@ -24,6 +24,7 @@
   backface-visibility: hidden;
 }
 .ph-stream { padding: 0; gap: 0; }
+.ph-snapshot { width: 100%; height: 100%; }
 /* Preserve every edge of the source. Its browser aspect ratio need not match
    the handset; quiet letterboxing is preferable to cutting off real content. */
 .ph-viewport {

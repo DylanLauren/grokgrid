@@ -77,17 +77,29 @@ export async function runPhoneSupervisor(configPath, dependencies = {}) {
   const root = dirname(resolve(configPath)); await privateRoot(root)
   const { contents } = await readPrivatePhoneFile(resolve(configPath))
   const config = validateConfig(JSON.parse(contents))
+  const videoPath = config.videoConfigFile
+  if (videoPath !== undefined) {
+    if (typeof videoPath !== 'string' || resolve(videoPath) !== videoPath || dirname(videoPath) !== root) throw Error('private-video-config-required')
+    await readPrivatePhoneFile(videoPath)
+  }
   await privateRoot(dirname(resolve(config.statusFile))); await privateRoot(dirname(resolve(config.tokenFile)))
   const supervisorStatus = join(root, 'local-phone-supervisor-status.json'), lockPath = supervisorStatus + '.lock'
-  const protectedPaths = [resolve(config.statusFile), resolve(config.tokenFile), resolve(configPath), supervisorStatus, lockPath, resolve(config.statusFile) + '.lock']
+  const protectedPaths = [resolve(config.statusFile), resolve(config.tokenFile), resolve(configPath), supervisorStatus, lockPath, resolve(config.statusFile) + '.lock', ...(videoPath ? [videoPath] : [])]
   if (new Set(protectedPaths).size !== protectedPaths.length) throw Error('configuration-path-collision')
   await recoverPhoneLock(lockPath)
   const lock = await open(lockPath, 'wx', 0o600); await lock.writeFile(String(process.pid)); await lock.sync(); const own = await lock.stat(); await lock.close()
-  let stop = false, child = null, restarts = 0, stopReason = 'operator-stop'
+  let stop = false, child = null, video = null, videoDone = Promise.resolve(), videoKillTimer, restarts = 0, stopReason = 'operator-stop'
   const abort = new AbortController()
+  const stopVideo = () => {
+    if (!video) return videoDone
+    const current = video
+    current.kill('SIGTERM')
+    if (!videoKillTimer) videoKillTimer = setTimeout(() => current.kill('SIGKILL'), 12_000)
+    return videoDone
+  }
   const requestStop = reason => {
     if (!stop) stopReason = reason === 'parent-exited' ? 'parent-exited' : 'operator-stop'
-    stop = true; abort.abort(); child?.kill('SIGTERM')
+    stop = true; abort.abort(); child?.kill('SIGTERM'); stopVideo()
   }
   // Compare our actual parent relationship; never signal a caller-supplied PID.
   const checkParent = () => {
@@ -101,12 +113,13 @@ export async function runPhoneSupervisor(configPath, dependencies = {}) {
   // Preserve call order even if a child exits before its initial status fsync.
   let statusWrites = Promise.resolve()
   const status = (state, extra = {}) => {
-    const value = { version: 1, state, observedAt: new Date().toISOString(), childPid: child?.pid ?? null, restartCount: restarts, ...extra }
+    const value = { version: 1, state, observedAt: new Date().toISOString(), childPid: child?.pid ?? null, videoPid: video?.pid ?? null, restartCount: restarts, ...extra }
     const write = statusWrites.then(() => writeStatus(supervisorStatus, value))
     statusWrites = write.catch(() => {})
     return write
   }
   const launch = dependencies.spawnPublisher ?? (() => spawn(process.execPath, [fileURLToPath(new URL('./phone-feed.mjs', import.meta.url)), '--config', resolve(configPath)], { stdio: 'ignore' }))
+  const launchVideo = dependencies.spawnVideo ?? (() => spawn(process.execPath, [fileURLToPath(new URL('./phone-video-controller.mjs', import.meta.url)), '--config', videoPath, '--run'], { stdio: 'ignore' }))
   try {
     checkParent()
     while (!stop) {
@@ -116,6 +129,15 @@ export async function runPhoneSupervisor(configPath, dependencies = {}) {
       const tokenBefore = await capabilityIdentity(config.tokenFile), started = Date.now()
       checkParent()
       if (stop) break
+      if (videoPath) {
+        video = launchVideo()
+        const currentVideo = video
+        videoDone = new Promise(resolveVideo => {
+          let settled = false
+          const ended = () => { if (settled) return; settled = true; if (videoKillTimer) clearTimeout(videoKillTimer); videoKillTimer = undefined; if (video === currentVideo) video = null; resolveVideo() }
+          video.once('error', ended); video.once('exit', ended)
+        })
+      }
       child = launch()
       let killTimer
       const result = await new Promise(resolveExit => {
@@ -130,6 +152,9 @@ export async function runPhoneSupervisor(configPath, dependencies = {}) {
         status('publishing-process-running').catch(requestStop)
       })
       child = null
+      // Pause, source failure, credential holds and app restarts terminate both
+      // publishers. Only a new supervised cycle may start a new video controller.
+      await stopVideo()
       if (stop) break
       let last = null
       try { last = JSON.parse((await readPrivatePhoneFile(config.statusFile)).contents); if (Date.parse(last.observedAt) < started || Date.parse(last.observedAt) > Date.now() + 1000 || !Number.isFinite(Date.parse(last.observedAt))) last = null } catch {}
@@ -153,6 +178,7 @@ export async function runPhoneSupervisor(configPath, dependencies = {}) {
     if (parentWatcher) clearInterval(parentWatcher)
     process.off('SIGINT', requestStop); process.off('SIGTERM', requestStop)
     if (child) child.kill('SIGTERM')
+    await stopVideo()
     try { const current = await lstat(lockPath); if (current.dev === own.dev && current.ino === own.ino) await unlink(lockPath) } catch {}
   }
 }
