@@ -13,25 +13,27 @@ const day = now => new Date(now).toISOString().slice(0, 10);
  * Cost includes any rent a buy paid, which only ever stops trading sooner.
  */
 export function journalRisk(state, wallet, now) {
-  let todaySpent = 0n, todayReceived = 0n;
+  let todaySpent = 0n, todayReceived = 0n, totalSpent = 0n, totalReceived = 0n;
   const open = new Map(); // mint -> { cost, tokens }
   const done = state.intents.filter(i => i.state === 'reconciled-confirmed').sort((a, b) => a.createdAt - b.createdAt);
   for (const i of done) {
     const today = day(i.createdAt) === day(now), o = open.get(i.mint) || { cost: 0n, tokens: 0n };
     if (i.side === 'buy') {
       const spent = BigInt(i.receipt.spentLamports);
-      o.cost += spent; o.tokens += BigInt(i.receipt.receivedTokenUnits); if (today) todaySpent += spent;
+      o.cost += spent; o.tokens += BigInt(i.receipt.receivedTokenUnits); totalSpent += spent; if (today) todaySpent += spent;
     } else {
       const sold = BigInt(i.receipt.soldTokenUnits);
       if (sold >= o.tokens) { o.cost = 0n; o.tokens = 0n; }
       else { o.cost -= o.cost * sold / o.tokens; o.tokens -= sold; }
-      if (today) todayReceived += BigInt(i.receipt.receivedLamports);
+      totalReceived += BigInt(i.receipt.receivedLamports); if (today) todayReceived += BigInt(i.receipt.receivedLamports);
     }
     open.set(i.mint, o);
   }
   const exposure = [...open.values()].reduce((n, o) => n + o.cost, 0n);
   const floor = x => (x > 0n ? x : 0n).toString();
-  return { wallet, complete: true, exposureLamports: exposure.toString(), dailyLossLamports: floor(todaySpent - todayReceived), utcDay: day(now), observedAt: now };
+  // Realised loss over the journal's life: everything spent, less everything received and the cost still open.
+  const totalLoss = totalSpent - totalReceived - exposure;
+  return { wallet, complete: true, exposureLamports: exposure.toString(), dailyLossLamports: floor(todaySpent - todayReceived), totalLossLamports: floor(totalLoss), utcDay: day(now), observedAt: now };
 }
 
 /** The next intent this tick may sign, or why none. */
@@ -41,6 +43,7 @@ export function nextExecutable(state, policy, now, stopFilePresent) {
   if (state.intents.some(i => i.state === 'held-ambiguous')) return { reason: 'submission-unresolved' };
   const risk = journalRisk(state, policy.wallet, now);
   if (BigInt(risk.dailyLossLamports) >= BigInt(policy.maxDailyLossLamports)) return { reason: 'daily-loss-stop' };
+  if (policy.maxTotalLossLamports !== undefined && BigInt(risk.totalLossLamports) >= BigInt(policy.maxTotalLossLamports)) return { reason: 'total-loss-stop' };
   const intent = state.intents.find(i => i.state === 'planned' && i.expiresAt > now + 5000);
   if (!intent) return { reason: 'nothing-planned' };
   if (intent.side === 'buy' && BigInt(risk.exposureLamports) + BigInt(intent.spendLamports) > BigInt(policy.maxExposureLamports)) return { reason: 'exposure-limit' };

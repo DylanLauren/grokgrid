@@ -105,3 +105,19 @@ test('exposure is the open cost basis: a flat book after losses has none, but th
   assert.equal(journalRisk(flat, wallet, now).exposureLamports, '0')
   assert.equal(nextExecutable(flat, { ...p, maxDailyLossLamports: '1000000' }, now, false).reason, 'daily-loss-stop')
 })
+
+test('optional total-loss stop: realised losses over the journal life stop new buys; absent means none', () => {
+  const r = (id: string, side: 'buy' | 'sell', m: string, at: number, receipt: Record<string, string>) => ({ id, side, mint: m, state: 'reconciled-confirmed', createdAt: at, receipt })
+  const B = 'So11111111111111111111111111111111111111112', day = 86_400_000
+  const s = { ...emptyTradingState(execute()), intents: [
+    r('b1', 'buy', mint, now - 3 * day, { spentLamports: '5000000', receivedTokenUnits: '100' }), r('s1', 'sell', mint, now - 3 * day + 1, { soldTokenUnits: '100', receivedLamports: '1000000' }),
+    r('b2', 'buy', B, now - 2 * day, { spentLamports: '5000000', receivedTokenUnits: '100' }), r('s2', 'sell', B, now - 2 * day + 1, { soldTokenUnits: '100', receivedLamports: '1000000' }),
+    r('b3', 'buy', B, now - 1000, { spentLamports: '2000000', receivedTokenUnits: '100' }), // still open: exposure, not loss
+  ] }
+  const risk = journalRisk(s, wallet, now)
+  assert.equal(risk.totalLossLamports, '8000000'); assert.equal(risk.exposureLamports, '2000000'); assert.equal(risk.dailyLossLamports, '2000000')
+  const capped = execute({ maxDailyLossLamports: '5000000', maxTotalLossLamports: '8000000' })
+  assert.equal(nextExecutable({ ...s, intents: [...s.intents, { ...planned(capped).intents[0], createdAt: now }] }, capped, now, false).reason, 'total-loss-stop')
+  assert.notEqual(nextExecutable({ ...s, intents: [...s.intents, { ...planned(execute({ maxDailyLossLamports: '5000000' })).intents[0], createdAt: now }] }, execute({ maxDailyLossLamports: '5000000' }), now, false).reason, 'total-loss-stop')
+  assert.throws(() => validateTradingPolicy(execute({ maxDailyLossLamports: '5000000', maxTotalLossLamports: '1000' })), /Invalid limits/) // below the daily stop
+})
