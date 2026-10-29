@@ -29,6 +29,18 @@ export function trimIdl(idl, names) {
   return { address: idl.address, metadata: idl.metadata, instructions, types: (idl.types || []).filter(t => used.has(t.name)) };
 }
 
+// ComputeBudget is not an Anchor program: its instructions carry a 1-byte tag. This minimal IDL
+// lets the policy bound the unit limit and the priority price so a stolen key can't burn SOL on fees.
+export const MAX_COMPUTE_UNITS = '600000', MAX_MICRO_LAMPORTS = '1000000'; // worst case 0.0006 SOL per transaction
+export const COMPUTE_BUDGET_IDL = {
+  address: COMPUTE_BUDGET, metadata: { name: 'compute_budget', version: '0.1.0', spec: '0.1.0' },
+  instructions: [
+    { name: 'set_compute_unit_limit', discriminator: [2], accounts: [], args: [{ name: 'units', type: 'u32' }] },
+    { name: 'set_compute_unit_price', discriminator: [3], accounts: [], args: [{ name: 'micro_lamports', type: 'u64' }] },
+  ],
+  types: [],
+};
+
 const program = id => ({ field_source: 'solana_program_instruction', field: 'programId', operator: 'eq', value: id });
 const arg = (idl, field, operator, value) => ({ field_source: 'solana_instruction_data', idl, field, operator, value });
 
@@ -38,7 +50,8 @@ export function buildRules(maxTrade = MAX_TRADE_LAMPORTS) {
   const amm = trimIdl(require('@pump-fun/pump-swap-sdk').pumpAmmJson, ['sell']);
   const rule = (name, conditions) => ({ name, method: 'signTransaction', action: 'ALLOW', conditions });
   return [
-    rule('compute budget', [program(COMPUTE_BUDGET)]),
+    rule('compute unit limit, capped', [program(COMPUTE_BUDGET), arg(COMPUTE_BUDGET_IDL, 'set_compute_unit_limit.args.units', 'lte', MAX_COMPUTE_UNITS)]),
+    rule('compute unit price, capped', [program(COMPUTE_BUDGET), arg(COMPUTE_BUDGET_IDL, 'set_compute_unit_price.args.micro_lamports', 'lte', MAX_MICRO_LAMPORTS)]),
     rule('create token accounts', [program(ATA)]),
     rule('pump.fun curve buy, capped', [program(PUMP), arg(pump, 'buy.args.max_sol_cost', 'lte', maxTrade)]),
     rule('pump.fun curve sell', [program(PUMP), arg(pump, 'sell.args.min_sol_output', 'gte', '1')]),
@@ -48,7 +61,7 @@ export function buildRules(maxTrade = MAX_TRADE_LAMPORTS) {
   ];
 }
 
-export const summary = maxTrade => `GrokGrid agent signer may only sign: pump.fun curve buys up to ${Number(maxTrade) / 1e9} SOL per instruction, curve and PumpSwap sells, compute budget, token-account creation. No SOL transfers, WSOL close, message signing or key export.`;
+export const summary = maxTrade => `GrokGrid agent signer may only sign: pump.fun curve buys up to ${Number(maxTrade) / 1e9} SOL per instruction, curve and PumpSwap sells, compute limit/price within caps (≤0.0006 SOL fee), token-account creation. No SOL transfers, WSOL close, message signing or key export.`;
 
 function secretFile(name) {
   const path = join(RUNTIME, name);

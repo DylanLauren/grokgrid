@@ -12,7 +12,10 @@ test('agent policy has no recipient-free transfers or closes, and every IDL chec
     if (r.conditions.some((c: { field_source: string }) => c.field_source === 'solana_instruction_data'))
       assert.ok(r.conditions.some((c: { field_source: string; field: string }) => c.field_source === 'solana_program_instruction' && c.field === 'programId'))
   }
-  const caps = rules.flatMap(r => r.conditions).filter((c: { operator: string }) => c.operator === 'lte')
+  const caps = rules.flatMap(r => r.conditions).filter((c: { operator: string; field: string }) => c.operator === 'lte' && !c.field.startsWith('set_compute'))
   assert.ok(caps.every((c: { value: string }) => c.value === '50000000'))
+  // Compute budget is bounded too: no bare program-only rule for it.
+  const cb = rules.filter(r => r.conditions.some((c: { value: string }) => c.value === 'ComputeBudget111111111111111111111111111111'))
+  assert.equal(cb.length, 2); assert.ok(cb.every(r => r.conditions.length === 2))
   assert.ok(Buffer.byteLength(JSON.stringify(rules)) < 128 * 1024)
 })
