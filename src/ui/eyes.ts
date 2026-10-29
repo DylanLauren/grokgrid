@@ -144,7 +144,8 @@ function tick(now: number) {
     }
     // now and then a face
     if (now > b.faceNext) {
-      b.face = PICK[Math.floor(Math.random() * PICK.length)]
+      // tiny bots only blink: a squint or wink at that size just reads as shut eyes
+      b.face = r.width < 40 ? 'blink' : PICK[Math.floor(Math.random() * PICK.length)]
       b.faceUntil = now + FACE_TIME[b.face]
       b.faceNext = now + 3200 + Math.random() * 4200
     }
