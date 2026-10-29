@@ -64,3 +64,16 @@ test('posts attach media ids, and query parameters are part of the OAuth signatu
   const b = oauthHeader('GET', 'https://api.x.com/2/media/upload?command=STATUS&media_id=2', creds, 'n', 1)
   assert.notEqual(a, b)
 })
+
+test('coin pictures come only from allowlisted https hosts, never follow redirects, and stop at 2 MB', async () => {
+  const { coinImage } = await import('../scripts/x-media.mjs')
+  let fetched = 0, opts: { redirect?: string } = {}
+  const ok = (bytes: number) => (async (_u: string, o: { redirect: string }) => { fetched++; opts = o
+    return { ok: true, headers: new Headers({ 'content-type': 'image/png' }), body: (async function* () { for (let i = 0; i < bytes; i += 65536) yield new Uint8Array(Math.min(65536, bytes - i)) })() } }) as unknown as typeof fetch
+  assert.match(String(await coinImage('https://cdn.dexscreener.com/x.png', ok(1000))), /^data:image\/png;base64,/)
+  assert.equal(opts.redirect, 'error')
+  for (const bad of ['http://cdn.dexscreener.com/x.png', 'https://169.254.169.254/latest', 'https://localhost/x.png', 'https://evil.example/x.png', 'https://cdn.dexscreener.com.evil.io/x.png', 'https://u:p@ipfs.io/x'])
+    assert.equal(await coinImage(bad, ok(10)), null, bad)
+  assert.equal(fetched, 1)
+  assert.equal(await coinImage('https://ipfs.io/ipfs/x', ok(3_000_000)), null)
+})
