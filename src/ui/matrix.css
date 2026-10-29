@@ -5,7 +5,7 @@
 .mx-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--paper-50); }
 .mx-live.live i { background: var(--gain); box-shadow: 0 0 8px var(--gain); animation: pulse 1.6s infinite; }
 
-.mx-totals { display: grid; grid-template-columns: repeat(5, 1fr); margin: 14px 0 10px; border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; }
+.mx-totals { display: grid; grid-template-columns: repeat(5, 1fr); margin: 14px 0 10px; background: #0f0f10; border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; }
 .mx-totals div { padding: 10px 14px; }
 .mx-totals div + div { border-left: 1px solid var(--hair); }
 .mx-totals dt { font-size: 11px; color: var(--paper-50); text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--mono); }
@@ -16,7 +16,7 @@
 .mx-sort button:hover { color: var(--paper); }
 .mx-sort button.on { background: #ffffff14; color: var(--paper); }
 
-.mx-table { border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; }
+.mx-table { background: #0f0f10; border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; }
 .mx-row {
   display: grid;
   grid-template-columns: 26px minmax(190px, 1.5fr) minmax(140px, 1fr) repeat(7, minmax(60px, 0.5fr)) minmax(150px, 1fr) 56px;

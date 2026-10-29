@@ -114,7 +114,7 @@ function Row({ a, i, solUsd, now }: { a: Agent; i: number; solUsd: number; now: 
       <span className="mx-i mono">{a.house ? '00' : String(i).padStart(2, '0')}</span>
       <span className="mx-bot">
         <span className="mx-face">
-          <LiveBot size={34} color={a.house ? 'house' : a.color} eye={a.house ? '#0a0a0a' : '#fff'} shape={a.shape} habit={a.house ? 'look' : HABITS[i % HABITS.length]} delay={i * -0.6} />
+          <LiveBot size={34} color={a.house ? 'house' : a.color} shape={a.shape} habit={a.house ? 'look' : HABITS[i % HABITS.length]} delay={i * -0.6} />
         </span>
         <span>
           <b>{a.name}</b>
