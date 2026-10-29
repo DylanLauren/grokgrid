@@ -6,15 +6,25 @@ const id = x => typeof x === 'string' && /^[a-zA-Z0-9_-]{1,96}$/.test(x);
 const WSOL = 'So11111111111111111111111111111111111111112';
 const positive = x => integer(x) && BigInt(x) > 0n;
 const validAmounts = (i,p) => i.side === 'buy' ? positive(i.spendLamports) && BigInt(i.spendLamports) <= BigInt(p.maxTradeLamports) && i.tokenUnits === undefined && i.minimumReceiveLamports === undefined : i.side === 'sell' && positive(i.tokenUnits) && positive(i.minimumReceiveLamports) && Number.isInteger(i.tokenDecimals) && i.tokenDecimals >= 0 && i.tokenDecimals <= 18 && i.spendLamports === undefined;
-const receiptAmounts = (i,r) => i.side === 'buy' ? r.spentLamports === i.spendLamports && positive(r.receivedTokenUnits) : r.soldTokenUnits === i.tokenUnits && positive(r.receivedLamports) && BigInt(r.receivedLamports) >= BigInt(i.minimumReceiveLamports);
+// An executed buy carries maxCostLamports (budget + token-account rent); the actual spend may be lower.
+const buyCostOk = (i,r) => positive(r.spentLamports) && (i.maxCostLamports === undefined ? r.spentLamports === i.spendLamports : BigInt(r.spentLamports) <= BigInt(i.maxCostLamports));
+const receiptAmounts = (i,r) => i.side === 'buy' ? buyCostOk(i,r) && positive(r.receivedTokenUnits) : r.soldTokenUnits === i.tokenUnits && positive(r.receivedLamports) && BigInt(r.receivedLamports) >= BigInt(i.minimumReceiveLamports);
 const timestamp = x => Number.isSafeInteger(x) && x > 0;
+const PENDING = ['blocked-execution-disabled', 'planned', 'held-ambiguous'];
+// Token-account rent a first buy may pay on top of its budget.
+export const MAX_RENT_ALLOWANCE = 2_100_000n;
 export function publicAddress(x) { try { return typeof x === 'string' && new PublicKey(x).toBase58() === x; } catch { return false; } }
+const absolute = x => typeof x === 'string' && x.startsWith('/');
+// 'observe-only' never signs. 'execute' is an explicit operator choice: both flags on, a stop file and a key file.
+export const executes = p => p.mode === 'execute';
 export function validateTradingPolicy(p) {
-  if (!p || p.version !== 1 || p.mode !== 'observe-only' || p.executionEnabled !== false || p.signingEnabled !== false) throw Error('Execution is disabled in this worker');
+  const observe = p?.mode === 'observe-only' && p.executionEnabled === false && p.signingEnabled === false;
+  const execute = p?.mode === 'execute' && p.executionEnabled === true && p.signingEnabled === true && absolute(p.stopFile) && absolute(p.keypairFile);
+  if (!p || p.version !== 1 || !(observe || execute)) throw Error('Execution is disabled in this worker');
   if (!id(p.agentId) || !publicAddress(p.wallet) || !Array.isArray(p.allowedMints) || !p.allowedMints.every(publicAddress) || new Set(p.allowedMints).size !== p.allowedMints.length) throw Error('Invalid pinned identities');
   for (const field of ['maxTradeLamports', 'maxExposureLamports', 'maxDailyLossLamports', 'reserveLamports']) if (!integer(p[field])) throw Error('Invalid integer policy');
   if (BigInt(p.maxTradeLamports) <= 0n || BigInt(p.maxExposureLamports) < BigInt(p.maxTradeLamports) || BigInt(p.maxDailyLossLamports) <= 0n) throw Error('Invalid limits');
-  if (!Number.isSafeInteger(p.maxSlippageBps) || p.maxSlippageBps < 0 || p.maxSlippageBps > 1000 || !Number.isSafeInteger(p.maxPendingIntents) || p.maxPendingIntents < 1 || p.maxPendingIntents > 100 || !Number.isSafeInteger(p.maxIntentAgeMs) || p.maxIntentAgeMs < 1000 || p.maxIntentAgeMs > 3600000) throw Error('Invalid timing or execution limits');
+  if (!Number.isSafeInteger(p.maxSlippageBps) || p.maxSlippageBps < 0 || p.maxSlippageBps > 2000 || !Number.isSafeInteger(p.maxPendingIntents) || p.maxPendingIntents < 1 || p.maxPendingIntents > 100 || !Number.isSafeInteger(p.maxIntentAgeMs) || p.maxIntentAgeMs < 1000 || p.maxIntentAgeMs > 3600000) throw Error('Invalid timing or execution limits');
   return p;
 }
 export function policyFingerprint(p) {
@@ -22,14 +32,14 @@ export function policyFingerprint(p) {
   return createHash('sha256').update(JSON.stringify(Object.fromEntries(Object.keys(p).sort().map(k => [k, p[k]])))).digest('hex');
 }
 export function emptyTradingState(p) {
-  return { version: 1, revision: 0, policyFingerprint: policyFingerprint(p), agentId: p.agentId, wallet: p.wallet, executionEnabled: false, signingEnabled: false, intents: [] };
+  return { version: 1, revision: 0, policyFingerprint: policyFingerprint(p), agentId: p.agentId, wallet: p.wallet, executionEnabled: p.executionEnabled, signingEnabled: p.signingEnabled, intents: [] };
 }
 export function validateTradingState(s, p) {
-  if (!s || s.version !== 1 || !Number.isSafeInteger(s.revision) || s.revision < 0 || s.policyFingerprint !== policyFingerprint(p) || s.agentId !== p.agentId || s.wallet !== p.wallet || s.executionEnabled !== false || s.signingEnabled !== false || !Array.isArray(s.intents)) throw Error('Journal identity or policy mismatch');
+  if (!s || s.version !== 1 || !Number.isSafeInteger(s.revision) || s.revision < 0 || s.policyFingerprint !== policyFingerprint(p) || s.agentId !== p.agentId || s.wallet !== p.wallet || s.executionEnabled !== p.executionEnabled || s.signingEnabled !== p.signingEnabled || !Array.isArray(s.intents)) throw Error('Journal identity or policy mismatch');
   const ids = new Set(), signatures = new Set();
   for (const i of s.intents) {
-    if (!id(i.id) || ids.has(i.id) || i.agentId !== p.agentId || i.wallet !== p.wallet || !p.allowedMints.includes(i.mint) || !validAmounts(i,p) || i.mint === WSOL || !Number.isSafeInteger(i.slippageBps) || i.slippageBps < 0 || i.slippageBps > p.maxSlippageBps || !timestamp(i.createdAt) || !timestamp(i.expiresAt) || i.expiresAt <= i.createdAt || i.expiresAt - i.createdAt > p.maxIntentAgeMs || !['blocked-execution-disabled', 'expired', 'held-ambiguous', 'reconciled-failed', 'reconciled-confirmed'].includes(i.state)) throw Error('Invalid journal intent');
-    if ((i.state === 'held-ambiguous' || i.state.startsWith('reconciled-')) && !/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(i.signature ?? '')) throw Error('Invalid receipt identity');
+    if (!id(i.id) || ids.has(i.id) || i.agentId !== p.agentId || i.wallet !== p.wallet || !p.allowedMints.includes(i.mint) || !validAmounts(i,p) || i.mint === WSOL || !Number.isSafeInteger(i.slippageBps) || i.slippageBps < 0 || i.slippageBps > p.maxSlippageBps || !timestamp(i.createdAt) || !timestamp(i.expiresAt) || i.expiresAt <= i.createdAt || i.expiresAt - i.createdAt > p.maxIntentAgeMs || ![...PENDING, 'expired', 'dropped-expired', 'reconciled-failed', 'reconciled-confirmed'].includes(i.state) || (i.maxCostLamports !== undefined && (i.side !== 'buy' || !integer(i.maxCostLamports) || BigInt(i.maxCostLamports) < BigInt(i.spendLamports) || BigInt(i.maxCostLamports) > BigInt(i.spendLamports) + MAX_RENT_ALLOWANCE)) || (i.lastValidBlockHeight !== undefined && !Number.isSafeInteger(i.lastValidBlockHeight))) throw Error('Invalid journal intent');
+    if ((i.state === 'held-ambiguous' || i.state === 'dropped-expired' || i.state.startsWith('reconciled-')) && !/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(i.signature ?? '')) throw Error('Invalid receipt identity');
     if (i.signature) { if (signatures.has(i.signature)) throw Error('Duplicate submission signature'); signatures.add(i.signature); }
     if (i.state.startsWith('reconciled-')) {
       const r = i.receipt;
@@ -51,7 +61,7 @@ export function validateTradingState(s, p) {
 function updated(s, intents) { return { ...s, revision: s.revision + 1, intents }; }
 export function expireIntents(s, now) {
   if (!timestamp(now)) throw Error('Invalid clock');
-  const intents = s.intents.map(i => i.state === 'blocked-execution-disabled' && i.expiresAt <= now ? { ...i, state: 'expired' } : i);
+  const intents = s.intents.map(i => ['blocked-execution-disabled', 'planned'].includes(i.state) && i.expiresAt <= now ? { ...i, state: 'expired' } : i);
   return intents.some((i, n) => i !== s.intents[n]) ? updated(s, intents) : s;
 }
 // Intents are hypothetical inputs. Passing these checks never permits execution.
@@ -68,7 +78,7 @@ export function planIntent(state, policy, proposal, observation, risk, now = Dat
   if (!observation || observation.status !== 'observing' || observation.mode !== 'observe-only' || observation.executionEnabled !== false || observation.signingEnabled !== false || observation.house?.wallet !== p.wallet || !integer(observation.house?.balanceLamports)) throw Error('House observer identity or state unavailable');
   const observedAt = Date.parse(observation.observedAt);
   if (!Number.isFinite(observedAt) || now - observedAt > 90000 || observedAt > now) throw Error('House observer is stale');
-  const pending = s.intents.filter(i => ['blocked-execution-disabled', 'held-ambiguous'].includes(i.state));
+  const pending = s.intents.filter(i => PENDING.includes(i.state));
   if (pending.some(i => i.state === 'held-ambiguous')) throw Error('Unresolved submission blocks new proposals');
   if (pending.length >= p.maxPendingIntents) throw Error('Policy pending-intent limit reached');
   if (proposal.side === 'buy') {
@@ -86,19 +96,23 @@ export function planIntent(state, policy, proposal, observation, risk, now = Dat
   }
   const fields = ['id','agentId','wallet','mint','side','slippageBps','createdAt','expiresAt',...(proposal.side==='buy'?['spendLamports']:['tokenUnits','tokenDecimals','minimumReceiveLamports'])];
   const intent = Object.fromEntries(fields.map(k => [k, proposal[k]]));
-  return updated(s, [...s.intents, { ...intent, state: 'blocked-execution-disabled', reason: 'No signer or transaction transport exists in this worker' }]);
+  return updated(s, [...s.intents, executes(p) ? { ...intent, state: 'planned', reason: 'Awaiting execution gates' }
+    : { ...intent, state: 'blocked-execution-disabled', reason: 'No signer or transaction transport exists in this worker' }]);
 }
 // This records an already-known external signature; it never broadcasts anything.
 // Once recorded, expiry cannot release the hold or allow a retry.
-export function holdExternalSubmission(s, p, intentId, signature) {
+export function holdExternalSubmission(s, p, intentId, signature, submission = {}) {
   validateTradingState(s, p);
   if (!/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(signature ?? '')) throw Error('Invalid signature');
   if (s.intents.some(i => i.id !== intentId && i.signature === signature)) throw Error('Signature already belongs to another intent');
   const i = s.intents.find(i => i.id === intentId);
-  if (!i || !['blocked-execution-disabled','held-ambiguous'].includes(i.state)) throw Error('Cannot record submission in this state');
+  if (!i || !PENDING.includes(i.state)) throw Error('Cannot record submission in this state');
   if (i.signature && i.signature !== signature) throw Error('Submission signature cannot change');
   if (i.state === 'held-ambiguous') return s;
-  return updated(s, s.intents.map(x => x.id === intentId ? { ...x, signature, state: 'held-ambiguous', reason: 'Awaiting independently verified finalized receipt' } : x));
+  const extra = {};
+  if (submission.lastValidBlockHeight !== undefined) extra.lastValidBlockHeight = submission.lastValidBlockHeight;
+  if (submission.maxCostLamports !== undefined) extra.maxCostLamports = submission.maxCostLamports;
+  return validateTradingState(updated(s, s.intents.map(x => x.id === intentId ? { ...x, ...extra, signature, state: 'held-ambiguous', reason: 'Awaiting independently verified finalized receipt' } : x)), p);
 }
 // The verifier is an injected READ-ONLY chain adapter. There is intentionally no
 // default adapter: null/uncertain results leave the intent held across restarts.
@@ -114,4 +128,13 @@ export async function reconcileHeldIntent(s, p, intentId, verifier) {
   const clean = { signature: receipt.signature, wallet: receipt.wallet, mint: receipt.mint, finality: receipt.finality, slot:receipt.slot, outcome: receipt.outcome };
   if (receipt.outcome === 'confirmed') Object.assign(clean, i.side === 'buy' ? { spentLamports: receipt.spentLamports, receivedTokenUnits: receipt.receivedTokenUnits } : { soldTokenUnits:receipt.soldTokenUnits, receivedLamports:receipt.receivedLamports });
   return updated(s, s.intents.map(x => x.id === intentId ? { ...x, state: `reconciled-${receipt.outcome}`, receipt: clean, reason: 'Read-only verifier returned a matching finalized receipt' } : x));
+}
+
+// Only a passed blockhash with the signature never seen is a known non-landing. Anything else holds.
+export function dropExpiredSubmission(s, p, intentId, status, blockHeight) {
+  validateTradingState(s, p);
+  const i = s.intents.find(x => x.id === intentId);
+  if (!i || i.state !== 'held-ambiguous') throw Error('Only held submissions can drop');
+  if (status !== null || !Number.isSafeInteger(i.lastValidBlockHeight) || !Number.isSafeInteger(blockHeight) || blockHeight <= i.lastValidBlockHeight) return s;
+  return updated(s, s.intents.map(x => x.id === intentId ? { ...x, state: 'dropped-expired', reason: 'Blockhash expired; signature never seen on chain' } : x));
 }

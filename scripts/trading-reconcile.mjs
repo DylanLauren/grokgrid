@@ -58,7 +58,9 @@ export function inspectFinalizedIntentReceipt(intent, status, tx) {
     if (!safeNatural(meta.fee)) return null;
     if (walletIndex === 0) net += BigInt(meta.fee);
     if (intent.side === 'buy') {
-      if (net >= 0n || -net !== BigInt(intent.spendLamports)) return null;
+      // An executed buy is exact-out with a SOL ceiling: it may spend less, never more.
+      const ceiling = integer(intent.maxCostLamports) ? BigInt(intent.maxCostLamports) : null;
+      if (net >= 0n || (ceiling === null ? -net !== BigInt(intent.spendLamports) : -net > ceiling)) return null;
       return {...base,outcome:'confirmed',spentLamports:(-net).toString(),receivedTokenUnits:received.toString()};
     }
     if (net <= 0n || net < BigInt(intent.minimumReceiveLamports)) return null;

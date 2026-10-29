@@ -1,12 +1,16 @@
 #!/usr/bin/env node
-// Observation/planning worker. Optional read-only RPC; no signing or broadcast.
+// Observation/planning worker. In 'observe-only' it never signs. In an explicit 'execute'
+// policy it signs at most one planned intent per tick, journals it, then broadcasts.
 import { open, rename, mkdir, lstat, unlink } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { resolve, join } from 'node:path';
 import { homedir } from 'node:os';
-import { validateTradingPolicy, expireIntents, planIntent, reconcileHeldIntent } from './trading-policy.mjs';
+import { access } from 'node:fs/promises';
+import { validateTradingPolicy, expireIntents, planIntent, reconcileHeldIntent, dropExpiredSubmission, executes } from './trading-policy.mjs';
+import { journalRisk, signNext } from './trading-executor.mjs';
+import { connect, readMint, buildBuy, buildSell, loadSigner, signatureStatus, signedSignature } from './pump-chain.mjs';
 import { createFinalizedReceiptVerifier } from './trading-reconcile.mjs';
 import { collectFinalizedPositions } from './trading-positions.mjs';
 import { observerIsFresh, positionRefreshPlan, tradingReadiness, observeLaunchQueue } from './trading-readiness.mjs';
@@ -45,6 +49,7 @@ async function tick() {
   const proposal=proposalAt>=0?await json(resolve(args[proposalAt+1])):null;
   let positions=null,attempt=null,positionsRefreshed=false;
   let launchIntake={rejectedCount:0,queueUnavailable:true,truncated:false,capacityReached:false};
+  let execution={reason:'observe-only'},pendingSend=null;
   const state=await withTradingStore(join(root,'trading'),policy,async s=>{
     try{positions=await json(join(root,'trading-positions.json'));}catch{}
     try{attempt=await json(join(root,'trading-position-refresh.json'));}catch{}
@@ -64,14 +69,37 @@ async function tick() {
       const verify=createFinalizedReceiptVerifier(await rpcUrl());
       for(const intent of s.intents.filter(i=>i.state==='held-ambiguous'))s=await reconcileHeldIntent(s,policy,intent.id,verify);
     }
-    if(proposal)s=planIntent(s,policy,proposal,observation,proposal.side==='buy'?await json(join(root,'trading-risk.json')):null,Date.now(),positions);
+    if(executes(policy)) {
+      const conn=connect(await rpcUrl());
+      for(const intent of s.intents.filter(i=>i.state==='held-ambiguous'&&Number.isSafeInteger(i.lastValidBlockHeight)))
+        s=dropExpiredSubmission(s,policy,intent.id,await signatureStatus(conn,intent.signature),await conn.getBlockHeight('finalized'));
+    }
+    // Execute mode sizes risk from its own journal (conservatively); observe mode keeps the external snapshot.
+    if(proposal)s=planIntent(s,policy,proposal,observation,proposal.side==='buy'?(executes(policy)?journalRisk(s,policy.wallet,Date.now()):await json(join(root,'trading-risk.json'))):null,Date.now(),positions);
+    if(executes(policy)) {
+      const conn=connect(await rpcUrl());
+      const stopFilePresent=await access(policy.stopFile).then(()=>true,()=>false);
+      let signer=null;
+      const signed=await signNext(s,policy,{stopFilePresent,signatureOf:signedSignature,
+        sign:tx=>tx.sign([signer]),
+        build:async intent=>{
+          signer??=await loadSigner(policy.keypairFile,policy.wallet);
+          const {tokenProgram}=await readMint(conn,intent.mint);
+          return intent.side==='buy'?buildBuy(conn,{wallet:policy.wallet,mint:intent.mint,spendLamports:intent.spendLamports,slippageBps:intent.slippageBps,tokenProgram})
+            :buildSell(conn,{wallet:policy.wallet,mint:intent.mint,tokenUnits:intent.tokenUnits,minimumReceiveLamports:intent.minimumReceiveLamports,slippageBps:intent.slippageBps,tokenProgram});
+        }},Date.now());
+      s=signed.state;execution={reason:signed.reason,intentId:signed.intentId??null};
+      if(signed.tx)pendingSend={conn,tx:signed.tx};
+    }
     return s;
   });
+  // The signature is durable in the journal now; only then broadcast. A send error leaves it held.
+  if(pendingSend)try{await pendingSend.conn.sendRawTransaction(pendingSend.tx.serialize(),{skipPreflight:false,preflightCommitment:'finalized',maxRetries:0});execution.broadcast='sent';}catch{execution.broadcast='error-held';}
   const now=Date.now(), age=observation?now-Date.parse(observation.observedAt):NaN;
   const readiness=tradingReadiness(policy,observation,positions,state,now),observerFresh=readiness.observerFresh;
   const nextRefresh=positionRefreshPlan(policy,attempt,positions,now);
-  const status={observedAt:new Date(now).toISOString(),mode:'observe-only',executionEnabled:false,signingEnabled:false,status:observerFresh?'observing-execution-disabled':'observer-unavailable',agentId:policy.agentId,wallet:policy.wallet,observerFresh,observerAgeMs:Number.isFinite(age)?age:null,journalRevision:state.revision,intents:state.intents.map(i=>({id:i.id,mint:i.mint,side:i.side,state:i.state})),pendingLaunchesObserved:observerFresh&&Array.isArray(observation.pendingLaunches)?observation.pendingLaunches.length:null,strategy:'unvalidated-no-orders',automaticLaunchesEnabled:false,reconciliationEnabled:args.includes('--reconcile'),positionsRefreshed,readiness,positionRefresh:{outcome:attempt?.outcome??'unavailable',nextAttemptAt:nextRefresh.nextAttemptAt},launchIntake:{...launchIntake,observedCount:(state.launchesObserved??[]).length,acknowledged:false,executionEnabled:false}};
-  await savePrivate('trading-status.json',status);console.log(JSON.stringify({status:status.status,revision:state.revision,intents:state.intents.length,executionEnabled:false}));
+  const status={observedAt:new Date(now).toISOString(),mode:policy.mode,executionEnabled:policy.executionEnabled,signingEnabled:policy.signingEnabled,execution,status:!observerFresh?'observer-unavailable':executes(policy)?'executing':'observing-execution-disabled',agentId:policy.agentId,wallet:policy.wallet,observerFresh,observerAgeMs:Number.isFinite(age)?age:null,journalRevision:state.revision,intents:state.intents.map(i=>({id:i.id,mint:i.mint,side:i.side,state:i.state})),pendingLaunchesObserved:observerFresh&&Array.isArray(observation.pendingLaunches)?observation.pendingLaunches.length:null,strategy:'unvalidated-no-orders',automaticLaunchesEnabled:false,reconciliationEnabled:args.includes('--reconcile'),positionsRefreshed,readiness,positionRefresh:{outcome:attempt?.outcome??'unavailable',nextAttemptAt:nextRefresh.nextAttemptAt},launchIntake:{...launchIntake,observedCount:(state.launchesObserved??[]).length,acknowledged:false,executionEnabled:false}};
+  await savePrivate('trading-status.json',status);console.log(JSON.stringify({status:status.status,revision:state.revision,intents:state.intents.length,executionEnabled:policy.executionEnabled}));
 }
 do {
   try{await tick();}catch(error){
