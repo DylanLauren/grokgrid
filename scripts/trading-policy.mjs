@@ -11,6 +11,19 @@ const buyCostOk = (i,r) => positive(r.spentLamports) && (i.maxCostLamports === u
 const receiptAmounts = (i,r) => i.side === 'buy' ? buyCostOk(i,r) && positive(r.receivedTokenUnits) : r.soldTokenUnits === i.tokenUnits && positive(r.receivedLamports) && BigInt(r.receivedLamports) >= BigInt(i.minimumReceiveLamports);
 const timestamp = x => Number.isSafeInteger(x) && x > 0;
 const PENDING = ['blocked-execution-disabled', 'planned', 'held-ambiguous'];
+// 'dynamic' replaces a static list with the journal's expiring, filter-approved allowlist.
+// Buys need a live entry; sells of a held position never do, so exits always work.
+const dynamic = p => p.allowedMints === 'dynamic';
+const mintPermitted = (p, mint) => dynamic(p) ? publicAddress(mint) : p.allowedMints.includes(mint);
+const allowlisted = (s, mint, now) => (s.allowlist || []).some(a => a.mint === mint && a.expiresAt > now);
+/** Replaces the allowlist (pruned of expired entries). */
+export function setAllowlist(s, p, entries, now) {
+  validateTradingState(s, p);
+  if (!dynamic(p)) throw Error('Static allowlist policy');
+  const next = entries.filter(a => a.expiresAt > now).map(a => ({ mint: a.mint, approvedAt: a.approvedAt, expiresAt: a.expiresAt }));
+  if (JSON.stringify(next) === JSON.stringify(s.allowlist || [])) return s;
+  return validateTradingState({ ...s, revision: s.revision + 1, allowlist: next }, p);
+}
 // Token-account rent a first buy may pay on top of its budget.
 export const MAX_RENT_ALLOWANCE = 2_100_000n;
 export function publicAddress(x) { try { return typeof x === 'string' && new PublicKey(x).toBase58() === x; } catch { return false; } }
@@ -21,7 +34,7 @@ export function validateTradingPolicy(p) {
   const observe = p?.mode === 'observe-only' && p.executionEnabled === false && p.signingEnabled === false;
   const execute = p?.mode === 'execute' && p.executionEnabled === true && p.signingEnabled === true && absolute(p.stopFile) && absolute(p.keypairFile);
   if (!p || p.version !== 1 || !(observe || execute)) throw Error('Execution is disabled in this worker');
-  if (!id(p.agentId) || !publicAddress(p.wallet) || !Array.isArray(p.allowedMints) || !p.allowedMints.every(publicAddress) || new Set(p.allowedMints).size !== p.allowedMints.length) throw Error('Invalid pinned identities');
+  if (!id(p.agentId) || !publicAddress(p.wallet) || !(p.allowedMints === 'dynamic' || (Array.isArray(p.allowedMints) && p.allowedMints.every(publicAddress) && new Set(p.allowedMints).size === p.allowedMints.length))) throw Error('Invalid pinned identities');
   for (const field of ['maxTradeLamports', 'maxExposureLamports', 'maxDailyLossLamports', 'reserveLamports']) if (!integer(p[field])) throw Error('Invalid integer policy');
   if (BigInt(p.maxTradeLamports) <= 0n || BigInt(p.maxExposureLamports) < BigInt(p.maxTradeLamports) || BigInt(p.maxDailyLossLamports) <= 0n) throw Error('Invalid limits');
   if (!Number.isSafeInteger(p.maxSlippageBps) || p.maxSlippageBps < 0 || p.maxSlippageBps > 2000 || !Number.isSafeInteger(p.maxPendingIntents) || p.maxPendingIntents < 1 || p.maxPendingIntents > 100 || !Number.isSafeInteger(p.maxIntentAgeMs) || p.maxIntentAgeMs < 1000 || p.maxIntentAgeMs > 3600000) throw Error('Invalid timing or execution limits');
@@ -38,7 +51,7 @@ export function validateTradingState(s, p) {
   if (!s || s.version !== 1 || !Number.isSafeInteger(s.revision) || s.revision < 0 || s.policyFingerprint !== policyFingerprint(p) || s.agentId !== p.agentId || s.wallet !== p.wallet || s.executionEnabled !== p.executionEnabled || s.signingEnabled !== p.signingEnabled || !Array.isArray(s.intents)) throw Error('Journal identity or policy mismatch');
   const ids = new Set(), signatures = new Set();
   for (const i of s.intents) {
-    if (!id(i.id) || ids.has(i.id) || i.agentId !== p.agentId || i.wallet !== p.wallet || !p.allowedMints.includes(i.mint) || !validAmounts(i,p) || i.mint === WSOL || !Number.isSafeInteger(i.slippageBps) || i.slippageBps < 0 || i.slippageBps > p.maxSlippageBps || !timestamp(i.createdAt) || !timestamp(i.expiresAt) || i.expiresAt <= i.createdAt || i.expiresAt - i.createdAt > p.maxIntentAgeMs || ![...PENDING, 'expired', 'dropped-expired', 'reconciled-failed', 'reconciled-confirmed'].includes(i.state) || (i.maxCostLamports !== undefined && (i.side !== 'buy' || !integer(i.maxCostLamports) || BigInt(i.maxCostLamports) < BigInt(i.spendLamports) || BigInt(i.maxCostLamports) > BigInt(i.spendLamports) + MAX_RENT_ALLOWANCE)) || (i.lastValidBlockHeight !== undefined && !Number.isSafeInteger(i.lastValidBlockHeight))) throw Error('Invalid journal intent');
+    if (!id(i.id) || ids.has(i.id) || i.agentId !== p.agentId || i.wallet !== p.wallet || !mintPermitted(p, i.mint) || !validAmounts(i,p) || i.mint === WSOL || !Number.isSafeInteger(i.slippageBps) || i.slippageBps < 0 || i.slippageBps > p.maxSlippageBps || !timestamp(i.createdAt) || !timestamp(i.expiresAt) || i.expiresAt <= i.createdAt || i.expiresAt - i.createdAt > p.maxIntentAgeMs || ![...PENDING, 'expired', 'dropped-expired', 'reconciled-failed', 'reconciled-confirmed'].includes(i.state) || (i.maxCostLamports !== undefined && (i.side !== 'buy' || !integer(i.maxCostLamports) || BigInt(i.maxCostLamports) < BigInt(i.spendLamports) || BigInt(i.maxCostLamports) > BigInt(i.spendLamports) + MAX_RENT_ALLOWANCE)) || (i.lastValidBlockHeight !== undefined && !Number.isSafeInteger(i.lastValidBlockHeight))) throw Error('Invalid journal intent');
     if ((i.state === 'held-ambiguous' || i.state === 'dropped-expired' || i.state.startsWith('reconciled-')) && !/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(i.signature ?? '')) throw Error('Invalid receipt identity');
     if (i.signature) { if (signatures.has(i.signature)) throw Error('Duplicate submission signature'); signatures.add(i.signature); }
     if (i.state.startsWith('reconciled-')) {
@@ -47,6 +60,11 @@ export function validateTradingState(s, p) {
       if (r.outcome === 'confirmed' && (!receiptAmounts(i,r))) throw Error('Invalid saved receipt amount');
     }
     ids.add(i.id);
+  }
+  if (s.allowlist !== undefined) {
+    if (!dynamic(p) || !Array.isArray(s.allowlist) || s.allowlist.length > 500) throw Error('Invalid allowlist');
+    const seen = new Set();
+    for (const a of s.allowlist) { if (!publicAddress(a?.mint) || seen.has(a.mint) || !timestamp(a.approvedAt) || !timestamp(a.expiresAt) || a.expiresAt <= a.approvedAt || a.expiresAt - a.approvedAt > 86400000) throw Error('Invalid allowlist entry'); seen.add(a.mint); }
   }
   if (s.launchesObserved !== undefined) {
     if (!Array.isArray(s.launchesObserved) || s.launchesObserved.length > 1000) throw Error('Invalid observed launch journal');
@@ -68,7 +86,7 @@ export function expireIntents(s, now) {
 export function planIntent(state, policy, proposal, observation, risk, now = Date.now(), positions = null) {
   const p = validateTradingPolicy(policy); validateTradingState(state, p);
   if (!timestamp(now)) throw Error('Invalid clock');
-  if (!proposal || !id(proposal.id) || proposal.agentId !== p.agentId || proposal.wallet !== p.wallet || !p.allowedMints.includes(proposal.mint) || !validAmounts(proposal,p) || proposal.mint === WSOL || !Number.isSafeInteger(proposal.slippageBps) || proposal.slippageBps < 0 || proposal.slippageBps > p.maxSlippageBps || !timestamp(proposal.createdAt) || proposal.createdAt > now || !timestamp(proposal.expiresAt) || proposal.expiresAt <= now || proposal.expiresAt <= proposal.createdAt || proposal.expiresAt - proposal.createdAt > p.maxIntentAgeMs || now - proposal.createdAt > p.maxIntentAgeMs) throw Error('Invalid or expired proposal');
+  if (!proposal || !id(proposal.id) || proposal.agentId !== p.agentId || proposal.wallet !== p.wallet || !mintPermitted(p, proposal.mint) || (dynamic(p) && proposal.side === 'buy' && !allowlisted(state, proposal.mint, now)) || !validAmounts(proposal,p) || proposal.mint === WSOL || !Number.isSafeInteger(proposal.slippageBps) || proposal.slippageBps < 0 || proposal.slippageBps > p.maxSlippageBps || !timestamp(proposal.createdAt) || proposal.createdAt > now || !timestamp(proposal.expiresAt) || proposal.expiresAt <= now || proposal.expiresAt <= proposal.createdAt || proposal.expiresAt - proposal.createdAt > p.maxIntentAgeMs || now - proposal.createdAt > p.maxIntentAgeMs) throw Error('Invalid or expired proposal');
   const existing = state.intents.find(i => i.id === proposal.id);
   if (existing) {
     if (['agentId','wallet','mint','side','spendLamports','tokenUnits','tokenDecimals','minimumReceiveLamports','slippageBps','createdAt','expiresAt'].some(k => existing[k] !== proposal[k])) throw Error('Idempotency key reused with different intent');

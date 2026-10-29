@@ -1,0 +1,77 @@
+import { createRequire } from 'node:module';
+import { PublicKey } from '@solana/web3.js';
+import { getMint, getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
+
+// Market data for the strategy. DexScreener for market metrics, the RPC (Helius) for
+// on-chain facts. Every fetch is bounded; a failed read yields null and screens out.
+const require = createRequire(import.meta.url);
+const { OnlinePumpSdk } = require('@pump-fun/pump-sdk');
+const DEX = 'https://api.dexscreener.com';
+const getJson = async (url, fetchImpl = fetch) => {
+  const r = await fetchImpl(url, { headers: { accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(10000) });
+  if (!r.ok) throw Error(`HTTP ${r.status}`);
+  return r.json();
+};
+
+/** Recently profiled or boosted pump.fun coins, newest first. */
+export async function candidates(limit, fetchImpl = fetch) {
+  const lists = await Promise.allSettled([getJson(`${DEX}/token-profiles/latest/v1`, fetchImpl), getJson(`${DEX}/token-boosts/latest/v1`, fetchImpl)]);
+  const mints = [];
+  for (const l of lists) if (l.status === 'fulfilled' && Array.isArray(l.value))
+    for (const t of l.value) if (t?.chainId === 'solana' && typeof t.tokenAddress === 'string' && t.tokenAddress.endsWith('pump') && !mints.includes(t.tokenAddress)) mints.push(t.tokenAddress);
+  return mints.slice(0, limit);
+}
+
+/** Best pump.fun / PumpSwap pair per mint, as plain metrics. */
+export async function marketMetrics(mints, fetchImpl = fetch) {
+  const out = new Map();
+  for (let i = 0; i < mints.length; i += 30) {
+    let pairs = [];
+    try { pairs = await getJson(`${DEX}/tokens/v1/solana/${mints.slice(i, i + 30).join(',')}`, fetchImpl); } catch { continue; }
+    for (const p of Array.isArray(pairs) ? pairs : []) {
+      const mint = p?.baseToken?.address;
+      if (!mints.includes(mint) || !['pumpfun', 'pumpswap'].includes(p.dexId) || p.quoteToken?.symbol !== 'SOL') continue;
+      const m = { chainId: p.chainId, mint, symbol: p.baseToken.symbol, dexId: p.dexId, pairAddress: p.pairAddress, image: p.info?.imageUrl ?? null,
+        pairCreatedAt: p.pairCreatedAt, liquidityUsd: p.liquidity?.usd,
+        marketCapUsd: p.marketCap ?? p.fdv, volume5mUsd: p.volume?.m5, volume24hUsd: p.volume?.h24,
+        buys5m: p.txns?.m5?.buys, sells5m: p.txns?.m5?.sells, priceSol: Number(p.priceNative), solUsd: Number(p.priceUsd) / Number(p.priceNative) };
+      const prev = out.get(mint);
+      if (!prev || (m.liquidityUsd ?? 0) > (prev.liquidityUsd ?? 0)) out.set(mint, m);
+    }
+  }
+  return out;
+}
+
+async function dasHolders(rpcUrl, mint, enough, fetchImpl) {
+  const r = await fetchImpl(rpcUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(10000),
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getTokenAccounts', params: { mint, limit: Math.min(1000, Math.max(1, enough)), options: { showZeroBalance: false } } }) });
+  const body = await r.json();
+  const n = body?.result?.token_accounts?.length;
+  return Number.isSafeInteger(n) ? n : null; // a count of at least `enough`, capped there
+}
+
+/** Authorities, holder floor, top-10 share among wallet holders, creator share. */
+export async function chainFacts(conn, rpcUrl, mint, minHolders, fetchImpl = fetch) {
+  const key = new PublicKey(mint), account = await conn.getAccountInfo(key, 'confirmed');
+  if (!account || ![TOKEN_PROGRAM_ID.toBase58(), TOKEN_2022_PROGRAM_ID.toBase58()].includes(account.owner.toBase58())) return null;
+  const info = await getMint(conn, key, 'confirmed', account.owner);
+  const supply = Number(info.supply);
+  if (!(supply > 0)) return null;
+  const largest = (await conn.getTokenLargestAccounts(key, 'confirmed')).value;
+  const parsed = await conn.getMultipleParsedAccounts(largest.map(a => a.address), { commitment: 'confirmed' });
+  // Curve and pool vaults are program-owned (off-curve) and are liquidity, not holders.
+  const wallets = largest.map((a, i) => ({ amount: Number(a.amount), owner: parsed.value[i]?.data?.parsed?.info?.owner }))
+    .filter(x => x.owner && PublicKey.isOnCurve(new PublicKey(x.owner).toBytes()));
+  const top10Share = wallets.slice(0, 10).reduce((n, x) => n + x.amount, 0) / supply;
+  let devShare = null;
+  try {
+    const creator = (await new OnlinePumpSdk(conn).fetchBondingCurve(key)).creator;
+    const ata = getAssociatedTokenAddressSync(key, creator, true, account.owner);
+    const bal = await conn.getTokenAccountBalance(ata, 'confirmed').catch(() => null);
+    devShare = bal ? Number(bal.value.amount) / supply : 0;
+  } catch { devShare = null; }
+  let holders = null;
+  try { holders = await dasHolders(rpcUrl, mint, minHolders, fetchImpl); } catch { holders = null; }
+  return { mintAuthority: info.mintAuthority ? info.mintAuthority.toBase58() : null, freezeAuthority: info.freezeAuthority ? info.freezeAuthority.toBase58() : null,
+    decimals: info.decimals, top10Share, devShare, holders, tokenProgram: account.owner.toBase58() };
+}
