@@ -38,7 +38,7 @@ function morphOpen(card: HTMLElement, id: string, open: () => void) {
     flushSync(open)
     card.style.viewTransitionName = ''
     const target = document.querySelector<HTMLElement>(`.panel [data-call="${CSS.escape(id)}"]`)
-    target?.scrollIntoView({ block: 'center' })
+    target?.scrollIntoView({ block: 'center', behavior: 'instant' })
     const cc = target?.querySelector<HTMLElement>('.cc')
     if (cc) cc.style.viewTransitionName = 'call-open'
   })
@@ -191,7 +191,9 @@ export default function App() {
         <button className="panel-x" onClick={() => setTab('desk')} aria-label="close">
           <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
         </button>
-        <CallsPanel feed={feed} focus={tab === 'calls' ? focusCall : undefined} />
+        <div className="panel-body">
+          <CallsPanel feed={feed} focus={tab === 'calls' ? focusCall : undefined} />
+        </div>
       </aside>
 
       {tab === 'stats' && <StatsPage feed={feed} />}
