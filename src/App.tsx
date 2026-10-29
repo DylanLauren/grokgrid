@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { MAIN_MINT, MAIN_NAME, MAIN_TICKER, X_HANDLE, buyUrl } from './config'
+import { XMark } from './ui/XMark'
 import { stats, useFeed } from './data/useFeed'
 import type { View } from './scene/Scene'
 import { pct } from './lib/format'
@@ -183,7 +184,7 @@ export default function App() {
             <span className="status mono" title="sample trades until his first real trade">sample data</span>
           )}
           {X_HANDLE && (
-            <a className="chip mono" href={`https://x.com/${X_HANDLE}`} target="_blank" rel="noreferrer">@{X_HANDLE}</a>
+            <a className="chip chip-icon" href={`https://x.com/${X_HANDLE}`} target="_blank" rel="noreferrer" aria-label={`@${X_HANDLE} on X`} title={`@${X_HANDLE} on X`}><XMark /></a>
           )}
           <BuyButton />
         </div>
