@@ -82,7 +82,7 @@ export interface Looker {
   paths: [SVGPathElement, SVGPathElement]
   shape: Shape
   doze?: boolean
-  flow?: number // set: the eyes follow this bot's own slow loop and ignore the pointer
+  flow?: number // set: the eyes trace this bot's own slow loop, and watch the pointer while it moves
   // eased state
   lx: number
   ly: number
@@ -140,7 +140,12 @@ function tick(now: number) {
     const flowing = b.flow !== undefined
     const near = !flowing && dist < r.width * 0.6 // the pointer is on it
     let tx = 0, ty = 0, ts = 1
-    if (flowing) {
+    if (flowing && active) {
+      // the pointer moved lately: the whole team turns to watch it, easing in like water
+      const k = Math.min(1, dist / 220)
+      tx = (dx / (dist || 1)) * k * 0.95
+      ty = (dy / (dist || 1)) * k * 0.8
+    } else if (flowing) {
       const [fx, fy, ph, ax, ay] = LOOPS[b.flow! % LOOPS.length]
       const t = now / 1000 / (6.5 + (b.flow! % 4) * 0.9) * Math.PI * 2
       tx = Math.sin(t * fx + ph) * ax
@@ -184,7 +189,7 @@ function tick(now: number) {
     b.o2 += (f2 - b.o2) * ease
     ts *= fs
     // smooth, a touch springy
-    const follow = flowing ? 0.06 : 0.12
+    const follow = flowing ? (active ? 0.09 : 0.05) : 0.12
     b.lx += (tx - b.lx) * follow
     b.ly += (ty - b.ly) * follow
     b.sc += (ts - b.sc) * 0.15
