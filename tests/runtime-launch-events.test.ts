@@ -65,3 +65,11 @@ test('malformed batch cannot advance journal and ahead or foreign checkpoint can
   const cp=reconcileLaunchCheckpoint(null,pins,'0',0)
   for(const invalid of [{...cp,cursor:'1'},{...cp,observationSequence:1},{...cp,houseWallet:pins.burnWallet},{...cp,executionEnabled:true}])assert.throws(()=>reconcileLaunchCheckpoint(invalid,pins,'0',0))
 }))
+
+test('launch events carry a valid Privy wallet id and reject a malformed one', () => {
+  const row = { cursor: '1', id: 'bot-1', mint: 'So11111111111111111111111111111111111111112', wallet: '11111111111111111111111111111111', ts: 1000 }
+  const page = (r: object) => ({ version: 1, events: [r], nextCursor: '1', headCursor: '1', hasMore: false, coverage: LAUNCH_COVERAGE, executionEnabled: false })
+  assert.equal(validateLaunchEvents(page({ ...row, privyWalletId: 'wallet_abc' }), '0', 2000).events[0].privyWalletId, 'wallet_abc')
+  assert.equal('privyWalletId' in validateLaunchEvents(page(row), '0', 2000).events[0], false)
+  assert.throws(() => validateLaunchEvents(page({ ...row, privyWalletId: 'bad id' }), '0', 2000), /identity-invalid/)
+})
