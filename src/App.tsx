@@ -163,10 +163,8 @@ export default function App() {
         </button>
         <nav className="mini-menu" aria-label="links">
           {LINKS.map((l) => (
-            <a key={l.href} href={l.href} target="_blank" rel="noreferrer" tabIndex={tucked.on ? 0 : -1}>
-              <span className="mini-ico">{l.icon}</span>
-              <span>{l.label}</span>
-              <span className="mini-go" aria-hidden>↗</span>
+            <a key={l.href} href={l.href} target="_blank" rel="noreferrer" tabIndex={tucked.on ? 0 : -1} aria-label={l.label} title={l.label}>
+              {l.icon}
             </a>
           ))}
         </nav>
