@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import { PublicKey } from '@solana/web3.js';
 import { getMint, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
+import { screen } from './strategy-policy.mjs';
 
 // Market data for the strategy. DexScreener for market metrics, the RPC (Helius) for
 // on-chain facts. Every fetch is bounded; a failed read yields null and screens out.
@@ -77,4 +78,21 @@ export async function chainFacts(conn, rpcUrl, mint, minHolders, fetchImpl = fet
   try { holderCount = await dasHolders(rpcUrl, mint, minHolders, fetchImpl); } catch { holderCount = null; }
   return { mintAuthority: info.mintAuthority ? info.mintAuthority.toBase58() : null, freezeAuthority: info.freezeAuthority ? info.freezeAuthority.toBase58() : null,
     decimals: info.decimals, top10Share, devShare, holders: holderCount, tokenProgram: account.owner.toBase58() };
+}
+
+/** Candidates + held coins: market metrics for all, chain facts only where the market screen passes. */
+export async function gatherMarket(c, conn, rpcUrl, heldMints, now) {
+  const found = await candidates(c.scanLimit);
+  const metrics = await marketMetrics([...new Set([...found, ...heldMints])]);
+  const facts = new Map();
+  let screened = 0;
+  for (const [mint, m] of metrics) {
+    if (heldMints.includes(mint)) continue;
+    // Only spend RPC calls on coins whose market metrics already pass.
+    const pre = screen({ ...m, mintAuthority: null, freezeAuthority: null, holders: Number.MAX_SAFE_INTEGER, top10Share: 0, devShare: 0 }, c, now);
+    if (!pre.ok) continue;
+    screened++;
+    try { const f = await chainFacts(conn, rpcUrl, mint, c.minHolders); if (f) facts.set(mint, f); } catch {}
+  }
+  return { metrics, facts, scanned: found.length, preScreened: screened };
 }

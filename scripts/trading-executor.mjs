@@ -38,7 +38,7 @@ export function nextExecutable(state, policy, now, stopFilePresent) {
 /**
  * Builds and signs one intent, then journals the signature. Returns the signed transaction
  * for the caller to broadcast only after the returned state is durably stored.
- * deps: build(intent) -> { tx, lastValidBlockHeight } | null, sign(tx), signatureOf(tx).
+ * deps: build(intent) -> { tx, lastValidBlockHeight } | null, sign(tx) -> void | signed tx, signatureOf(tx).
  */
 export async function signNext(state, policy, deps, now) {
   validateTradingPolicy(policy); validateTradingState(state, policy);
@@ -46,8 +46,9 @@ export async function signNext(state, policy, deps, now) {
   if (!pick.intent) return { state, tx: null, reason: pick.reason };
   const built = await deps.build(pick.intent);
   if (!built) return { state, tx: null, reason: 'no-supported-route' };
-  deps.sign(built.tx);
+  // A local keypair signs in place; a remote signer (Privy) returns a new signed transaction.
+  const tx = (await deps.sign(built.tx)) || built.tx;
   const maxCostLamports = pick.intent.side === 'buy' ? (BigInt(pick.intent.spendLamports) + MAX_RENT_ALLOWANCE).toString() : undefined;
-  const next = holdExternalSubmission(state, policy, pick.intent.id, deps.signatureOf(built.tx), { lastValidBlockHeight: built.lastValidBlockHeight, maxCostLamports });
-  return { state: next, tx: built.tx, reason: 'signed', intentId: pick.intent.id };
+  const next = holdExternalSubmission(state, policy, pick.intent.id, deps.signatureOf(tx), { lastValidBlockHeight: built.lastValidBlockHeight, maxCostLamports });
+  return { state: next, tx, reason: 'signed', intentId: pick.intent.id };
 }

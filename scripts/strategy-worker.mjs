@@ -8,8 +8,8 @@ import { constants } from 'node:fs';
 import { randomUUID, createHash } from 'node:crypto';
 import { resolve, join } from 'node:path';
 import { homedir } from 'node:os';
-import { validateStrategyConfig, screen } from './strategy-policy.mjs';
-import { candidates, marketMetrics, chainFacts } from './strategy-data.mjs';
+import { validateStrategyConfig } from './strategy-policy.mjs';
+import { gatherMarket as gather } from './strategy-data.mjs';
 import { paperTick, paperSummary, emptyPaper, livePlan } from './strategy-engine.mjs';
 import { connect, quoteSell } from './pump-chain.mjs';
 import { validateTradingPolicy, planIntent, setAllowlist, executes } from './trading-policy.mjs';
@@ -46,22 +46,6 @@ async function withPaper(c, run) {
     await savePrivate('strategy-paper.json', { version: 1, state: next, sha256: digest(next) });
     return next;
   } finally { await lock.close(); await unlink(lockPath); }
-}
-
-async function gather(c, conn, rpcUrl, heldMints, now) {
-  const found = await candidates(c.scanLimit);
-  const metrics = await marketMetrics([...new Set([...found, ...heldMints])]);
-  const facts = new Map();
-  let screened = 0;
-  for (const [mint, m] of metrics) {
-    if (heldMints.includes(mint)) continue;
-    // Only spend RPC calls on coins whose market metrics already pass.
-    const pre = screen({ ...m, mintAuthority: null, freezeAuthority: null, holders: Number.MAX_SAFE_INTEGER, top10Share: 0, devShare: 0 }, c, now);
-    if (!pre.ok) continue;
-    screened++;
-    try { const f = await chainFacts(conn, rpcUrl, mint, c.minHolders); if (f) facts.set(mint, f); } catch {}
-  }
-  return { metrics, facts, scanned: found.length, preScreened: screened };
 }
 
 async function tick() {
