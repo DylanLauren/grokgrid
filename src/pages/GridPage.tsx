@@ -48,6 +48,9 @@ const EMPTY: Draft = { look: 3, name: '', botName: '', ticker: '', description: 
 const DRAFT_KEY = 'gg-launch-draft'
 // the house exits every bot runs under: an owner can set them tighter, never looser
 const HOUSE = { takeProfit: 60, stopLoss: 25 }
+// what a launch needs from the owner's Phantom, matching api/launch/prepare.ts
+const MIN_FUND = 0.03 // the bot keeps 0.02 in reserve, so less would never trade
+const LAUNCH_COST = 0.03 // about: Solana network fees and pump.fun's coin-creation rent
 const MAX_TRADE = 0.05 // the signer policy's per-buy cap: a higher max could never be used
 const LIMITS = { name: 32, botName: 32, ticker: 10, description: 600, strategy: 140 }
 const RESERVED = ['house', 'housetrader', 'housebot', 'grokgrid', 'grokgridofficial', 'official', 'admin'] // matches api/_launch.ts
@@ -70,7 +73,7 @@ function check(d: Draft) {
   if (n(d.maxSol, 0.01, MAX_TRADE)) e.maxSol = `0.01 to ${MAX_TRADE} SOL`
   if (n(d.takeProfit, 5, HOUSE.takeProfit)) e.takeProfit = `5% to ${HOUSE.takeProfit}%`
   if (n(d.stopLoss, 1, HOUSE.stopLoss)) e.stopLoss = `1% to ${HOUSE.stopLoss}%`
-  if (!(Number(d.fund) >= 0.03 && Number(d.fund) <= 10)) e.fund = '0.03 to 10 SOL'
+  if (!(Number(d.fund) >= MIN_FUND && Number(d.fund) <= 10)) e.fund = `at least ${MIN_FUND} SOL, up to 10`
   if (d.firstBuy && !(Number(d.firstBuy) === 0 || (Number(d.firstBuy) >= 0.001 && Number(d.firstBuy) <= 10))) e.firstBuy = '0, or 0.001 to 10 SOL'
   return e
 }
@@ -285,24 +288,33 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
           </Group>
 
           <Group n="04" title="launch">
-            <Field label="fund your bot" unit="SOL" error={err('fund')} hint="sent from your Phantom to your bot’s trading wallet in the same approval. it keeps 0.02 in reserve and trades the rest. each buy is about 2% of that, so around 0.25 SOL or more gives real trades.">
-              <input inputMode="decimal" value={d.fund} onBlur={() => touch('fund')} onChange={(e) => set('fund', num(e.target.value))} />
-            </Field>
-            <Field label="first buy" unit="SOL" error={err('firstBuy')} hint="optional. bought by your phantom in the same approval, so these tokens stay in your phantom (the bot doesn't trade them).">
-              <input inputMode="decimal" value={d.firstBuy} placeholder="0" onBlur={() => touch('firstBuy')} onChange={(e) => set('firstBuy', num(e.target.value))} />
-            </Field>
+            <div className="gd-row">
+              <Field label="fund your bot" unit="SOL" count={`min ${MIN_FUND}`} error={err('fund')} hint={`goes to your bot’s own trading wallet. ${MIN_FUND} SOL is the minimum; it keeps 0.02 in reserve and buys with about 2% of the rest, so 0.25 SOL or more gives real trades.`}>
+                <input inputMode="decimal" value={d.fund} placeholder={String(MIN_FUND)} onBlur={() => touch('fund')} onChange={(e) => set('fund', num(e.target.value))} />
+              </Field>
+              <Field label="dev buy" unit="SOL" error={err('firstBuy')} hint="optional. your Phantom buys your own coin the moment it’s created. the tokens stay in your Phantom; the bot never trades or sells them.">
+                <input inputMode="decimal" value={d.firstBuy} placeholder="0" onBlur={() => touch('firstBuy')} onChange={(e) => set('firstBuy', num(e.target.value))} />
+              </Field>
+            </div>
+            {/* everything the one approval does, and what it costs */}
+            <dl className="gd-sign">
+              <div><dt>create ${d.ticker || 'TICKER'} on pump.fun, 80/20 split locked</dt><dd>≈{LAUNCH_COST} SOL fees + rent</dd></div>
+              <div><dt>fund your bot’s trading wallet</dt><dd>{Number(d.fund) > 0 ? Number(d.fund) : 0} SOL</dd></div>
+              <div><dt>dev buy, tokens to your Phantom</dt><dd>{Number(d.firstBuy) > 0 ? Number(d.firstBuy) : 0} SOL</dd></div>
+              <div className="sum"><dt>one approval in Phantom, about</dt><dd>{+(LAUNCH_COST + (Number(d.fund) || 0) + (Number(d.firstBuy) || 0)).toFixed(3)} SOL</dd></div>
+            </dl>
             <div className="gd-split">
               <div>
                 <b>80%</b>
-                <span>of creator fees go to your bot’s trading wallet</span>
+                <span>of creator fees go to your bot’s trading wallet, which collects them and trades with them</span>
               </div>
               <div>
                 <b>20%</b>
                 <span>of creator fees go to the ${MAIN_TICKER} burn wallet</span>
               </div>
             </div>
-            <p className="gd-note">Pressing Launch lets Grok Bot trade your bot’s wallet, only inside its fixed limits. You can stop it at any time.</p>
-            <p className="gd-note mono">one bot per Phantom · 80/20 split locked at creation · review the exact network fees, rent and optional first buy before signing</p>
+            <p className="gd-note">Your Phantom only signs the launch and holds your dev buy. Your bot’s own wallet collects its fees and does all the trading, only inside its fixed limits. You can stop it at any time.</p>
+            <p className="gd-note mono">one bot per Phantom · 80/20 split locked at creation · your wallet shows the exact total before you sign</p>
             <button type="submit" className="btn" disabled={!ready}>
               <Roll>{step !== null ? STEPS[step] : status === null ? 'Checking launchpad…' : !status.open ? 'Launches paused' : !owner ? 'Connect Phantom' : !agentWallet ? 'Sign the message in Phantom' : !(agentWallet.authorizationReady || agentWallet.authorize) ? 'Checking your wallet…' : 'Launch bot'}</Roll>
             </button>
