@@ -146,7 +146,7 @@ async function tick() {
   await savePrivate(stateFile, state);
 
   let global = { ...DEFAULT_STRATEGY }; try { global = await json(join(root, 'strategy-config.json')); } catch {}
-  global = validateStrategyConfig({ ...global, mode: c.mode === 'execute' ? 'live' : 'paper' });
+  global = validateStrategyConfig({ ...DEFAULT_STRATEGY, ...global, mode: c.mode === 'execute' ? 'live' : 'paper' });
   // Defence in depth: never run two agents on one wallet, whatever the state file says.
   const wallets = new Set();
   const ready = Object.values(state.agents).filter(a => a.status === 'ready' && !wallets.has(a.wallet) && wallets.add(a.wallet)).slice(0, c.maxAgents);

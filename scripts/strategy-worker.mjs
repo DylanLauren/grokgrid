@@ -8,7 +8,7 @@ import { constants } from 'node:fs';
 import { randomUUID, createHash } from 'node:crypto';
 import { resolve, join } from 'node:path';
 import { homedir } from 'node:os';
-import { validateStrategyConfig } from './strategy-policy.mjs';
+import { validateStrategyConfig, DEFAULT_STRATEGY } from './strategy-policy.mjs';
 import { gatherMarket as gather } from './strategy-data.mjs';
 import { paperTick, paperSummary, emptyPaper, livePlan } from './strategy-engine.mjs';
 import { connect, quoteSell } from './pump-chain.mjs';
@@ -50,7 +50,8 @@ async function withPaper(c, run) {
 
 async function tick() {
   const rs = await lstat(root); if (!rs.isDirectory() || rs.isSymbolicLink() || !ownedPrivate(rs)) throw Error('Runtime directory must be private and owned');
-  const c = validateStrategyConfig(await json(join(root, 'strategy-config.json')));
+  // Settings added after a config was written fall back to their defaults.
+  const c = validateStrategyConfig({ ...DEFAULT_STRATEGY, ...await json(join(root, 'strategy-config.json')) });
   const rpc = await json(join(root, 'observer-config.json'));
   const conn = connect(rpc.rpcUrl), now = Date.now();
   const liquidating = typeof c.exitFile === 'string' && c.exitFile.startsWith('/') && await exists(c.exitFile);

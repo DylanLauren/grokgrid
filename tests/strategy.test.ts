@@ -9,13 +9,13 @@ const now = 1_800_000_000_000
 const c = validateStrategyConfig({ ...DEFAULT_STRATEGY })
 const MINT = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'
 const good = { chainId: 'solana', mint: MINT, symbol: 'GOOD', pairCreatedAt: now - 60 * 60000, liquidityUsd: 40000, marketCapUsd: 250000, volume5mUsd: 10000, volume24hUsd: 200000,
-  buys5m: 90, sells5m: 60, priceSol: 0.000001, solUsd: 100, mintAuthority: null, freezeAuthority: null, holders: 150, top10Share: 0.16, devShare: 0.01, decimals: 6 }
+  buys5m: 90, sells5m: 60, change5m: 8, change1h: 20, priceSol: 0.000001, solUsd: 100, mintAuthority: null, freezeAuthority: null, holders: 150, top10Share: 0.16, devShare: 0.01, decimals: 6 }
 const market = (m = good) => ({ metrics: new Map([[m.mint, m]]), facts: new Map([[m.mint, { mintAuthority: m.mintAuthority, freezeAuthority: m.freezeAuthority, holders: m.holders, top10Share: m.top10Share, devShare: m.devShare }]]) })
 
 test('a liquid coin with rising buyers passes; each failing fact is named; unknowns fail closed', () => {
   assert.deepEqual(screen(good, c, now), { ok: true, reasons: [] })
   for (const [patch, why] of [[{ mintAuthority: 'x' }, 'authorities'], [{ holders: 20 }, 'holders'], [{ top10Share: 0.6 }, 'concentration'], [{ devShare: 0.2 }, 'dev-holding'],
-    [{ pairCreatedAt: now - 60000 }, 'age'], [{ buys5m: 50, sells5m: 60 }, 'buy-pressure'], [{ holders: undefined }, 'holders'], [{ liquidityUsd: 400 }, 'trade-too-large-for-liquidity']] as const)
+    [{ pairCreatedAt: now - 60000 }, 'age'], [{ buys5m: 50, sells5m: 60 }, 'buy-pressure'], [{ holders: undefined }, 'holders'], [{ liquidityUsd: 400 }, 'trade-too-large-for-liquidity'], [{ change5m: 60 }, 'chasing-5m-pump'], [{ change5m: undefined }, 'chasing-5m-pump']] as const)
     assert.ok(screen({ ...good, ...patch }, c, now).reasons.includes(why), why)
 })
 
@@ -104,4 +104,12 @@ test('phone heartbeat is healthy only while frames are fresh', async () => {
   assert.equal(phoneBeat({ state: 'sending', lastSentAt: '2026-10-29T02:58:30Z' }, now).healthy, false)
   assert.equal(phoneBeat({ state: 'waiting-for-window', lastSentAt: '2026-10-29T02:59:59Z' }, now).note, 'waiting-for-window')
   assert.equal(phoneBeat(null, now).healthy, false)
+})
+
+test('a coin that was just stopped out is not bought again inside the cooldown', () => {
+  let s = paperTick(emptyPaper(), c, market(), now)
+  s = paperTick(s, c, market({ ...good, priceSol: 0.0000005 }), now + 60000) // -50%: stop-loss
+  assert.equal(s.closed[0].reason, 'stop-loss'); assert.equal(s.positions.length, 0)
+  assert.equal(paperTick(s, c, market(), now + 120000).positions.length, 0)
+  assert.equal(paperTick(s, c, market(), now + 60000 + c.reentryCooldownMinutes * 60000 + 1).positions.length, 1)
 })

@@ -14,6 +14,9 @@ export const DEFAULT_STRATEGY = Object.freeze({
   minLiquidityUsd: 15000, minMarketCapUsd: 30000, maxMarketCapUsd: 5_000_000,
   minVolume5mUsd: 3000, minVolume24hUsd: 50000,
   minBuys5m: 20, minBuySellRatio5m: 1.2,
+  // Paper run 2026-10-29: 26 of 33 exits were stop-losses ~5 min after buying a spike, and
+  // 8 coins were re-bought after stopping out. So: don't chase a 5m pump, and cool off a coin.
+  maxChange5mPct: 25, reentryCooldownMinutes: 360,
   minHolders: 150, maxTop10Share: 0.30, maxDevShare: 0.05,
   maxTradeShareOfLiquidity: 0.01,
   tradeLamports: '50000000', maxOpenPositions: 3,
@@ -23,7 +26,7 @@ export const DEFAULT_STRATEGY = Object.freeze({
 
 export function validateStrategyConfig(c) {
   if (!c || c.version !== 1 || !['paper', 'live'].includes(c.mode) || typeof c.flavor !== 'string') throw Error('Unsupported strategy config');
-  for (const k of ['minAgeMinutes', 'maxAgeMinutes', 'minLiquidityUsd', 'minMarketCapUsd', 'maxMarketCapUsd', 'minVolume5mUsd', 'minVolume24hUsd', 'minBuys5m', 'minBuySellRatio5m', 'minHolders', 'maxHoldMinutes', 'allowlistMinutes', 'maxOpenPositions', 'scanLimit'])
+  for (const k of ['minAgeMinutes', 'maxAgeMinutes', 'minLiquidityUsd', 'minMarketCapUsd', 'maxMarketCapUsd', 'minVolume5mUsd', 'minVolume24hUsd', 'minBuys5m', 'minBuySellRatio5m', 'minHolders', 'maxHoldMinutes', 'allowlistMinutes', 'maxOpenPositions', 'scanLimit', 'maxChange5mPct', 'reentryCooldownMinutes'])
     if (!num(c[k]) || c[k] < 0) throw Error(`Invalid ${k}`);
   for (const k of ['maxTop10Share', 'maxDevShare', 'maxTradeShareOfLiquidity', 'takeProfit', 'stopLoss', 'trailArm', 'trailStop', 'paperSlippage']) if (!frac(c[k]) && !(k === 'takeProfit' && num(c[k]) && c[k] > 0)) throw Error(`Invalid ${k}`);
   if (c.minAgeMinutes >= c.maxAgeMinutes || c.minMarketCapUsd >= c.maxMarketCapUsd || !integer(c.tradeLamports) || BigInt(c.tradeLamports) <= 0n) throw Error('Invalid strategy ranges');
@@ -59,6 +62,7 @@ export function screen(m, c, now) {
   need(num(m?.volume24hUsd) && m.volume24hUsd >= c.minVolume24hUsd, 'volume-24h');
   need(num(m?.buys5m) && m.buys5m >= c.minBuys5m, 'buys-5m');
   need(num(m?.buys5m) && num(m?.sells5m) && m.buys5m / Math.max(1, m.sells5m) >= c.minBuySellRatio5m, 'buy-pressure');
+  need(num(m?.change5m) && m.change5m <= c.maxChange5mPct, 'chasing-5m-pump');
   need(m?.mintAuthority === null && m?.freezeAuthority === null, 'authorities');
   need(num(m?.holders) && m.holders >= c.minHolders, 'holders');
   need(num(m?.top10Share) && m.top10Share <= c.maxTop10Share, 'concentration');
