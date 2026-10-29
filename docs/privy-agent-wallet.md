@@ -95,3 +95,38 @@ Local verifier tests use injected public fixtures only. They cover wrong app/iss
 `api/agent-wallet/readiness.ts` serves the readiness route. `api/_privy-provider.ts` maps raw `@privy-io/node` resources onto the verifier contract: `utils().auth().verifyAccessToken`, `users()._get`, `wallets().get`, `policies().get`. Privy's wallet `owner_id` is a key quorum, not a user DID, so ownership means an embedded, non-imported Solana account linked to the verified user plus a non-null owner quorum on the wallet. A policy with no owner fails as `policy-not-approved`. With any server value missing, the route answers `configuration-missing` and makes no Privy calls.
 
 Still open: create the GrokGrid Privy app, the agent signer key quorum and the policy (built from the approved limits in the protected config), then set the env names above in Vercel.
+
+## Setting up GrokGrid's Privy app (dlao)
+
+The three steps below never print a secret. The clipboard is cleared after each save.
+
+1. Copy the **App secret** from the Privy dashboard, then run (put your App ID in place of the placeholder):
+   ```sh
+   GG=~/.config/grokgrid/runtime; APP_ID='<your Privy App ID>'; (umask 077; pbpaste | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{require("fs").writeFileSync(process.argv[1],JSON.stringify({appId:process.argv[2],appSecret:s.trim()})+"\n",{mode:0o600});console.log("saved privy-server.json")})' "$GG/privy-server.json" "$APP_ID") && pbcopy </dev/null
+   ```
+2. Create an **authorization key** in the dashboard, copy its private key (`wallet-auth:…`), then run:
+   ```sh
+   GG=~/.config/grokgrid/runtime; (umask 077; pbpaste | tr -d '\n' > "$GG/privy-authorization.key") && pbcopy </dev/null && echo saved privy-authorization.key
+   ```
+3. Create the signer and the policy:
+   ```sh
+   cd ~/coding/grokgrid-main && git fetch -q origin main && git checkout -q --detach origin/main && npx tsx ops/privy-setup.mjs
+   ```
+   It prints only public values:
+   - the signer (key quorum) ID and its public key;
+   - the policy ID, the policy SHA-256 (`privyPolicyFingerprint`) and the one-line summary;
+   - the Vercel env names to set.
+
+   Set `PRIVY_APP_SECRET` and `PRIVY_AUTHORIZATION_PRIVATE_KEY` in Vercel yourself.
+
+**The policy** (`ops/privy-setup.mjs`, check offline with `--dry-build`) is default deny. It allows `signTransaction` only for:
+- compute-budget instructions;
+- token-account creation;
+- pump.fun curve `buy` with `max_sol_cost` ≤ 0.05 SOL, and curve `sell`;
+- PumpSwap `buy` with `max_quote_amount_in` ≤ 0.05 SOL, and PumpSwap `sell`;
+- SOL transfers ≤ 0.05 SOL (the PumpSwap SOL wrap);
+- WSOL `SyncNative` and `CloseAccount`.
+
+Every IDL check sits in the same rule as its program-id check. There is no message signing and no key export. The signer quorum owns the policy, so the app secret alone can't loosen it. Total size is about 23 KB.
+
+**Known limits.** A system transfer's recipient and a `CloseAccount` destination can't be pinned per wallet, so a stolen authorization key could move at most 0.05 SOL per transaction that way. The runner's caps, daily-loss stop and stop file still apply on top of the policy.
