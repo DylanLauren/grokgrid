@@ -14,7 +14,7 @@ const FAQ: [string, string][] = [
   ['Can I take money out of my bot’s wallet?', 'Yes. It’s your Privy wallet. GrokGrid’s signer can’t move funds out, but you can.'],
   ['Can GrokGrid take my funds?', 'No. The signer can only buy and sell on pump.fun under the policy, with no transfers. You can remove it at any time.'],
   ['How do I stop my bot?', 'Remove the signer from your wallet. It stops trading on the next cycle, and the coin and wallet stay yours.'],
-  ['Can my bot lose money?', 'Yes. Memecoins are risky. Limits cap each trade and the daily loss, but a bot can still lose what it trades with.'],
+  ['Can my bot lose money?', 'Yes. Memecoins are risky. Limits cap each trade and the daily loss, and Grok Bot’s size only grows as fees come in, but a bot can still lose what it trades with.'],
   ['When does trading go live?', 'After a funded test of the house bot. Until then the bots run in practice mode. The workers section on the stats page always shows the current mode.'],
   ['Where can I check all of this?', 'Every coin, wallet and trade links to pump.fun and Solscan. The addresses are at the bottom of this page.'],
   ['Is this made by xAI?', 'No. GrokGrid is an unofficial fan project.'],
@@ -36,7 +36,7 @@ const SECTIONS: [string, string, ReactNode][] = [
     'How he trades',
     <Fragment key="b">
       <p>He scans new pump.fun coins and skips anything that fails his safety checks: thin liquidity, low volume, few real buyers, too few holders, a top-10 that holds too much, a risky dev wallet, or a mint or freeze authority still set. When he buys, he exits on take-profit, stop-loss, a trailing stop or a maximum hold time.</p>
-      <p>Every trade has hard limits: 0.05 SOL per trade, 0.5 SOL open at once, a 0.25 SOL daily loss stop, 15% maximum slippage and a 0.02 SOL reserve he never spends. A stop switch halts him instantly, and an exit switch sells everything. Real trades show on the calls page with links to their transactions. Every coin he buys also gets a pump.fun Callout from his GrokGrid profile while he holds it.</p>
+      <p>His budget grows with what comes in. Each trade is 10% of the last 24 hours’ creator fees or 2% of his spare balance, whichever is bigger, up to a cap set by those fees: 0.02 SOL per trade under 1 SOL of daily fees, 0.05 SOL from 1 SOL, 0.1 SOL from 5 SOL and 0.5 SOL from 10 SOL, the hard maximum. Open positions stay under three times the cap and a quarter of his spare balance. The daily loss stop is two and a half times the cap, and never more than a fifth of his wallet. When fees slow down, his size shrinks again. On top of that, slippage is capped at 15%, he holds at most 3 coins, and a 0.02 SOL reserve is never spent. A stop switch halts him instantly, and an exit switch sells everything. Real trades show on the calls page with links to their transactions. Every coin he buys also gets a pump.fun Callout from his GrokGrid profile while he holds it.</p>
       <p>Before real trading he runs in practice mode: he picks and exits coins on live data but spends nothing. Real trading switches on after a funded test. The workers section on the stats page shows which parts are online and in which mode.</p>
     </Fragment>,
   ],
