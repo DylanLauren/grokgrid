@@ -9,6 +9,7 @@ export const STEPS = ['saving the picture', 'building the launch', 'approve in y
 export interface LaunchDraft {
   look: number
   name: string
+  botName: string
   ticker: string
   description: string
   x: string

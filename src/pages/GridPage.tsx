@@ -30,6 +30,7 @@ const CAST: { habit: Habit; say: string; trick: string }[] = [
 interface Draft {
   look: number
   name: string
+  botName: string // blank means the bot shares the coin's name
   ticker: string
   description: string
   x: string
@@ -42,10 +43,10 @@ interface Draft {
   fund: string // SOL sent from the owner's wallet to the bot's trading wallet at launch
 }
 
-const EMPTY: Draft = { look: 3, name: '', ticker: '', description: '', x: '', telegram: '', strategy: '', maxSol: '0.05', takeProfit: '100', stopLoss: '30', firstBuy: '', fund: '0.05' }
+const EMPTY: Draft = { look: 3, name: '', botName: '', ticker: '', description: '', x: '', telegram: '', strategy: '', maxSol: '0.05', takeProfit: '100', stopLoss: '30', firstBuy: '', fund: '0.05' }
 const DRAFT_KEY = 'gg-launch-draft'
 const MAX_TRADE = 0.05 // the signer policy's per-buy cap: a higher max could never be used
-const LIMITS = { name: 32, ticker: 10, description: 600, strategy: 140 }
+const LIMITS = { name: 32, botName: 32, ticker: 10, description: 600, strategy: 140 }
 const bytes = (s: string) => new TextEncoder().encode(s).length
 
 // What a field says is wrong with it, or nothing.
@@ -53,6 +54,7 @@ function check(d: Draft) {
   const e: Partial<Record<keyof Draft | 'image', string>> = {}
   if (!d.name.trim()) e.name = 'give it a name'
   else if (bytes(d.name) > LIMITS.name) e.name = `${LIMITS.name} bytes at most`
+  if (bytes(d.botName) > LIMITS.botName) e.botName = `${LIMITS.botName} bytes at most`
   if (!d.ticker) e.ticker = 'pick a ticker'
   else if (!/^[A-Z0-9]{2,10}$/.test(d.ticker)) e.ticker = '2 to 10 letters or numbers'
   if (bytes(d.description) > LIMITS.description) e.description = `${LIMITS.description} bytes at most`
@@ -171,7 +173,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
         <div className="gd-side">
           <div className="card gd-preview">
             <LiveBot key={`${d.look}-${cheer}`} color={look.color} shape={look.shape} habit={CAST[d.look].habit} size={170} selected />
-            <b>{d.name || 'your bot'}</b>
+            <b>{d.botName.trim() || d.name || 'your bot'}</b>
             <span>{d.strategy || 'one line on how it trades'}</span>
           </div>
           {/* how the coin will look on pump.fun */}
@@ -222,7 +224,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
               </div>
             </div>
             <div className="gd-row">
-              <Field label="name" count={`${bytes(d.name)}/${LIMITS.name}`} error={err('name')}>
+              <Field label="coin name" count={`${bytes(d.name)}/${LIMITS.name}`} error={err('name')}>
                 <input
                   value={d.name}
                   placeholder="night shift"
@@ -255,6 +257,9 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
           </Group>
 
           <Group n="03" title="how it trades">
+            <Field label="bot name" count={`${bytes(d.botName)}/${LIMITS.botName}`} error={err('botName')}>
+              <input value={d.botName} placeholder={d.name ? `${d.name} (or give it its own)` : 'night owl'} onBlur={() => touch('botName')} onChange={(e) => set('botName', e.target.value)} />
+            </Field>
             <Field label="strategy" count={`${bytes(d.strategy)}/${LIMITS.strategy}`} error={err('strategy')}>
               <input value={d.strategy} placeholder="only buys coins under 30K, sells at 2x" onBlur={() => touch('strategy')} onChange={(e) => set('strategy', e.target.value)} />
             </Field>
