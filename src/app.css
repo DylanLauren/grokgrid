@@ -21,17 +21,43 @@
   transition: background 0.3s, transform 0.45s cubic-bezier(.2,.8,.2,1), opacity 0.3s;
 }
 .bar.tuck { transform: translateY(-110%); opacity: 0; pointer-events: none; }
-/* the folded bar: one bot in a box, top left */
+/* the folded bar: one bot in a box, top left; hover it and the links drop out underneath */
+.mini-wrap { position: absolute; z-index: 31; top: 12px; left: var(--edge); pointer-events: none; }
+.mini-wrap.on { pointer-events: auto; }
 .mini {
-  position: absolute; z-index: 31; top: 12px; left: var(--edge);
-  width: 54px; height: 54px; display: grid; place-items: center; border-radius: 17px;
+  position: relative; width: 54px; height: 54px; display: grid; place-items: center; border-radius: 17px;
   background: var(--glass); border: 1px solid var(--hair-strong); backdrop-filter: blur(14px);
   box-shadow: 0 10px 30px #0008, inset 0 1px 0 #ffffff14;
   opacity: 0; transform: translateY(-14px) scale(0.6); pointer-events: none;
   transition: opacity 0.25s, transform 0.5s cubic-bezier(.3,1.6,.5,1), border-color 0.2s;
 }
-.mini.on { opacity: 1; transform: none; pointer-events: auto; transition-delay: 0.12s; }
-.mini:hover { border-color: var(--paper-50); }
+.mini-wrap.on .mini { opacity: 1; transform: none; pointer-events: auto; transition-delay: 0.12s; }
+.mini:hover, .mini-wrap:focus-within .mini { border-color: var(--paper-50); }
+.mini-menu {
+  position: absolute; top: 100%; left: 0; display: grid; gap: 2px; width: max-content; min-width: 200px;
+  margin-top: 8px; padding: 6px; border-radius: 16px;
+  background: #101012f2; border: 1px solid var(--hair-strong); backdrop-filter: blur(14px);
+  box-shadow: 0 18px 40px #000a, inset 0 1px 0 #ffffff12;
+  opacity: 0; translate: 0 -8px; scale: 0.96; transform-origin: 27px 0; pointer-events: none;
+  transition: opacity 0.2s, translate 0.35s cubic-bezier(.22,1,.36,1), scale 0.35s cubic-bezier(.22,1,.36,1);
+}
+/* a bridge over the gap, so the pointer can travel from the box to the list */
+.mini-menu::before { content: ''; position: absolute; left: 0; right: 0; top: -10px; height: 10px; }
+.mini-wrap.on:hover .mini-menu, .mini-wrap.on:focus-within .mini-menu { opacity: 1; translate: 0 0; scale: 1; pointer-events: auto; }
+.mini-menu a {
+  display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px 0 6px; border-radius: 11px;
+  font-size: 13.5px; color: var(--paper-70);
+  opacity: 0; translate: 0 -4px;
+  transition: background 0.2s, color 0.2s, opacity 0.3s, translate 0.35s cubic-bezier(.22,1,.36,1);
+}
+.mini-wrap.on:hover .mini-menu a, .mini-wrap.on:focus-within .mini-menu a { opacity: 1; translate: 0 0; }
+.mini-wrap.on:hover .mini-menu a:nth-child(2), .mini-wrap.on:focus-within .mini-menu a:nth-child(2) { transition-delay: 0s, 0s, 0.05s, 0.05s; }
+.mini-menu a:hover, .mini-menu a:focus-visible { background: #ffffff0f; color: var(--paper); }
+.mini-ico { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 9px; background: #ffffff0d; border: 1px solid var(--hair); color: var(--paper); transition: background 0.2s, scale 0.35s cubic-bezier(.3,1.6,.5,1); }
+.mini-menu a:hover .mini-ico { background: #ffffff1a; scale: 1.08; }
+.mini-go { margin-left: auto; padding-left: 14px; font-size: 12px; color: var(--paper-30); transition: translate 0.3s cubic-bezier(.22,1,.36,1), color 0.2s; }
+.mini-menu a:hover .mini-go { translate: 2px -2px; color: var(--paper); }
+@media (prefers-reduced-motion: reduce) { .mini-menu, .mini-menu a { transition: opacity 0.15s; translate: none; scale: none; } }
 .mb { position: relative; width: 32px; height: 32px; display: block; }
 /* the logo bot brings its own eyes; the box only floats it */
 .mb .logo-bot { position: absolute; inset: -1px; animation: mb-float 5.6s ease-in-out infinite; transition: rotate 0.7s cubic-bezier(.2,.8,.2,1), scale 0.7s cubic-bezier(.2,.8,.2,1); }
@@ -67,10 +93,17 @@
 .status { display: inline-flex; align-items: center; gap: 6px; height: 32px; font-size: 11.5px; color: var(--paper-70); border: 1px solid var(--hair-strong); border-radius: var(--r-pill); padding: 0 12px; text-transform: uppercase; letter-spacing: 0.06em; }
 .status i { width: 7px; height: 7px; border-radius: 50%; background: var(--gain); box-shadow: 0 0 8px var(--gain); animation: pulse 1.6s infinite; }
 .chip { display: inline-flex; align-items: center; height: 36px; font-size: 12px; border: 1px solid var(--hair-strong); border-radius: var(--r-pill); padding: 0 13px; }
-.chip-icon { width: 36px; justify-content: center; padding: 0; transition: background 0.2s ease, border-color 0.2s ease; }
-.chip-icon:hover { background: var(--hair); border-color: var(--paper-30); }
-.buy-group { display: flex; gap: 6px; }
-.ca { height: 36px; font-size: 12px; border: 1px solid var(--hair-strong); border-radius: var(--r-pill); padding: 0 13px; }
+/* X and GitHub: quiet round icons that lift, brighten and ring on hover */
+.soc {
+  position: relative; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+  color: var(--paper-70); background: #ffffff08; border: 1px solid var(--hair-strong);
+  transition: color 0.2s, background 0.25s, border-color 0.25s, translate 0.35s cubic-bezier(.3,1.6,.5,1), box-shadow 0.35s cubic-bezier(.22,1,.36,1);
+}
+.soc svg { transition: scale 0.35s cubic-bezier(.3,1.6,.5,1); }
+.soc:hover, .soc:focus-visible { color: var(--paper); background: #ffffff14; border-color: var(--paper-30); translate: 0 -2px; box-shadow: 0 0 0 4px #ffffff0d, 0 8px 20px #0007; }
+.soc:hover svg { scale: 1.1; }
+.soc:active { translate: 0 0; scale: 0.94; }
+@media (prefers-reduced-motion: reduce) { .soc, .soc svg { transition: color 0.2s, background 0.2s, border-color 0.2s; } .soc:hover { translate: none; } }
 .bar .buy, a.buy { display: inline-flex; align-items: center; height: 36px; background: var(--paper); color: var(--ink); border-radius: var(--r-pill); padding: 0 16px; font-size: 14px; font-weight: 560; white-space: nowrap; }
 .bar .buy.off { background: #ffffff12; color: var(--paper-50); font-weight: 450; font-size: 13px; border: 1px solid var(--hair); }
 

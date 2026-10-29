@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { MAIN_MINT, MAIN_NAME, MAIN_TICKER, X_HANDLE, buyUrl } from './config'
+import { GITHUB_URL, MAIN_MINT, MAIN_NAME, MAIN_TICKER, X_HANDLE, buyUrl } from './config'
 import { XMark } from './ui/XMark'
+import { GitHubMark } from './ui/GitHubMark'
 import { LogoBot } from './ui/LogoBot'
 import { stats, useFeed } from './data/useFeed'
 import type { View } from './scene/Scene'
@@ -155,9 +156,21 @@ export default function App() {
         </ErrorBoundary>
       </div>
 
-      <button className={`mini ${tucked.on ? 'on' : ''}`} onClick={tucked.open} aria-label="show menu" tabIndex={tucked.on ? 0 : -1}>
-        <MiniBot />
-      </button>
+      {/* the folded bar: the bot in its box; hover it and the links drop out underneath */}
+      <div className={`mini-wrap ${tucked.on ? 'on' : ''}`}>
+        <button className="mini" onClick={tucked.open} aria-label="show menu" tabIndex={tucked.on ? 0 : -1}>
+          <MiniBot />
+        </button>
+        <nav className="mini-menu" aria-label="links">
+          {LINKS.map((l) => (
+            <a key={l.href} href={l.href} target="_blank" rel="noreferrer" tabIndex={tucked.on ? 0 : -1}>
+              <span className="mini-ico">{l.icon}</span>
+              <span>{l.label}</span>
+              <span className="mini-go" aria-hidden>↗</span>
+            </a>
+          ))}
+        </nav>
+      </div>
       <header className={`bar ${tucked.on ? 'tuck' : ''}`}>
         <button className="brand" onClick={() => { setTab('desk'); setView('third') }}>
           <LogoBot size={34} />
@@ -182,9 +195,9 @@ export default function App() {
               live
             </span>
           )}
-          {X_HANDLE && (
-            <a className="chip chip-icon" href={`https://x.com/${X_HANDLE}`} target="_blank" rel="noreferrer" aria-label={`@${X_HANDLE} on X`} title={`@${X_HANDLE} on X`}><XMark /></a>
-          )}
+          {LINKS.map((l) => (
+            <a key={l.href} className="soc" href={l.href} target="_blank" rel="noreferrer" aria-label={l.label} title={l.label}>{l.icon}</a>
+          ))}
           <BuyButton />
         </div>
       </header>
@@ -292,6 +305,12 @@ function useTuck() {
   }, [])
   return { on, open: () => setOn(false) }
 }
+
+// where GrokGrid lives off the site: the bar shows them as icons, the folded bar as a list
+const LINKS = [
+  ...(X_HANDLE ? [{ href: `https://x.com/${X_HANDLE}`, label: `@${X_HANDLE} on X`, icon: <XMark size={14} /> }] : []),
+  ...(GITHUB_URL ? [{ href: GITHUB_URL, label: 'source on GitHub', icon: <GitHubMark size={16} /> }] : []),
+]
 
 // The folded bar's bot: floats slowly in its box and looks around like the others.
 function MiniBot() {
