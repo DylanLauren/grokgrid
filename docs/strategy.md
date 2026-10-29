@@ -42,6 +42,16 @@ Take `DEFAULT_STRATEGY` from `scripts/strategy-policy.mjs`, then add `"exitFile"
 
 Per-agent rules go through `tighten()`. They can only lower size, take-profit, stop-loss, hold time and open positions, or raise the liquidity and holder floors. They can never loosen a global setting.
 
+## Fast exits (exit watcher)
+
+The market scan runs about once a minute, and a memecoin can fall through a −25% stop between two scans. Two losses on 2026-10-29 exited at −41% and −43%.
+
+`scripts/exit-watcher.mjs` (launchd `fun.grokgrid.exit-watcher`, always running) closes that gap:
+- **Every 5 seconds:** it gets an on-chain sell quote for each coin the house holds. The quote is what selling would return now, net of pump.fun fees.
+- **Same rules:** it runs those prices through the strategy's own exit rules (`livePlan`, sells only): take-profit, stop-loss, trailing stop and max hold.
+- **Sell at once:** a sell it plans goes into the house trading journal, and the trading worker is started immediately to sign it.
+- **Limits:** it never buys, never signs and changes no limits. It keeps its own peak prices in `exit-watcher-state.json`. The STOP file and observe-only mode pause it. Status is in `exit-watcher-status.json`.
+
 ## Heartbeats
 
 The trading, buyback and strategy workers each `POST /api/ingest` once per tick:
