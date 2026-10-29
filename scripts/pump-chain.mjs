@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import { lstat, readFile } from 'node:fs/promises';
 import { ComputeBudgetProgram, Connection, Keypair, PublicKey, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
+import { fallbackFetch, fallbackUrl } from './rpc-fallback.mjs';
 import { NATIVE_MINT, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, createBurnCheckedInstruction, getAssociatedTokenAddressSync, getMint } from '@solana/spl-token';
 
 // pump.fun chain adapter shared by buy-and-burn and the trading executor. Reads use finalized commitment. Builders return
@@ -11,8 +12,9 @@ const BN = require('bn.js');
 const { PUMP_SDK, OnlinePumpSdk, getBuyTokenAmountFromSolAmount, getSellSolAmountFromTokenAmount } = sdk;
 const amm = require('@pump-fun/pump-swap-sdk');
 
-export const connect = rpcUrl => new Connection(rpcUrl, { commitment: 'finalized', disableRetryOnRateLimit: true,
-  fetch: (url, init) => fetch(url, { ...init, redirect: 'error', signal: AbortSignal.timeout(15000) }) });
+// Requests that fail on rpcUrl (network, 429, 5xx) retry once on the fallback RPC (rpc-fallback.mjs).
+export const connect = (rpcUrl, fallback = fallbackUrl()) => new Connection(rpcUrl, { commitment: 'finalized', disableRetryOnRateLimit: true,
+  fetch: fallbackFetch(rpcUrl, fallback) });
 
 /** The official mint must be a real SPL/Token-2022 mint nobody can mint more of or freeze. */
 export async function readMint(conn, mint) {

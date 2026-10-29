@@ -98,3 +98,10 @@ The phone helper and keep-awake jobs are left as they are.
 | `off` | Everything back to observe-only / paper. It creates STOP first; a house with trade history stays frozen by STOP | — |
 
 To add new launchd jobs later, re-run `ops/install-launchd.sh` **without** `--apply-limits` once the journal has history.
+
+## RPC fallback
+
+Every worker's Solana connection (`connect()` in `scripts/pump-chain.mjs`) uses the RPC URL from `observer-config.json` first. If a request fails there with a network error, timeout, HTTP 429 or a 5xx, the same request is retried once on a fallback endpoint:
+- **Endpoint:** `GROKGRID_RPC_FALLBACK` when it is set to an https URL, otherwise Solana's public RPC.
+- **Sends:** retrying a send re-sends the same signed transaction, which has the same signature, so it can't double-spend.
+- **Not covered:** direct JSON-RPC fetches outside `connect()` (Helius DAS holder counts, the receipt verifier) still use the primary and fail closed as before.
