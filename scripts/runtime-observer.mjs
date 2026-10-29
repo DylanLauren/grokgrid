@@ -7,6 +7,7 @@ import { getMint, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-to
 import { fundState, validateRuntime } from './runtime-policy.mjs';
 import { assertSnapshotProgress, assertPrivateRoot, readPrivateText, savePrivateJSON, withObservationJournal } from './runtime-observation-store.mjs';
 import { captureLaunchRuleSnapshots } from './runtime-launch-rules.mjs';
+import { phoneHeartbeat } from './runtime-ingest.mjs';
 import { validateLaunchEvents, reconcileLaunchCheckpoint, LAUNCH_COVERAGE } from './runtime-launch-events.mjs';
 const root=resolve(process.env.GROKGRID_RUNTIME_DIR||join(homedir(),'.config/grokgrid/runtime'));
 const stateFile=join(root,'observer-status.json');
@@ -75,6 +76,7 @@ async function run(){
         const status={...observation,observationSequence};await savePrivateJSON(stateFile,status);return status;
       });
       console.log(JSON.stringify({at:result.observedAt,status:result.status,burnState:result.burn?.state,queued:result.pendingLaunches?.length,launchIntake:result.launchEvents?.state}));
+      await phoneHeartbeat(root).catch(()=>{});
       if(result.status==='unavailable'&&process.argv.includes('--once'))process.exitCode=1;
     }catch(error){
       if(error?.code!=='OBSERVER_LOCKED')await savePrivateJSON(stateFile,{observedAt:new Date().toISOString(),status:'unavailable',signingEnabled:false,executionEnabled:false}).catch(()=>{});

@@ -43,3 +43,19 @@ export function postTrade(root, { agent, side, mint, sig, symbol, name, image, n
   if (note) event.note = clean(note, 280);
   return postIngest(root, event, fetchImpl);
 }
+
+/**
+ * The phone helper runs from its own app bundle, so its beat is derived here from the
+ * feed's private status file: healthy only while frames were sent in the last minute.
+ */
+export async function phoneHeartbeat(root, now = Date.now(), fetchImpl) {
+  let s = null;
+  try { s = JSON.parse(await readPrivateText(join(root, 'local-phone-status.json'), 16384)); } catch {}
+  return heartbeat(root, 'phone', phoneBeat(s, now), fetchImpl);
+}
+
+export function phoneBeat(s, now) {
+  const sent = Date.parse(s?.lastSentAt ?? '');
+  const healthy = s?.state === 'sending' && Number.isFinite(sent) && sent <= now + 5000 && now - sent < 60000;
+  return { mode: 'observe-only', healthy, note: healthy ? 'live' : String(s?.state || 'unknown').slice(0, 40) };
+}
