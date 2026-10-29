@@ -203,3 +203,14 @@
 ::view-transition-new(calls-panel) { animation: none; }
 /* narrow phones: the crew gives way so the X and buy buttons fit */
 @media (max-width: 440px) { .crew { display: none; } }
+
+/* the music button: four bars that dance while it plays and lie flat when muted */
+.soc.sound { cursor: pointer; font: inherit; }
+.soc.sound i { display: inline-flex; align-items: center; gap: 2px; height: 14px; }
+.soc.sound b { width: 2px; height: 100%; border-radius: 1px; background: currentColor; transform: scaleY(0.18); transition: transform 0.3s; }
+.soc.sound.on b { animation: sound-bar 1.15s ease-in-out infinite; }
+.soc.sound.on b:nth-child(2) { animation-delay: -0.35s; }
+.soc.sound.on b:nth-child(3) { animation-delay: -0.8s; }
+.soc.sound.on b:nth-child(4) { animation-delay: -0.55s; }
+@keyframes sound-bar { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .soc.sound.on b { animation: none; transform: scaleY(0.7); } }
