@@ -72,7 +72,7 @@ async function tick() {
     const observation = await json(join(root, 'observer-status.json'));
     let positions; try { positions = await json(join(root, 'trading-positions.json')); } catch { positions = null; }
     if (!positions?.complete || positions.wallet !== policy.wallet) throw Error('Finalized positions unavailable');
-    let peaks = {}; try { peaks = (await json(join(root, 'strategy-live.json'))).peaks || {}; } catch {}
+    let peaks = {}, entries = {}; try { ({ peaks = {}, entries = {} } = await json(join(root, 'strategy-live.json'))); } catch {}
     const market = await gather(c, conn, rpc.rpcUrl, positions.positions.map(p => p.mint), now);
     market.sellQuotes = new Map();
     for (const p of positions.positions) if (BigInt(p.spendableTokenUnits) > 0n) {
@@ -81,7 +81,7 @@ async function tick() {
     const outcomes = [];
     let planned;
     await withTradingStore(join(root, 'trading'), policy, async s => {
-      planned = livePlan({ tradingState: s, policy, c, peaks, positions, market, now, liquidating });
+      planned = livePlan({ tradingState: s, policy, c, peaks, entries, positions, market, now, liquidating });
       s = setAllowlist(s, policy, planned.allowlist, now);
       for (const p of planned.proposals) {
         const { reason, ...proposal } = p;
@@ -92,7 +92,7 @@ async function tick() {
       }
       return s;
     });
-    await savePrivate('strategy-live.json', { peaks: planned.peaks, observedAt: now });
+    await savePrivate('strategy-live.json', { peaks: planned.peaks, entries: planned.entries, observedAt: now });
     Object.assign(status, { scanned: market.scanned, preScreened: market.preScreened, chainChecked: market.facts.size, allowlisted: planned.allowlist.length, proposals: outcomes });
   }
   await savePrivate('strategy-status.json', status);
