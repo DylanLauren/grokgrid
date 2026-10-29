@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 // @ts-expect-error Node runtime
-import { observerIsFresh, positionsAreFresh, positionRefreshPlan, tradingReadiness, observeLaunchQueue } from '../scripts/trading-readiness.mjs'
+import { observerIsFresh, positionsAreFresh, positionRefreshPlan, tradingReadiness, launchRuleReadiness, observeLaunchQueue } from '../scripts/trading-readiness.mjs'
 // @ts-expect-error Node runtime
 import { emptyTradingState,validateTradingState } from '../scripts/trading-policy.mjs'
 // @ts-expect-error Node runtime
@@ -62,5 +62,44 @@ test('CLI preserves backoff and writes truthful readiness without connection cre
   await run(process.execPath,['scripts/trading-worker.mjs','--once'],{env:{...process.env,GROKGRID_RUNTIME_DIR:root}})
   const second=JSON.parse(await readFile(join(root,'trading-position-refresh.json'),'utf8'));assert.equal(second.lastAttemptAt,first.lastAttemptAt)
   const status=JSON.parse(await readFile(join(root,'trading-status.json'),'utf8'));assert.equal(status.readiness.inventoryMintCount,null);assert.equal(status.readiness.readyForLiveTrading,false);assert.equal(status.launchIntake.acknowledged,false)
+ }finally{await rm(root,{recursive:true,force:true})}
+})
+
+
+test('missing/null/malformed queue stays unavailable while a genuinely empty queue is available',()=>{
+ for(const queue of [undefined,null,{},'[]',42]){
+  const result=observeLaunchQueue(emptyTradingState(policy),policy,queue,now)
+  assert.equal(result.queueUnavailable,true);assert.equal(result.state.revision,0)
+ }
+ assert.equal(observeLaunchQueue(emptyTradingState(policy),policy,[],now).queueUnavailable,false)
+})
+
+test('readiness reports rule evidence holds without confusing fresh snapshots with approved policy',()=>{
+ const evidence={snapshotSchemaVersion:1,observedAt:now,observedCount:2,rulesObservedCount:1,identityConflictCount:1,ruleChangeCount:1,rulesUnavailableCount:1,queueAvailable:false,registryFresh:true,capacityReached:false,historyComplete:false,activePolicy:null,acknowledged:false,executionEnabled:false}
+ const ready=tradingReadiness(policy,{...observation,launchRules:evidence},positions,emptyTradingState(policy),now).launchReadiness
+ assert.equal(ready.snapshotFresh,true);assert.equal(ready.observedCount,2);assert.equal(ready.readyForLaunches,false);assert.equal(ready.policyApproved,false);assert.equal(ready.activePolicy,null)
+ for(const reason of ['launch-history-incomplete','launch-policy-unapproved','launch-queue-unavailable','launch-identity-conflict','launch-rule-change-review-required','launch-rules-unavailable'])assert.ok(ready.blockers.includes(reason))
+ const currentApprovedLooking={...evidence,observedCount:1,rulesObservedCount:1,identityConflictCount:0,ruleChangeCount:0,rulesUnavailableCount:0,queueAvailable:true}
+ assert.equal(launchRuleReadiness({launchRules:currentApprovedLooking},true,now).policyApproved,false)
+ for(const candidate of [undefined,{...evidence,observedAt:now-90001},{...evidence,observedAt:now+1},{...evidence,observedCount:-1},{...evidence,executionEnabled:true},{...evidence,activePolicy:'hash'}]){
+  const r=launchRuleReadiness({launchRules:candidate},true,now)
+  assert.equal(r.snapshotFresh,false);assert.equal(r.observedCount,null);assert.ok(r.blockers.includes('launch-rule-evidence-unavailable'))
+ }
+ assert.equal(launchRuleReadiness({launchRules:evidence},false,now).snapshotFresh,false)
+})
+
+test('CLI preserves unknown queue diagnostics and does not acknowledge or activate snapshot evidence',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'grokgrid-queue-')),run=promisify(execFile)
+ try{
+  await writeFile(join(root,'trading-config.json'),JSON.stringify(policy),{mode:0o600})
+  for(const queue of [undefined,null,{},[]]){
+   await writeFile(join(root,'observer-status.json'),JSON.stringify({...observation,observedAt:new Date().toISOString(),pendingLaunches:queue}),{mode:0o600})
+   await run(process.execPath,['scripts/trading-worker.mjs','--once'],{env:{...process.env,GROKGRID_RUNTIME_DIR:root}})
+   const result=JSON.parse(await readFile(join(root,'trading-status.json'),'utf8'))
+   assert.equal(result.launchIntake.queueUnavailable,!Array.isArray(queue))
+   assert.equal(result.pendingLaunchesObserved,Array.isArray(queue)?0:null)
+   assert.equal(result.automaticLaunchesEnabled,false);assert.equal(result.launchIntake.acknowledged,false)
+   assert.equal(result.readiness.launchReadiness.readyForLaunches,false)
+  }
  }finally{await rm(root,{recursive:true,force:true})}
 })
