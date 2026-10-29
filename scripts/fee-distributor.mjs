@@ -33,6 +33,11 @@ async function tick() {
   let registry = [];
   try { registry = (await (await fetch(`${ORIGIN}/api/agents`, { redirect: 'error', signal: AbortSignal.timeout(10000) })).json()).agents || []; } catch {}
   const state = await read('fee-distributor-state.json', { version: 1, mints: {} });
+  // Mark sends that finalized, so trade sizing counts only fees that really reached a wallet.
+  for (const e of (state.history || []).filter(e => e.confirmed === undefined && now - e.at < 3600_000)) {
+    try { const { value: [st] } = await conn.getSignatureStatuses([e.signature], { searchTransactionHistory: true });
+      if (st?.confirmationStatus === 'finalized') e.confirmed = st.err === null; } catch {}
+  }
   const stopped = trading.stopFile ? await exists(trading.stopFile) : false;
   const live = !probe && cfg.enabled && !stopped && trading.keypairFile;
   const signer = live ? await loadSigner(trading.keypairFile, trading.wallet) : null;
@@ -60,6 +65,7 @@ async function tick() {
             tx.sign([signer]);
             const signature = signedSignature(tx);
             state.mints[mint] = { at: now, signature, lamports: info.distributableFees };
+            state.history = [...(state.history || []), { mint, at: now, signature, lamports: info.distributableFees }].slice(-500);
             await save('fee-distributor-state.json', state); // recorded before broadcast; a resend waits retryMinutes
             await conn.sendRawTransaction(tx.serialize(), { skipPreflight: false, preflightCommitment: 'confirmed', maxRetries: 0 });
             result = 'sent';

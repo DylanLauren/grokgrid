@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { screen, exitDecision, approve, pruneAllowlist } from './strategy-policy.mjs';
+import { tradeBudget } from './trade-budget.mjs';
+import { journalRisk } from './trading-executor.mjs';
 
 // One strategy pass. Paper mode simulates fills against observed prices and keeps its own
 // journal. Live mode returns proposals for the existing planIntent path; it signs nothing.
@@ -86,7 +88,7 @@ function costBasis(tradingState, decimalsByMint) {
  * because the wallet cost of a first buy includes one-time account rent (token account,
  * PumpSwap volume accumulator) that can exceed a small trade and would read as a loss.
  */
-export function livePlan({ tradingState, policy, c, peaks, entries: entryPrices = {}, positions, market, now, liquidating }) {
+export function livePlan({ tradingState, policy, c, peaks, entries: entryPrices = {}, positions, market, now, liquidating, sizing = null }) {
   const proposals = [], nextPeaks = { ...peaks }, nextEntries = { ...entryPrices };
   const basis = costBasis(tradingState, new Map((positions.positions || []).map(p => [p.mint, p.decimals])));
   const busy = new Set(tradingState.intents.filter(i => ['planned', 'held-ambiguous', 'blocked-execution-disabled'].includes(i.state)).map(i => i.mint));
@@ -117,12 +119,20 @@ export function livePlan({ tradingState, policy, c, peaks, entries: entryPrices 
   for (const i of [...tradingState.intents].filter(i => i.state === 'reconciled-confirmed').sort((a, b) => a.createdAt - b.createdAt)) lastDone.set(i.mint, i.side);
   const held = new Set([...(positions.positions || []).filter(p => BigInt(p.tokenUnits) > 0n).map(p => p.mint), ...busy,
     ...[...lastDone].filter(([, side]) => side === 'buy').map(([mint]) => mint)]);
-  if (!liquidating && held.size < c.maxOpenPositions) {
+  // Trade size follows fees received and spendable balance, within the hard caps (trade-budget.mjs).
+  // Without sizing inputs it is the configured size, as before.
+  const risk = journalRisk(tradingState, policy.wallet, now), openCost = risk.exposureLamports;
+  const budget = tradeBudget({ floorLamports: c.tradeLamports, capLamports: policy.maxTradeLamports, exposureCapLamports: policy.maxExposureLamports,
+    dailyLossCapLamports: policy.maxDailyLossLamports, walletLamports: sizing?.walletLamports ?? 0, reserveLamports: policy.reserveLamports,
+    openCostLamports: openCost, feesLamports24h: sizing?.feesLamports24h ?? 0 });
+  // Without sizing inputs (no wallet reading) the old fixed size and the policy's own limits apply.
+  const roomForBuy = !sizing || (BigInt(openCost) + BigInt(budget.perTradeLamports) <= BigInt(budget.exposureLamports) && BigInt(risk.dailyLossLamports) < BigInt(budget.dailyLossLamports));
+  if (!liquidating && held.size < c.maxOpenPositions && roomForBuy) {
     const cooling = new Set(tradingState.intents.filter(i => i.side === 'sell' && ['reconciled-confirmed', 'held-ambiguous'].includes(i.state) && now - i.createdAt < c.reentryCooldownMinutes * 60000).map(i => i.mint));
-    const [pick] = entries(market, c, now, held, cooling);
+    const [pick] = entries(market, sizing ? { ...c, tradeLamports: budget.perTradeLamports } : c, now, held, cooling);
     if (pick) {
       allowlist = approve(allowlist, pick.mint, c, now, {});
-      const spend = BigInt(c.tradeLamports) < BigInt(policy.maxTradeLamports) ? c.tradeLamports : policy.maxTradeLamports;
+      const spend = sizing ? budget.perTradeLamports : (BigInt(c.tradeLamports) < BigInt(policy.maxTradeLamports) ? c.tradeLamports : policy.maxTradeLamports);
       proposals.push({ ...base, id: `buy-${randomUUID()}`, mint: pick.mint, side: 'buy', spendLamports: spend, reason: 'screen-passed' });
       if (pick.m.priceSol > 0) nextEntries[pick.mint] = { priceSol: pick.m.priceSol, at: now };
     }
@@ -130,5 +140,5 @@ export function livePlan({ tradingState, policy, c, peaks, entries: entryPrices 
   for (const k of Object.keys(nextPeaks)) if (!(positions.positions || []).some(p => p.mint === k)) delete nextPeaks[k];
   // Keep an entry while the coin is held or its buy is in flight; drop refused or sold ones.
   for (const [k, e] of Object.entries(nextEntries)) if (!held.has(k) && now - (e?.at ?? 0) > 10 * 60000) delete nextEntries[k];
-  return { allowlist, proposals, peaks: nextPeaks, entries: nextEntries };
+  return { allowlist, proposals, peaks: nextPeaks, entries: nextEntries, budget };
 }

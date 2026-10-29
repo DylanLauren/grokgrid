@@ -23,6 +23,7 @@ import { createFinalizedReceiptVerifier } from './trading-reconcile.mjs';
 import { collectFinalizedPositions } from './trading-positions.mjs';
 import { connect, readMint, buildBuy, buildSell, signatureStatus, signedSignature, quoteSell } from './pump-chain.mjs';
 import { postCallouts } from './trading-callouts.mjs';
+import { feesReceived24h } from './trade-budget.mjs';
 import { heartbeat } from './runtime-ingest.mjs';
 
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
@@ -102,6 +103,9 @@ async function runLive(dir, agent, policy, c, market, ctx) {
   market.sellQuotes = new Map();
   for (const p of positions.positions) if (BigInt(p.spendableTokenUnits) > 0n) { try { const q = await quoteSell(conn, { mint: p.mint, tokenUnits: p.spendableTokenUnits, tokenProgram: p.tokenProgram }); if (q) market.sellQuotes.set(p.mint, q); } catch {} }
   let peaks = {}, entries = {}; try { ({ peaks = {}, entries = {} } = await json(join(dir, 'strategy-live.json'))); } catch {}
+  // The bot's income: its 80% share of its own coin's creator fees the fee router paid out in 24h.
+  let fees = '0'; try { fees = feesReceived24h(await json(join(root, 'fee-distributor-state.json')), [agent.mint], 8000, now); } catch {}
+  const sizing = { walletLamports: balance, feesLamports24h: fees };
   let pending = null, planned, execution = { reason: 'observe-only' };
   const state = await withTradingStore(join(dir, 'trading'), policy, async s => {
     const verify = createFinalizedReceiptVerifier(rpcUrl);
@@ -110,7 +114,7 @@ async function runLive(dir, agent, policy, c, market, ctx) {
       if (s.intents.find(x => x.id === i.id)?.state === 'held-ambiguous' && Number.isSafeInteger(i.lastValidBlockHeight))
         s = dropExpiredSubmission(s, policy, i.id, await signatureStatus(conn, i.signature), await conn.getBlockHeight('finalized'));
     }
-    planned = livePlan({ tradingState: s, policy, c, peaks, entries, positions, market, now, liquidating });
+    planned = livePlan({ tradingState: s, policy, c, peaks, entries, positions, market, now, liquidating, sizing });
     s = setAllowlist(s, policy, planned.allowlist, now);
     for (const p of planned.proposals) {
       const { reason, ...proposal } = p; void reason;
@@ -131,7 +135,7 @@ async function runLive(dir, agent, policy, c, market, ctx) {
   if (pending) try { await conn.sendRawTransaction(pending.serialize(), { skipPreflight: false, preflightCommitment: 'finalized', maxRetries: 0 }); execution.broadcast = 'sent'; } catch { execution.broadcast = 'error-held'; }
   await savePrivate(join(dir, 'strategy-live.json'), { peaks: planned.peaks, entries: planned.entries, observedAt: now });
   const callouts = await postCallouts(root, state, { agent: agent.id, ledgerDir: dir }).catch(() => null);
-  return { status: executes(policy) ? 'executing' : 'observing', execution, intents: state.intents.length, callouts };
+  return { status: executes(policy) ? 'executing' : 'observing', execution, intents: state.intents.length, callouts, budget: planned.budget };
 }
 
 async function tick() {
