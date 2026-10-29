@@ -69,6 +69,3 @@ export const LiveBot = forwardRef<HTMLDivElement, Props>(function LiveBot({ colo
     </div>
   )
 })
-
-// Kept for callers: every LiveBot now watches the pointer on its own.
-export function useEyesFollow(_root: React.RefObject<HTMLElement | null>) {}

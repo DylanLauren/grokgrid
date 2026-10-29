@@ -1,10 +1,3 @@
-.mx-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-right: 44px; }
-.mx-head h2 { margin: 0; font-size: clamp(26px, 3vw, 34px); font-weight: 520; letter-spacing: -0.035em; }
-.mx-head p { margin: 4px 0 0; color: var(--paper-50); font-size: 14px; line-height: 1.45; }
-.mx-live { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--paper-70); border: 1px solid var(--hair-strong); border-radius: var(--r-pill); padding: 5px 10px; white-space: nowrap; }
-.mx-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--paper-50); }
-.mx-live.live i { background: var(--gain); box-shadow: 0 0 8px var(--gain); animation: pulse 1.6s infinite; }
-
 .mx-totals { display: grid; grid-template-columns: repeat(5, 1fr); margin: 14px 0 10px; background: #0f0f10; border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; }
 .mx-totals div { padding: 10px 14px; }
 .mx-totals div + div { border-left: 1px solid var(--hair); }
@@ -38,7 +31,6 @@
 .mx-row:not(.mx-th):hover::before { transform: scaleY(1); }
 .mx-row:hover .mx-face { transform: scale(1.12) rotate(-4deg); box-shadow: 0 6px 18px #0008; }
 .mx-row:hover .mx-face .lb-body { animation: lb-jump 0.65s cubic-bezier(.3,0,.3,1); }
-.mx-row:hover .mx-face .lb-doze .lb-blink, .mx-row:hover .mx-face .lb-blink { transform: scaleY(1); }
 .mx-coin > span:first-child { transition: transform 0.6s cubic-bezier(.3,1.4,.5,1); }
 .mx-row:hover .mx-coin > span:first-child { transform: rotateY(360deg); }
 .mx-row:hover .mx-bot b { text-decoration: underline; text-decoration-color: var(--paper-30); text-underline-offset: 3px; }

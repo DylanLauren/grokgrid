@@ -69,16 +69,6 @@ export async function balances(wallets: string[]): Promise<Record<string, number
   return out
 }
 
-// True when the signature exists on chain, succeeded, and was signed by the wallet.
-export async function signedBy(sig: string, wallet: string): Promise<boolean> {
-  const tx = await rpc<{ meta: { err: unknown } | null; transaction: { message: { accountKeys: { pubkey: string; signer: boolean }[] } } }>('getTransaction', [
-    sig,
-    { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' },
-  ])
-  if (!tx || tx.meta?.err) return false
-  return tx.transaction.message.accountKeys.some((k) => k.signer && k.pubkey === wallet)
-}
-
 export interface Market { mcUsd: number; vol24hUsd: number; change24h: number; image?: string; symbol: string; name: string }
 
 // Market data for up to 30 coins per call from DexScreener, picking each coin's deepest pair.

@@ -1,8 +1,7 @@
-// Launchpad rules shared by the launch routes: what a bot draft may hold, the pool of
-// trading wallets Grok Bot hands out, per-IP limits, and where pending launches live.
-// No keys here: the pool only ever holds public addresses Grok Bot posted.
+// Launchpad rules shared by the launch routes: what a bot draft may hold, per-IP limits,
+// and where pending launches live. No keys here: each bot trades from its launcher's wallet.
 import { beats, runnerReady } from './_heartbeat.js'
-import { HOUSE_WALLET, isAddress, redis } from './_lib.js'
+import { isAddress, redis } from './_lib.js'
 
 export const SITE_URL = (process.env.SITE_URL || 'https://grokgrid-alpha.vercel.app').replace(/\/$/, '')
 export const BURN_WALLET = process.env.VITE_BURN_WALLET || ''
@@ -21,10 +20,7 @@ export const keys = {
   image: (m: string) => `gg:img:${m}`,
   meta: (m: string) => `gg:meta:${m}`,
   pending: (m: string) => `gg:launch:${m}`,
-  lease: (w: string) => `gg:lease:${w}`,
   launcher: (w: string) => `gg:launcher:${w}`,
-  pool: 'gg:pool',
-  used: 'gg:pool:used',
 }
 
 export interface Draft {
@@ -105,48 +101,6 @@ export const metadataJson = (d: Draft, mint: string) => ({
 
 // A stable, readable id for the registry: ticker plus the start of the mint.
 export const agentId = (ticker: string, mint: string) => `${ticker.toLowerCase()}-${mint.slice(0, 5).toLowerCase()}`.replace(/[^a-z0-9-]/g, '')
-
-// ---- trading wallet pool ----
-// Grok Bot makes each bot's trading wallet and keeps its key. It posts spare public
-// addresses to /api/ingest ("wallets"); each launch borrows one for 15 minutes and keeps
-// it once the coin is confirmed on chain.
-
-export async function freeWallets(): Promise<number> {
-  const [members] = await redis(['SMEMBERS', keys.pool])
-  const wallets = ((members as string[]) ?? []).filter(isAddress)
-  if (!wallets.length) return 0
-  const busy = await redis(...wallets.map((w) => ['EXISTS', keys.lease(w)]))
-  return busy.filter((n) => Number(n) === 0).length
-}
-
-export async function leaseWallet(mint: string): Promise<string | null> {
-  const [members] = await redis(['SMEMBERS', keys.pool])
-  for (const w of ((members as string[]) ?? []).filter(isAddress)) {
-    const [ok] = await redis(['EVAL', `if redis.call('SISMEMBER', KEYS[1], ARGV[1]) ~= 1 or redis.call('SISMEMBER', KEYS[2], ARGV[1]) == 1 then return false end return redis.call('SET', KEYS[3], ARGV[2], 'NX', 'EX', ARGV[3])`, 3, keys.pool, keys.used, keys.lease(w), w, mint, LEASE_TTL])
-    if (ok === 'OK') return w
-  }
-  return null
-}
-
-// Compare ownership inside Redis, so an old request cannot release a newer lease.
-export async function releaseWallet(wallet: string, mint: string) {
-  await redis(['EVAL', `if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end return 0`, 1, keys.lease(wallet), mint])
-}
-
-// Before sending any signed bytes, remove expiry. Ambiguous network failures must
-// retain this wallet until chain reconciliation proves failure or success.
-export async function pinWallet(wallet: string, mint: string, expectedRecord: string, recoveryRecord: string): Promise<boolean> {
-  const [ok] = await redis(['EVAL', `if redis.call('GET', KEYS[1]) ~= ARGV[1] or redis.call('GET', KEYS[2]) ~= ARGV[2] then return 0 end redis.call('PERSIST', KEYS[1]) redis.call('SET', KEYS[2], ARGV[3]) redis.call('SADD', KEYS[3], ARGV[1]) return 1`, 3, keys.lease(wallet), keys.pending(mint), 'gg:launch:open', mint, expectedRecord, recoveryRecord])
-  return Number(ok) === 1
-}
-
-
-export async function addWallets(list: string[]) {
-  const fresh = [...new Set(list.filter(isAddress))].filter((w) => w !== BURN_WALLET && w !== HOUSE_WALLET)
-  if (!fresh.length) return 0
-  const [added] = await redis(['EVAL', `local count = 0 for _, w in ipairs(ARGV) do if redis.call('SISMEMBER', KEYS[2], w) == 0 then count = count + redis.call('SADD', KEYS[1], w) end end return count`, 2, keys.pool, keys.used, ...fresh])
-  return Number(added ?? 0)
-}
 
 // ---- launch status ----
 export async function launchStatus(): Promise<{ open: boolean; reason: string | null; free: number; walletModel: 'launcher'; oneAgentPerWallet: true }> {

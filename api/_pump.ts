@@ -225,7 +225,8 @@ export async function verifyLaunch(mint: string, bot: string, burn: string) {
   const want = shares(bot, burn)
   const splitOk = c.mint.equals(m) && c.adminRevoked && c.shareholders.length === 2 && want.every((w) => c.shareholders.some((s) => s.address.equals(w.address) && s.shareBps === w.shareBps))
   if (!splitOk) return { ok: false as const, reason: "fee split doesn't match" }
-  if (!b.creator.equals(feeSharingConfigPda(m)) || b.isMayhemMode || b.isCashbackCoin) return { ok: false as const, reason: "coin settings don't match" }
+  // the coin must be the plain SOL coin we built: no custom creator rate, no holder rewards
+  if (!b.creator.equals(feeSharingConfigPda(m)) || b.isMayhemMode || b.isCashbackCoin || b.isHolderReward || !b.quoteMint.equals(NATIVE_MINT) || !b.creatorFeeBps.isZero()) return { ok: false as const, reason: "coin settings don't match" }
   return { ok: true as const }
 }
 

@@ -33,6 +33,12 @@ export async function finishLaunch(mint: string): Promise<Result> {
     return out({ retry: true }, 202)
   }
   if (!check.ok) return out({ error: check.reason }, 400)
+  // The coin being on chain isn't enough: it must have come from the transaction we prepared
+  // and checked, or someone could create the same mint with their own name and link.
+  if (!p.raw || !p.lastValidBlockHeight) return out({ error: 'This launch needs review before it can join the grid.' }, 409)
+  const landed = await launchProgress(p.raw, p.signature, p.lastValidBlockHeight)
+  if (landed === 'pending') return out({ retry: true }, 202)
+  if (landed !== 'landed') return out({ error: "This coin wasn't created by the launch you signed, so it can't join the grid. The reservation needs review." }, 409)
 
   const d = p.draft
   const [color, shape] = LOOKS[d.look] ?? LOOKS[0]

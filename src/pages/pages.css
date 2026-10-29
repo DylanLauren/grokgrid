@@ -209,7 +209,6 @@
 @keyframes gd-spin { to { transform: rotate(360deg); } }
 .gd-made { margin: 0; padding: 12px 14px; border-radius: 10px; background: #4ade801a; color: var(--gain); font-size: 14px; }
 .gd-made a { color: var(--paper); text-decoration: underline; }
-.gd-wallets { display: flex; flex-wrap: wrap; gap: 8px; }
 .gd-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
 .gd-bot { display: flex; align-items: center; gap: 10px; padding: 12px; color: var(--paper); text-decoration: none; transition: border-color 0.2s; }
 .gd-bot:hover { border-color: var(--hair-strong); }

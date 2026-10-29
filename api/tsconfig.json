@@ -8,5 +8,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["*.ts", "launch/*.ts"]
+  "include": ["*.ts", "launch/*.ts", "agent-wallet/*.ts"]
 }

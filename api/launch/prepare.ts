@@ -6,8 +6,9 @@ import { balances, HOUSE_WALLET, hasStore, isAddress, parse, redis } from '../_l
 import { BURN_WALLET, DRAFT_TTL, LEASE_TTL, cleanDraft, friendly, keys, launchStatus, limited, metadataJson, noStore, readJson, SITE_URL } from '../_launch.js'
 import { launchOwnerState, releasePreparation, savePrepared } from '../_launch-owner.js'
 import { prepareLaunch } from '../_pump.js'
-import { privyReadinessConfig, privyReadinessProvider, sdkReads } from '../_privy-provider.js'
-import { verifyPrivyWalletReadiness } from '../_privy-readiness.js'
+import { verifiedWalletId } from '../_wallet-auth.js'
+
+export { verifiedWalletId }
 const MIN_LAUNCHER_SOL = 0.03
 
 export async function POST(req: Request) {
@@ -54,13 +55,4 @@ export async function POST(req: Request) {
     const msg=friendly(e);if(!msg)console.error('Launch preparation failed.')
     return noStore({error:msg??'Something broke building the launch. Nothing was spent, try again.'},msg?400:500)
   }
-}
-
-export async function verifiedWalletId(req: Request, walletId: unknown, launcher: string): Promise<string | null> {
-  const config = privyReadinessConfig()
-  if (!config) return null
-  const auth = req.headers.get('authorization') || ''
-  const accessToken = auth.startsWith('Bearer ') ? auth.slice(7).trim() : ''
-  const r = await verifyPrivyWalletReadiness({ accessToken, walletId, address: launcher }, config, privyReadinessProvider(sdkReads()))
-  return r.canAuthorize && r.walletAuthorizationReady && r.address === launcher && r.walletId === walletId ? r.walletId : null
 }
