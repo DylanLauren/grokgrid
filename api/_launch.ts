@@ -3,7 +3,7 @@
 import { beats, runnerReady } from './_heartbeat.js'
 import { isAddress, redis } from './_lib.js'
 
-export const SITE_URL = (process.env.SITE_URL || 'https://grokgrid-alpha.vercel.app').replace(/\/$/, '')
+export const SITE_URL = (process.env.SITE_URL || 'https://www.grokgrid.fun').replace(/\/$/, '')
 export const BURN_WALLET = process.env.VITE_BURN_WALLET || ''
 export const MAX_IMAGE_BYTES = 400_000
 // A picture and its metadata wait this long for their coin; sending a launch keeps them for good.

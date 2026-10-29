@@ -38,7 +38,7 @@ export function calloutGate(ledger, cfg, intent, now) {
 
 export function thesis(intent, symbol) {
   const sol = (Number(BigInt(intent.receipt.spentLamports)) / 1e9).toFixed(3);
-  return `Grok Bot bought ${sol} SOL of ${symbol ? '$' + String(symbol).replace(/[^\w]/g, '').slice(0, 12) : 'this'} on its own. Screened for liquidity, rising buyers and holder spread. Live at grokgrid-alpha.vercel.app. Not financial advice.`.slice(0, 280);
+  return `Grok Bot bought ${sol} SOL of ${symbol ? '$' + String(symbol).replace(/[^\w]/g, '').slice(0, 12) : 'this'} on its own. Screened for liquidity, rising buyers and holder spread. Live at grokgrid.fun. Not financial advice.`.slice(0, 280);
 }
 
 // Page script. Arguments are JSON-encoded; only a short result string is written back.

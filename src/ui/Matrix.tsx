@@ -29,7 +29,7 @@ export function houseRow(feed: Feed): Agent {
   return {
     id: 'house',
     house: true,
-    name: 'Grok Bot',
+    name: 'House Trader',
     color: '#ffffff',
     shape: 'sphere',
     strategy: 'the house bot. trades the $GRID treasury from his phone, nothing else',
