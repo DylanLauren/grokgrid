@@ -337,3 +337,22 @@
   .pg > *, .pg-sub, .pg-eyebrow, .pg-title, .pg-title span, .mx-row, .gd-name, .dc-toc > *, .st-hero > *, .pg-sec .card { animation: none !important; }
 }
 .fx-matrix .mx-row { --in: calc(0.25s + var(--r, 0) * 40ms); }
+
+/* best and worst closed trades */
+.st-bw { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.st-bw.one { grid-template-columns: 1fr; }
+.st-bw-card { position: relative; overflow: hidden; padding: 18px 20px; display: grid; grid-template-columns: 1fr auto; grid-template-areas: 'k k' 'coin pct' 'sub sub'; align-items: center; gap: 10px 16px; }
+.st-bw-card::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 100% 0%, var(--tint, transparent), transparent 60%); opacity: 0.5; }
+.st-bw-card.up { --tint: #3ddc8414; }
+.st-bw-card.down { --tint: #ff5a5a12; }
+.st-bw-card > .st-k { grid-area: k; }
+.st-bw-coin { grid-area: coin; display: inline-flex; align-items: center; gap: 12px; justify-self: start; padding: 4px 10px 4px 4px; margin-left: -4px; border-radius: 999px; cursor: default; outline: none; transition: background 0.2s; }
+.st-bw-coin:hover, .st-bw-coin:focus-visible { background: #ffffff0d; }
+.st-bw-coin > span { display: grid; line-height: 1.15; }
+.st-bw-coin b { font-size: 18px; font-weight: 560; letter-spacing: -0.02em; }
+.st-bw-coin small { font-size: 12px; color: var(--paper-50); max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-bw-pct { grid-area: pct; font-size: clamp(28px, 3.2vw, 40px); font-weight: 520; letter-spacing: -0.04em; }
+.st-bw-sub { grid-area: sub; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--paper-50); }
+.st-bw-sub a { color: var(--paper-70); }
+.st-bw-sub a:hover { color: var(--paper); }
+@media (max-width: 720px) { .st-bw { grid-template-columns: 1fr; } }

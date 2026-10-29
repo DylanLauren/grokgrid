@@ -1,4 +1,5 @@
 import { beats, fresh } from './_heartbeat.js'
+import { chainCurve } from './_curve.js'
 import { curveFrom, tally } from './_tally.js'
 import { balances, hasStore, HOUSE_WALLET, json, MAIN_MINT, markets, parse, redis, solUsd, toHash } from './_lib.js'
 
@@ -40,11 +41,14 @@ export async function grid(only?: string) {
   const callsOf = ids.map((_, i) => (Array.isArray(per[i * step + 1]) ? (per[i * step + 1] as unknown[]) : []).map((c) => parse<CallLite>(c)).filter((c): c is CallLite => !!c && !!c.mint))
   const shown = callsOf.map((c) => (only ? c : c.slice(0, RECENT)))
   const traded = [...new Set(shown.flat().map((c) => c.mint))].slice(0, MAX_MINTS)
-  const [bal, mkt, price, beat] = await Promise.all([
+  // a profile also gets its wallet history as the chain recorded it
+  const chains = only ? Promise.all(ids.map((id, i) => chainCurve(id, i === 0 && withHouse ? HOUSE_WALLET : records[i - (withHouse ? 1 : 0)].wallet))) : Promise.resolve([])
+  const [bal, mkt, price, beat, chain] = await Promise.all([
     balances([...(withHouse ? [HOUSE_WALLET] : []), ...records.map((r) => r.wallet)]),
     markets([MAIN_MINT, ...records.map((r) => r.coin.mint), ...traded]),
     solUsd(),
     beats().then((b) => b.trading).catch(() => undefined),
+    chains,
   ])
   const houseMode = fresh(beat) ? beat.mode : null
 
@@ -78,7 +82,9 @@ export async function grid(only?: string) {
     const recent = shown[i].map(trade)
     const posted = only ? ((per[i * step + 2] as unknown[]) ?? []).map((p) => parse<{ ts: number; sol: number }>(p)).filter((p): p is { ts: number; sol: number } => !!p) : undefined
     // no snapshots posted: rebuild the history from its own verified trades
-    const curve = posted && posted.length < 2 && bal[r.wallet] !== undefined ? curveFrom(calls, bal[r.wallet]) : posted
+    const onChain = chain[i]?.map(({ ts, sol }) => ({ ts, sol }))
+    const base = onChain?.length ? onChain : posted
+    const curve = base && base.length < 2 && bal[r.wallet] !== undefined ? curveFrom(calls, bal[r.wallet]) : base && onChain?.length && bal[r.wallet] !== undefined ? [...base, { ts: Date.now(), sol: bal[r.wallet] }] : base
     return {
       ...r,
       house: r.id === 'house' || undefined,

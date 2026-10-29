@@ -21,6 +21,7 @@ export interface Call {
   nowMc: number | null
   sample?: boolean
   sig?: string // transaction signature, links to solscan
+  coin?: { mcUsd: number; vol24hUsd: number; change24h: number } // the coin's market now (live)
   verification?: 'wallet-balance-movements'
   verified?: boolean // receipt checks only the wallet token/SOL flows, not profit
 }
