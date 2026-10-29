@@ -1,6 +1,5 @@
 /* These dimensions match the phone's 3D screen plane in Scene.tsx. */
 .ph-wrap {
-  --ph-status-height: 28px;
   position: relative;
   width: 300px;
   height: 640px;
@@ -32,8 +31,8 @@
   min-width: 0;
   min-height: 0;
   width: 100%;
-  height: calc(100% - var(--ph-status-height));
-  padding: 12px 8px 4px;
+  height: 100%;
+  padding: 12px 8px;
   display: grid;
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: stretch;
@@ -47,30 +46,6 @@
   height: 100%;
   object-fit: contain;
   object-position: center;
-}
-/* The status occupies its own strip, never the captured browser's controls. */
-.ph-live {
-  flex: 0 0 var(--ph-status-height);
-  height: var(--ph-status-height);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px 5px;
-  border-top: 1px solid #ffffff08;
-  color: #adb6c3;
-  font-size: 9px;
-  line-height: 1;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.ph-live i {
-  flex: none;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #8fe0b4;
 }
 .ph-video {
   position: absolute;

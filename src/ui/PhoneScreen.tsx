@@ -26,15 +26,13 @@ export function PhoneScreen({ feed, live, watching }: { feed: Feed; live: Live; 
       </div>
       <div className={`ph ph-stream ph-video ${livePlaying ? 'on' : ''}`} aria-hidden={!livePlaying}>
         <div className="ph-viewport"><video ref={liveVideo} muted playsInline autoPlay /></div>
-        <span className="ph-live mono"><i aria-hidden="true" />live video</span>
       </div>
       {PHONE_STREAM && (
         <div className={`ph ph-stream ph-video ${fallbackPlaying ? 'on' : ''}`} aria-hidden={!fallbackPlaying}>
           <div className="ph-viewport">
             <video ref={video} muted playsInline autoPlay />
           </div>
-          <span className="ph-live mono"><i aria-hidden="true" />live video</span>
-        </div>
+          </div>
       )}
       <PhoneTrades feed={feed} />
     </div>
@@ -90,17 +88,10 @@ function Stream({ ts, now, watching, videoState }: { ts: number; now: number; wa
       <div className="ph-viewport">
         <img src={frame.src} alt="Grok Bot’s captured working browser" />
       </div>
-      <span className="ph-live mono"><i aria-hidden="true" />{snapshotLabel(videoState)}</span>
     </div>
   )
 }
 
-function snapshotLabel(state: LivePhoneState) {
-  if (state === 'connecting') return 'Connecting video · snapshot'
-  if (state === 'waiting') return 'Waiting for video · snapshot'
-  if (state === 'unavailable') return 'Video unavailable · snapshot'
-  return 'Screen snapshot'
-}
 
 function Offline({ videoState }: { videoState: LivePhoneState }) {
   return (
