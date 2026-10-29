@@ -10,7 +10,10 @@ export const CONFIRM_WINDOW_MS = 20_000;
 export function confirmExit(previous, mint, reason, now) {
   const p = previous?.[mint];
   const fire = !!p && p.reason === reason && now - p.at > 0 && now - p.at <= CONFIRM_WINDOW_MS;
-  return { fire, pending: fire ? null : { reason, at: p && p.reason === reason ? p.at : now } };
+  // A same-reason sighting at this instant is kept; anything stale or different starts over now,
+  // so an old sighting can never block confirmation for good.
+  const keep = !!p && p.reason === reason && now - p.at >= 0 && now - p.at <= CONFIRM_WINDOW_MS;
+  return { fire, pending: fire ? null : { reason, at: keep ? p.at : now } };
 }
 
 /**

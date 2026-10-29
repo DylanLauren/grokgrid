@@ -41,3 +41,11 @@ test('a quote-triggered exit needs two agreeing checks a few seconds apart', asy
   assert.equal(confirmExit({ [MINT]: first.pending }, MINT, 'stop-loss', now + CONFIRM_WINDOW_MS + 1).fire, false) // too old
   assert.equal(confirmExit({ [MINT]: first.pending }, MINT, 'stop-loss', now).fire, false) // same instant does not count
 })
+
+test('a stale sighting restarts the confirmation window instead of blocking it forever', async () => {
+  const { confirmExit, CONFIRM_WINDOW_MS } = await import('../scripts/exit-watcher-core.mjs')
+  const stale = { [MINT]: { reason: 'stop-loss', at: now - 10 * CONFIRM_WINDOW_MS } }
+  const again = confirmExit(stale, MINT, 'stop-loss', now)
+  assert.equal(again.fire, false); assert.equal(again.pending!.at, now) // restarted
+  assert.equal(confirmExit({ [MINT]: again.pending }, MINT, 'stop-loss', now + 5000).fire, true)
+})
