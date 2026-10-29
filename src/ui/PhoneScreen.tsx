@@ -14,14 +14,15 @@ export function PhoneScreen({ live, watching }: { feed: Feed; live: Live; watchi
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
-  const frames = !!live.screenTs && now >= live.screenTs && now - live.screenTs < FRESH_MS
   return (
     <div className="ph-wrap">
-      {frames ? <Stream ts={live.screenTs} now={now} /> : <Offline />}
+      <Stream ts={live.screenTs} now={now} watching={watching} />
       {PHONE_STREAM && (
-        <div className={`ph ph-stream ph-video ${playing ? 'on' : ''}`}>
-          <video ref={video} muted playsInline autoPlay />
-          <span className="ph-live mono"><i />live screen</span>
+        <div className={`ph ph-stream ph-video ${playing ? 'on' : ''}`} aria-hidden={!playing}>
+          <div className="ph-viewport">
+            <video ref={video} muted playsInline autoPlay />
+          </div>
+          <span className="ph-live mono"><i aria-hidden="true" />live screen</span>
         </div>
       )}
     </div>
@@ -30,7 +31,7 @@ export function PhoneScreen({ live, watching }: { feed: Feed; live: Live; watchi
 
 // Real frames from his phone. The next frame loads behind the current one, then swaps in,
 // so the screen never flashes blank.
-function Stream({ ts, now }: { ts: number; now: number }) {
+function Stream({ ts, now, watching }: { ts: number; now: number; watching: boolean }) {
   const [frame, setFrame] = useState<{ ts: number; src: string } | null>(null)
   useEffect(() => {
     let active = true
@@ -69,13 +70,15 @@ function Stream({ ts, now }: { ts: number; now: number }) {
       img.onerror = null
       if (pendingSrc && !committed) URL.revokeObjectURL(pendingSrc)
     }
-  }, [ts])
+  }, [ts, watching])
   useEffect(() => () => { if (frame) URL.revokeObjectURL(frame.src) }, [frame])
   if (!frame || now < frame.ts || now - frame.ts >= FRESH_MS) return <Offline />
   return (
     <div className="ph ph-stream">
-      <img src={frame.src} alt="Grok Bot’s captured working browser" />
-      <span className="ph-live mono"><i />live screen</span>
+      <div className="ph-viewport">
+        <img src={frame.src} alt="Grok Bot’s captured working browser" />
+      </div>
+      <span className="ph-live mono"><i aria-hidden="true" />live screen</span>
     </div>
   )
 }

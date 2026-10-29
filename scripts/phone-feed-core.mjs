@@ -24,22 +24,61 @@ export function validateConfig(input) {
   return { ...input, site, everyMs }
 }
 export function verifyWindow(snapshot, config) {
-  if (!snapshot || snapshot.id !== config.windowId || snapshot.pid !== config.ownerPid || snapshot.bundleId !== config.bundleId || snapshot.title !== config.title || snapshot.onScreen !== true || snapshot.layer !== 0) throw Error('window-identity-mismatch')
+  // CoreGraphics omits minimized windows. A missing pin permits waiting only,
+  // never capture, substitution, or automatic selection of another window.
+  if (snapshot === null) throw Error('window-unavailable')
+  if (!snapshot || snapshot.id !== config.windowId || snapshot.pid !== config.ownerPid || snapshot.bundleId !== config.bundleId || snapshot.title !== config.title || (snapshot.onScreen !== true && snapshot.onScreen !== false) || snapshot.layer !== 0) throw Error('window-identity-mismatch')
   const b = snapshot.bounds
   if (!b || !['x', 'y', 'width', 'height'].every(k => Number.isFinite(b[k])) || b.width < 250 || b.height < 400 || b.width / b.height < .35 || b.width / b.height > .85) throw Error('phone-window-geometry-invalid')
   if (config.bundleId === 'com.google.Chrome' && snapshot.browserUrl !== config.browserUrl) throw Error('browser-url-mismatch')
+  // The same fully verified source may be temporarily hidden by another Space
+  // or minimized. Never capture it, but do not treat availability as a new source.
+  if (snapshot.onScreen === false) throw Error('window-temporarily-unavailable')
+  if (config.bundleId === 'com.google.Chrome') verifyViewport(snapshot)
   return snapshot
 }
 export function sameWindow(a, b) {
-  return ['id', 'pid', 'bundleId', 'title', 'onScreen', 'layer', 'browserUrl'].every(k => a[k] === b[k]) && ['x', 'y', 'width', 'height'].every(k => a.bounds[k] === b.bounds[k])
+  return ['id', 'pid', 'bundleId', 'title', 'onScreen', 'layer', 'browserUrl'].every(k => a[k] === b[k]) && ['x', 'y', 'width', 'height'].every(k => a.bounds[k] === b.bounds[k]) && (a.bundleId !== 'com.google.Chrome' || ['innerWidth', 'innerHeight', 'outerWidth', 'outerHeight', 'devicePixelRatio', 'href'].every(k => a.viewport?.[k] === b.viewport?.[k]))
+}
+export function verifyViewport(snapshot) {
+  const v = snapshot?.viewport, bounds = snapshot?.bounds
+  if (!v || !bounds || !['innerWidth', 'innerHeight', 'outerWidth', 'outerHeight'].every(k => Number.isSafeInteger(v[k]) && v[k] > 0 && v[k] <= 16384) || !Number.isFinite(v.devicePixelRatio) || v.devicePixelRatio <= 0 || v.devicePixelRatio > 16 || v.href !== snapshot.browserUrl || Math.abs(v.outerWidth - bounds.width) > 2 || Math.abs(v.outerHeight - bounds.height) > 2) throw Error('browser-viewport-invalid')
+  return v
+}
+// Full-width, bottom-aligned Chrome page area. Device ratio cross-checks prevent
+// treating a side panel / stale viewport width as the entire captured window.
+export function browserViewportCrop(snapshot, pixelWidth, pixelHeight) {
+  const v = verifyViewport(snapshot)
+  if (![pixelWidth, pixelHeight].every(n => Number.isSafeInteger(n) && n > 0 && n <= 32768)) throw Error('browser-viewport-invalid')
+  const xScale = pixelWidth / snapshot.bounds.width, yScale = pixelHeight / snapshot.bounds.height
+  const pixelsPerCss = pixelWidth / v.innerWidth
+  if (!Number.isFinite(pixelsPerCss) || pixelsPerCss <= 0 || pixelsPerCss > 16 || Math.abs(xScale - yScale) > .02 || Math.abs(pixelsPerCss - v.devicePixelRatio) > .02) throw Error('browser-viewport-invalid')
+  const height = Math.round(v.innerHeight * pixelsPerCss)
+  const top = pixelHeight - height
+  if (height <= 0 || top < 0 || top > pixelHeight * 0.35) throw Error('browser-viewport-invalid')
+  return { top, left: 0, width: pixelWidth, height }
 }
 export function validateJpeg(bytes) {
   if (!Buffer.isBuffer(bytes) || bytes.length < 4 || bytes.length > 330_000 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes.at(-2) !== 0xff || bytes.at(-1) !== 0xd9) throw Error('capture-invalid')
 }
+// Each encode callback must start from the original lossless screenshot. A
+// higher-resolution frame is preferred; retry smaller only for the byte limit.
+export async function encodePhoneCapture(sourceWidth, encode) {
+  if (!Number.isSafeInteger(sourceWidth) || sourceWidth <= 0) throw Error('capture-invalid')
+  const widths = [...new Set([780, 520, 390].map(width => Math.min(width, sourceWidth)))]
+  for (const width of widths) {
+    const bytes = await encode(width)
+    if (!Buffer.isBuffer(bytes)) throw Error('capture-invalid')
+    if (bytes.length > 330_000) continue
+    validateJpeg(bytes)
+    return bytes
+  }
+  throw Error('capture-invalid')
+}
 export async function captureAndSend(config, deps) {
   capabilityExpiry(deps.token, deps.now())
   const before = verifyWindow(await deps.inspect(), config)
-  const bytes = await deps.capture()
+  const bytes = await deps.capture(before)
   validateJpeg(bytes)
   const after = verifyWindow(await deps.inspect(), config)
   if (!sameWindow(before, after)) throw Error('window-changed-during-capture')
@@ -48,10 +87,17 @@ export async function captureAndSend(config, deps) {
   return { capturedAt: deps.now(), bytes: bytes.length }
 }
 export function retryPolicy(failures, code) {
+  if (['window-temporarily-unavailable', 'window-unavailable'].includes(code)) return { stop: false, delayMs: 5000 }
   if (['credential-rejected', 'screen-credential-invalid-or-expiring', 'request-rejected'].includes(code) || failures >= 8) return { stop: true, delayMs: 0 }
   return { stop: false, delayMs: Math.min(60_000, 2000 * 2 ** Math.max(0, failures - 1)) }
 }
+export function captureFailureState(failures, code) {
+  const waiting = ['window-temporarily-unavailable', 'window-unavailable'].includes(code)
+  const nextFailures = waiting ? failures : failures + 1
+  const retry = retryPolicy(nextFailures, code)
+  return { failures: nextFailures, state: retry.stop ? 'stopped-error' : waiting ? 'waiting-for-window' : 'retrying', ...retry }
+}
 export function safeFailure(error) {
-  const allowed = ['screen-credential-invalid-or-expiring', 'window-identity-mismatch', 'phone-window-geometry-invalid', 'browser-url-mismatch', 'window-changed-during-capture', 'capture-invalid', 'credential-rejected', 'request-rejected', 'ingest-unavailable', 'capture-unavailable']
+  const allowed = ['window-unavailable', 'browser-viewport-invalid', 'window-temporarily-unavailable', 'screen-credential-invalid-or-expiring', 'window-identity-mismatch', 'phone-window-geometry-invalid', 'browser-url-mismatch', 'window-changed-during-capture', 'capture-invalid', 'credential-rejected', 'request-rejected', 'ingest-unavailable', 'capture-unavailable']
   return allowed.includes(error?.message) ? error.message : 'feed-unavailable'
 }

@@ -84,7 +84,7 @@ export default function App() {
         setView('third')
       }
       if (e.key === '1') setView('third')
-      if (e.key === '2') setView('phone')
+      if (e.key === '2') { setTab('desk'); setFocusCall(undefined); setView('phone') }
     }
     addEventListener('keydown', onKey)
     return () => removeEventListener('keydown', onKey)
@@ -94,7 +94,7 @@ export default function App() {
     <div className={`app ${tab === 'calls' ? 'has-panel' : ''} ${onPage ? 'on-page' : ''} view-${view}`}>
       <div className="stage" aria-hidden={onPage}>
         <Suspense fallback={<Boot />}>
-          <Scene feed={feed} live={live} view={view} paused={onPage} onPhone={() => setView('phone')} />
+          <Scene feed={feed} live={live} view={view} paused={onPage} onPhone={() => { setTab('desk'); setFocusCall(undefined); setView('phone') }} />
         </Suspense>
       </div>
 
@@ -151,7 +151,7 @@ export default function App() {
         <button role="tab" aria-selected={view === 'third'} className={view === 'third' ? 'on' : ''} onClick={() => setView('third')}>
           <Roll>his room</Roll> <kbd>1</kbd>
         </button>
-        <button role="tab" aria-selected={view === 'phone'} className={view === 'phone' ? 'on' : ''} onClick={() => setView('phone')}>
+        <button role="tab" aria-selected={view === 'phone'} className={view === 'phone' ? 'on' : ''} onClick={() => { setTab('desk'); setFocusCall(undefined); setView('phone') }}>
           <Roll>his phone</Roll> <kbd>2</kbd>
         </button>
       </div>

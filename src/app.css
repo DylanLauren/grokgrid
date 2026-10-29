@@ -148,3 +148,6 @@
   .view-phone .calls-dock { display: none; }
   .fine { display: none; }
 }
+
+/* Focused viewing keeps call previews clear of the handset and its controls. */
+.view-phone .calls-dock { display: none; }

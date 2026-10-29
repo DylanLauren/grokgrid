@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Call, Feed, Live } from './types'
+import { LIVE_FAST_MS, LIVE_ROOM_MS, startLivePolling } from './livePolling'
 
-const FAST_MS = 2_500 // while someone watches his phone
-const SLOW_MS = 15_000 // the monitor's log, the rest of the time
 export const FRESH_MS = 12_000 // a frame older than this means his screen stream is off
 
 // The steps he goes through for one trade, used to narrate the demo.
@@ -19,28 +18,16 @@ export function useLive(active: boolean, fast: boolean, feed: Feed): Live {
 
   useEffect(() => {
     if (!active) return
-    let ctrl: AbortController | null = null
-    const pull = async () => {
-      ctrl?.abort()
-      ctrl = new AbortController()
-      try {
-        const res = await fetch('/api/live', { signal: ctrl.signal })
-        if (!res.ok) return
-        const j = (await res.json()) as Omit<Live, 'mode'>
-        if (j.actions?.length || j.screenTs) {
-          real.current = true
-          setLive({ mode: 'live', actions: j.actions ?? [], screenTs: j.screenTs ?? 0 })
-        }
-      } catch {
-        /* local dev without functions */
+    return startLivePolling(async (signal) => {
+      const res = await fetch('/api/live', { signal })
+      if (!res.ok) return
+      const j = (await res.json()) as Omit<Live, 'mode'>
+      if (signal.aborted) return
+      if (j.actions?.length || j.screenTs) {
+        real.current = true
+        setLive({ mode: 'live', actions: j.actions ?? [], screenTs: j.screenTs ?? 0 })
       }
-    }
-    pull()
-    const t = setInterval(pull, fast ? FAST_MS : SLOW_MS)
-    return () => {
-      ctrl?.abort()
-      clearInterval(t)
-    }
+    }, fast ? LIVE_FAST_MS : LIVE_ROOM_MS)
   }, [active, fast])
 
   // demo narration: replay the steps of his latest trade, one every ~2.4s
