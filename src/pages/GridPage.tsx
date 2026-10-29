@@ -283,7 +283,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             <Field label="fund your bot" unit="SOL" error={err('fund')} hint="sent from your Phantom to your bot’s trading wallet in the same approval. it keeps 0.02 in reserve and trades the rest.">
               <input inputMode="decimal" value={d.fund} onBlur={() => touch('fund')} onChange={(e) => set('fund', num(e.target.value))} />
             </Field>
-            <Field label="first buy" unit="SOL" error={err('firstBuy')} hint="optional. included in the coin-launch transaction you review in your wallet.">
+            <Field label="first buy" unit="SOL" error={err('firstBuy')} hint="optional. bought by your phantom in the same approval, so these tokens stay in your phantom (the bot doesn't trade them).">
               <input inputMode="decimal" value={d.firstBuy} placeholder="0" onBlur={() => touch('firstBuy')} onChange={(e) => set('firstBuy', num(e.target.value))} />
             </Field>
             <div className="gd-split">
