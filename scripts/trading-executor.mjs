@@ -6,20 +6,32 @@ import { executes, holdExternalSubmission, MAX_RENT_ALLOWANCE, validateTradingPo
 const day = now => new Date(now).toISOString().slice(0, 10);
 
 /**
- * Conservative risk from the journal alone. Cost basis isn't verified, so every unsold
- * lamport spent counts as exposure, and today's net outflow counts as today's loss.
- * That overstates both, which only ever stops trading sooner.
+ * Risk from the journal alone.
+ * - Exposure is the cost basis still open: what was paid for tokens not yet sold, pro rata
+ *   per coin, so a coin sold flat leaves nothing behind. Realised losses are not exposure.
+ * - Daily loss is today's net outflow, so today's realised losses count there.
+ * Cost includes any rent a buy paid, which only ever stops trading sooner.
  */
 export function journalRisk(state, wallet, now) {
-  let spent = 0n, received = 0n, todaySpent = 0n, todayReceived = 0n;
-  for (const i of state.intents) {
-    if (i.state !== 'reconciled-confirmed') continue;
-    const today = day(i.createdAt) === day(now);
-    if (i.side === 'buy') { spent += BigInt(i.receipt.spentLamports); if (today) todaySpent += BigInt(i.receipt.spentLamports); }
-    else { received += BigInt(i.receipt.receivedLamports); if (today) todayReceived += BigInt(i.receipt.receivedLamports); }
+  let todaySpent = 0n, todayReceived = 0n;
+  const open = new Map(); // mint -> { cost, tokens }
+  const done = state.intents.filter(i => i.state === 'reconciled-confirmed').sort((a, b) => a.createdAt - b.createdAt);
+  for (const i of done) {
+    const today = day(i.createdAt) === day(now), o = open.get(i.mint) || { cost: 0n, tokens: 0n };
+    if (i.side === 'buy') {
+      const spent = BigInt(i.receipt.spentLamports);
+      o.cost += spent; o.tokens += BigInt(i.receipt.receivedTokenUnits); if (today) todaySpent += spent;
+    } else {
+      const sold = BigInt(i.receipt.soldTokenUnits);
+      if (sold >= o.tokens) { o.cost = 0n; o.tokens = 0n; }
+      else { o.cost -= o.cost * sold / o.tokens; o.tokens -= sold; }
+      if (today) todayReceived += BigInt(i.receipt.receivedLamports);
+    }
+    open.set(i.mint, o);
   }
+  const exposure = [...open.values()].reduce((n, o) => n + o.cost, 0n);
   const floor = x => (x > 0n ? x : 0n).toString();
-  return { wallet, complete: true, exposureLamports: floor(spent - received), dailyLossLamports: floor(todaySpent - todayReceived), utcDay: day(now), observedAt: now };
+  return { wallet, complete: true, exposureLamports: exposure.toString(), dailyLossLamports: floor(todaySpent - todayReceived), utcDay: day(now), observedAt: now };
 }
 
 /** The next intent this tick may sign, or why none. */

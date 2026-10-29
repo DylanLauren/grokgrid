@@ -87,3 +87,21 @@ test('the chain receipt reader accepts an executed buy under its ceiling and rej
   assert.equal(inspectFinalizedIntentReceipt(intent, status, tx(151)), null)
   assert.equal(inspectFinalizedIntentReceipt({ ...intent, maxCostLamports: undefined }, status, tx(120)), null)
 })
+
+test('exposure is the open cost basis: a flat book after losses has none, but the day still counts the loss', () => {
+  const p = execute()
+  const r = (id: string, side: 'buy' | 'sell', m: string, at: number, receipt: Record<string, string>) => ({ id, side, mint: m, state: 'reconciled-confirmed', createdAt: at, receipt })
+  const A = mint, B = 'So11111111111111111111111111111111111111112'
+  const s = { ...emptyTradingState(p), intents: [
+    r('b1', 'buy', A, now - 3000, { spentLamports: '2000000', receivedTokenUnits: '1000' }),
+    r('s1', 'sell', A, now - 2000, { soldTokenUnits: '1000', receivedLamports: '800000' }), // A sold flat at a loss
+    r('b2', 'buy', B, now - 1000, { spentLamports: '1000000', receivedTokenUnits: '400' }),
+    r('s2', 'sell', B, now - 500, { soldTokenUnits: '100', receivedLamports: '300000' }), // a quarter of B sold
+  ] }
+  const risk = journalRisk(s, wallet, now)
+  assert.equal(risk.exposureLamports, '750000') // three quarters of B's cost; A's realised loss is not exposure
+  assert.equal(risk.dailyLossLamports, '1900000') // 3.0M spent - 1.1M received today
+  const flat = { ...s, intents: [...s.intents, r('s3', 'sell', B, now - 100, { soldTokenUnits: '300', receivedLamports: '200000' })] }
+  assert.equal(journalRisk(flat, wallet, now).exposureLamports, '0')
+  assert.equal(nextExecutable(flat, { ...p, maxDailyLossLamports: '1000000' }, now, false).reason, 'daily-loss-stop')
+})
