@@ -6,8 +6,8 @@ import { useToken, type GridToken } from '../data/useToken'
 import { useWorkers, type WorkerName, type Workers } from '../data/useWorkers'
 import { ago, compact, mc, pct, signedUsd, usd } from '../lib/format'
 import { CoinChip } from '../ui/CoinChip'
-import { PeekLayer } from '../ui/CoinPeek'
-import { BestWorst, dur, rounds, sol } from '../ui/BestWorst'
+import { peek, PeekLayer } from '../ui/CoinPeek'
+import { atMc, avgMcs, avgRows, BestWorst, dur, rounds, sol } from '../ui/BestWorst'
 import { positions, Positions } from '../ui/Positions'
 import { Addresses } from '../ui/Panels'
 import { Page, Section } from './Page'
@@ -19,6 +19,7 @@ export function StatsPage({ feed }: { feed: Feed }) {
   const burned = token?.burned ?? feed.burnedMain
   const done = useMemo(() => rounds(feed.calls, feed.mode === 'live', feed.solUsd), [feed])
   const open = useMemo(() => positions(feed.calls, feed.solUsd), [feed])
+  const avg = useMemo(() => avgMcs(feed.calls), [feed])
   const real = done.length ? done.reduce((n, r) => n + r.pnl, 0) : null
   const holds = done.flatMap((r) => (r.held === null ? [] : [r.held]))
   const avgHold = holds.length ? holds.reduce((a, b) => a + b, 0) / holds.length : null
@@ -66,12 +67,12 @@ export function StatsPage({ feed }: { feed: Feed }) {
       </div>
 
       <Section title="Open positions" note={open.length ? `${open.length} held · value from market cap now` : 'none right now'}>
-        {open.length ? <Positions open={open} solUsd={feed.solUsd} /> : <p className="pos-empty mono">He isn’t holding anything right now. New buys show here until he sells.</p>}
+        {open.length ? <Positions open={open} solUsd={feed.solUsd} avg={avg} /> : <p className="pos-empty mono">He isn’t holding anything right now. New buys show here until he sells.</p>}
       </Section>
 
       {done.length > 0 && (
         <Section title="Best and worst" note={`of ${done.length} closed`}>
-          <BestWorst done={done} solUsd={feed.solUsd} />
+          <BestWorst done={done} solUsd={feed.solUsd} avg={avg} />
         </Section>
       )}
 
@@ -91,7 +92,10 @@ export function StatsPage({ feed }: { feed: Feed }) {
           {feed.calls.slice(0, 14).map((c) => (
             <div className="st-tr" role="row" key={c.id}>
               <CoinChip call={c} size={34} />
-              <span className="st-coin">
+              <span className="st-coin" tabIndex={0} {...peek({
+                symbol: c.symbol, name: c.name, image: c.image, hue: c.hue, tag: `${c.side === 'buy' ? 'bought' : 'sold'} ${ago(c.ts)}`,
+                rows: [[`${c.side === 'buy' ? 'bought' : 'sold'} at`, `${atMc(c)} mc`], ...avgRows(avg.get(c.mint))],
+              })}>
                 <span>
                   <b>${c.symbol}</b>
                   <small>{c.name}</small>
@@ -107,7 +111,7 @@ export function StatsPage({ feed }: { feed: Feed }) {
               )}
               <span className="r mono dim">{ago(c.ts)}</span>
               {c.sig ? (
-                <a href={solscan('tx', c.sig)} target="_blank" rel="noreferrer" title="transaction on Solscan" aria-label="transaction on Solscan">↗</a>
+                <a className="sx" href={solscan('tx', c.sig)} target="_blank" rel="noreferrer" title="View on Solscan" aria-label="View on Solscan"><img src="/brands/solscan.svg" alt="" width={16} height={16} /></a>
               ) : (
                 <span />
               )}

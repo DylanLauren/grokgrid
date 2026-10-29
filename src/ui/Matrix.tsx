@@ -6,6 +6,7 @@ import { ago, compact, mc, short, sol, usd } from '../lib/format'
 import { LiveBot, type Habit } from './LiveBot'
 import { CoinChip } from './CoinChip'
 import { peek, PeekLayer, type PeekCoin } from './CoinPeek'
+import { atMc, avgMcs, avgRows, dur, type AvgMc, type Round } from './BestWorst'
 import './matrix.css'
 
 type Sort = 'mc' | 'newest'
@@ -59,7 +60,7 @@ export function ownCoin(a: Agent): PeekCoin {
   }
 }
 
-export function tradeCoin(t: BotTrade, now: number, solUsd: number): PeekCoin {
+export function tradeCoin(t: BotTrade, now: number, solUsd: number, avg?: AvgMc, round?: Round): PeekCoin {
   const pnl = t.pnlSol ?? (t.pnlUsd !== null ? t.pnlUsd / solUsd : null)
   return {
     symbol: t.symbol, name: t.name, image: t.image, hue: t.hue ?? '#5a5a66',
@@ -67,7 +68,11 @@ export function tradeCoin(t: BotTrade, now: number, solUsd: number): PeekCoin {
     ...(t.coin ?? {}),
     rows: [
       [t.side === 'buy' ? 'spent' : 'got back', `${t.spentSol.toFixed(4)} SOL`],
-      ...(t.side === 'sell' ? [['realised', pnl === null ? '–' : `${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} SOL`, pnl === null ? '' : pnl >= 0 ? 'gain' : 'loss'] as [string, string, string]] : []),
+      ...(t.side === 'sell' && round?.buy ? [['bought at', `${atMc(round.buy)} mc`] as [string, string]] : []),
+      [t.side === 'buy' ? 'bought at' : 'sold at', `${atMc(t)} mc`],
+      ...avgRows(avg),
+      ...(t.side === 'sell' ? [['realised', pnl === null ? '–' : `${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} SOL${round ? ` (${round.pct >= 0 ? '+' : ''}${round.pct.toFixed(1)}%)` : ''}`, pnl === null ? '' : pnl >= 0 ? 'gain' : 'loss'] as [string, string, string]] : []),
+      ...(round?.held != null ? [['held', dur(round.held)] as [string, string]] : []),
     ],
   }
 }
@@ -199,10 +204,11 @@ function Strip({ a, now, solUsd }: { a: Agent; now: number; solUsd: number }) {
   const list = a.recent?.length ? a.recent : a.last?.mint ? [{ ...a.last, mint: a.last.mint, name: '', pnlSol: null } as BotTrade] : []
   if (!list.length) return <span className="mx-none mono">no trades yet</span>
   const shown = list.slice(0, 5)
+  const avg = avgMcs(list)
   return (
     <span className="mx-strip">
       {shown.map((t, k) => (
-        <span key={`${t.sig ?? t.ts}-${t.side}`} className={`mx-tr ${t.side}`} style={{ '--k': k } as CSSProperties} {...peek(tradeCoin(t, now, solUsd))}>
+        <span key={`${t.sig ?? t.ts}-${t.side}`} className={`mx-tr ${t.side}`} style={{ '--k': k } as CSSProperties} {...peek(tradeCoin(t, now, solUsd, avg.get(t.mint)))}>
           <CoinChip call={{ image: t.image, symbol: t.symbol, hue: t.hue ?? a.color }} size={24} />
           <i />
         </span>

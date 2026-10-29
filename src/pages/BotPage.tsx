@@ -4,7 +4,7 @@ import type { Agent, AgentsFeed, BotTrade, Feed, WalletPoint } from '../data/typ
 import { ago, compact, mc, pct, short, usd } from '../lib/format'
 import { CoinChip } from '../ui/CoinChip'
 import { peek, PeekLayer } from '../ui/CoinPeek'
-import { atMc, BestWorst, rounds } from '../ui/BestWorst'
+import { atMc, avgMcs, BestWorst, dur, rounds, sol, type AvgMc, type Round, type Trade } from '../ui/BestWorst'
 import { positions, Positions } from '../ui/Positions'
 import { houseRow, tradeCoin } from '../ui/Matrix'
 import { Page } from './Page'
@@ -59,15 +59,27 @@ function Profile({ a, now, solUsd, onBack }: { a: Agent; now: number; solUsd: nu
   const trades = a.recent ?? []
   const done = useMemo(() => rounds(trades, !sample, solUsd), [trades, sample, solUsd])
   const open = useMemo(() => positions(trades, solUsd), [trades, solUsd])
+  const avg = useMemo(() => avgMcs(trades), [trades])
+  const bySell = useMemo(() => new Map<Trade, Round>(done.map((r) => [r.sell, r])), [done])
+  const holds = done.flatMap((r) => (r.held === null ? [] : [r.held]))
+  const avgHold = holds.length ? holds.reduce((x, y) => x + y, 0) / holds.length : null
+  // same returns as his Stats page: what closed in the window over what it cost
+  const ret = (ms: number) => {
+    let p = 0, cost = 0
+    for (const r of done) if (now - r.sell.ts <= ms) { p += r.pnl; cost += r.cost }
+    return cost > 0 ? (p / cost) * 100 : null
+  }
+  const pills: [string, number | null][] = [['1h', ret(3.6e6)], ['24h', ret(8.64e7)], ['all', ret(Infinity)]]
   const pnl = a.pnlSol
   const tiles: [string, React.ReactNode, string?, string?][] = [
     ['wallet', <Sol n={a.walletSol} d={4} />, '', a.wallet ? short(a.wallet) : ''],
     ['realised p&l', pnl === null ? '–' : <><span>{pnl >= 0 ? '+' : ''}{pnl.toFixed(4)}</span><small> SOL</small></>, pnl === null ? '' : pnl >= 0 ? 'gain' : 'loss', pnl === null ? 'no closed trades yet' : usd(pnl * solUsd)],
-    ['win rate', a.winRate === null ? '–' : `${a.winRate.toFixed(0)}%`, '', a.closed ? `${a.closed} closed` : ''],
-    ['trades', `${a.trades}`, '', a.recent?.[0] ? `last ${ago(a.recent[0].ts, now)}` : ''],
+    ['win rate', a.winRate === null ? '–' : `${a.winRate.toFixed(0)}%`, '', `${a.closed ? `${a.closed} closed of ` : ''}${a.trades} trades${a.recent?.[0] ? ` · last ${ago(a.recent[0].ts, now)}` : ''}`],
+    ['avg hold', avgHold === null ? '–' : dur(avgHold), '', 'buy to sell'],
     ['creator fees', sample ? '–' : <Sol n={a.coin.feesSol} d={3} />, '', a.house ? '80% treasury · 20% burn' : '80% wallet · 20% burn'],
     ['$GRID burned', sample ? '–' : compact(a.burnedMain), '', 'from its 20%'],
   ]
+  const total = done.reduce((n, r) => n + r.pnl, 0)
 
   return (
     <Page
@@ -114,6 +126,11 @@ function Profile({ a, now, solUsd, onBack }: { a: Agent; now: number; solUsd: nu
                 <dt className="st-k mono">{k}</dt>
                 <dd className={cls}>{v}</dd>
                 {note && <small className="mono">{note}</small>}
+                {k === 'wallet' && !sample && (
+                  <span className="st-pills bp-pills mono">
+                    {pills.map(([w, v]) => <span key={w} className={v === null ? '' : v >= 0 ? 'gain' : 'loss'}>{w} {v === null ? '–' : pct(v)}</span>)}
+                  </span>
+                )}
               </div>
             ))}
           </dl>
@@ -126,7 +143,7 @@ function Profile({ a, now, solUsd, onBack }: { a: Agent; now: number; solUsd: nu
             <h2>Open positions</h2>
             <span className="mono">{open.length ? `${open.length} held · value from market cap now` : 'none right now'}</span>
           </div>
-          {open.length ? <Positions open={open} solUsd={solUsd} now={now} /> : <p className="pos-empty mono">Not holding anything right now.</p>}
+          {open.length ? <Positions open={open} solUsd={solUsd} now={now} avg={avg} /> : <p className="pos-empty mono">Not holding anything right now.</p>}
         </section>
 
         {done.length > 0 && (
@@ -135,14 +152,17 @@ function Profile({ a, now, solUsd, onBack }: { a: Agent; now: number; solUsd: nu
               <h2>Best and worst</h2>
               <span className="mono">of {done.length} closed</span>
             </div>
-            <BestWorst done={done} solUsd={solUsd} />
+            <BestWorst done={done} solUsd={solUsd} avg={avg} />
           </section>
         )}
 
         <section className="bp-trades card">
           <div className="bp-trades-head">
             <h2>Trades</h2>
-            <span className="mono">{trades.length ? `${trades.length} shown · newest first · every one checked on chain` : ''}</span>
+            <span className="mono">
+              {trades.length ? `${trades.length} shown · newest first · every one checked on chain` : ''}
+              {done.length > 0 && <> · total realised <b className={total >= 0 ? 'gain' : 'loss'}>{sol(total)}</b></>}
+            </span>
           </div>
           {trades.length ? (
             <div className="bp-list" role="table">
@@ -150,14 +170,14 @@ function Profile({ a, now, solUsd, onBack }: { a: Agent; now: number; solUsd: nu
                 <span>coin</span>
                 <span>side</span>
                 <span className="r">sol</span>
-                <span className="r">realised</span>
-                <span className="r">mc at trade</span>
+                <span className="r">p&l</span>
+                <span className="r">entry → exit mc</span>
                 <span className="r">mc now</span>
                 <span className="r">when</span>
                 <span />
               </div>
               {trades.map((t, i) => (
-                <TradeRow key={`${t.sig ?? t.ts}-${t.side}-${i}`} t={t} i={i} now={now} solUsd={solUsd} />
+                <TradeRow key={`${t.sig ?? t.ts}-${t.side}-${i}`} t={t} i={i} now={now} solUsd={solUsd} avg={avg.get(t.mint)} round={bySell.get(t)} />
               ))}
             </div>
           ) : (
@@ -170,11 +190,12 @@ function Profile({ a, now, solUsd, onBack }: { a: Agent; now: number; solUsd: nu
   )
 }
 
-function TradeRow({ t, i, now, solUsd }: { t: BotTrade; i: number; now: number; solUsd: number }) {
+function TradeRow({ t, i, now, solUsd, avg, round }: { t: BotTrade; i: number; now: number; solUsd: number; avg?: AvgMc; round?: Round }) {
   const pnl = t.pnlSol ?? (t.pnlUsd !== null ? t.pnlUsd / solUsd : null)
+  const sell = t.side === 'sell'
   return (
     <div className="bp-tr" role="row" style={{ '--r': Math.min(i, 20) } as CSSProperties}>
-      <span className="bp-tr-coin" {...peek(tradeCoin(t, now, solUsd))}>
+      <span className="bp-tr-coin" {...peek(tradeCoin(t, now, solUsd, avg, round))}>
         <CoinChip call={{ symbol: t.symbol, image: t.image, hue: t.hue ?? '#5a5a66' }} size={28} />
         <span>
           <b>${t.symbol}</b>
@@ -183,13 +204,16 @@ function TradeRow({ t, i, now, solUsd }: { t: BotTrade; i: number; now: number; 
       </span>
       <span><em className={`bp-side mono ${t.side}`}>{t.side}</em></span>
       <span className="r mono">{t.spentSol.toFixed(4)}</span>
-      <span className={`r mono ${pnl === null ? 'dim' : pnl >= 0 ? 'gain' : 'loss'}`}>{t.side === 'sell' && pnl !== null ? `${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)}` : '–'}</span>
-      <span className="r mono" title={t.tradeMcApprox ? 'estimated from the fill price' : undefined}>{atMc(t)}</span>
+      <span className={`r mono bp-pnl ${!sell || pnl === null ? 'dim' : pnl >= 0 ? 'gain' : 'loss'}`}>
+        {sell && pnl !== null ? `${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)}` : '–'}
+        {sell && round && <small>{round.pct >= 0 ? '+' : ''}{round.pct.toFixed(1)}%</small>}
+      </span>
+      <span className="r mono" title={t.tradeMcApprox || round?.buy?.tradeMcApprox ? '≈ estimated from the fill price' : undefined}>{sell && round?.buy?.tradeMc ? `${atMc(round.buy)} → ${atMc(t)}` : atMc(t)}</span>
       <span className="r mono">{t.coin?.mcUsd ? mc(t.coin.mcUsd) : '–'}</span>
       <span className="r mono dim">{ago(t.ts, now)}</span>
       <span className="r">
         {t.sig && (
-          <a className="bp-tx mono" href={solscan('tx', t.sig)} target="_blank" rel="noreferrer" aria-label="transaction on Solscan">tx ↗</a>
+          <a className="sx" href={solscan('tx', t.sig)} target="_blank" rel="noreferrer" title="View on Solscan" aria-label="View on Solscan"><img src="/brands/solscan.svg" alt="" width={16} height={16} /></a>
         )}
       </span>
     </div>
