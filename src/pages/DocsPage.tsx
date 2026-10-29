@@ -14,7 +14,7 @@ const FAQ: [string, string][] = [
   ['Can GrokGrid take my funds?', 'No. The signer can only buy and sell on pump.fun under the policy, with no transfers. You can remove it at any time.'],
   ['How do I stop my bot?', 'Remove the signer from your wallet. It stops trading on the next cycle, and the coin and wallet stay yours.'],
   ['Can my bot lose money?', 'Yes. Memecoins are risky. Limits cap each trade and the daily loss, but a bot can still lose what it trades with.'],
-  ['When does trading go live?', 'After a funded test of the house bot. Until then every bot runs in practice mode, and the stats page shows each worker’s mode.'],
+  ['When does trading go live?', 'After a funded test of the house bot. Until then the bots run in practice mode. The workers section on the stats page always shows the current mode.'],
   ['Where can I check all of this?', 'Every coin, wallet and trade links to pump.fun and Solscan. The addresses are at the bottom of this page.'],
   ['Is this made by xAI?', 'No. GrokGrid is an unofficial fan project.'],
 ]
@@ -36,7 +36,7 @@ const SECTIONS: [string, string, ReactNode][] = [
     <Fragment key="b">
       <p>He scans new pump.fun coins and skips anything that fails his safety checks: thin liquidity, low volume, few real buyers, too few holders, a top-10 that holds too much, a risky dev wallet, or a mint or freeze authority still set. When he buys, he exits on take-profit, stop-loss, a trailing stop or a maximum hold time.</p>
       <p>Every trade has hard limits: 0.05 SOL per trade, 0.5 SOL open at once, a 0.25 SOL daily loss stop, 15% maximum slippage and a 0.02 SOL reserve he never spends. A stop switch halts him instantly, and an exit switch sells everything. Real trades show on the calls page with links to their transactions. Each real buy can also become a pump.fun Callout from his GrokGrid profile, at most once every 6 hours.</p>
-      <p>Right now he runs in practice mode: he picks and exits coins on live data but spends nothing. Real trading switches on after a funded test. The workers section on the stats page shows which parts are online and in which mode.</p>
+      <p>Before real trading he runs in practice mode: he picks and exits coins on live data but spends nothing. Real trading switches on after a funded test. The workers section on the stats page shows which parts are online and in which mode.</p>
     </Fragment>,
   ],
   [
@@ -78,7 +78,7 @@ const SECTIONS: [string, string, ReactNode][] = [
     'grid',
     'The matrix and the grid',
     <Fragment key="b">
-      <p>The matrix lists every bot with its coin, wallet balance, trades, wins, profit and last move, updating live. Rows link to the coin on pump.fun and the wallet on Solscan, so every number can be checked. Bots with a coin that was not launched here, or whose fee split doesn’t match, are left off.</p>
+      <p>The matrix lists every bot with its coin’s market cap, volume and fees, its wallet balance, trade count and last move, updating live. Until the first bots launch it shows clearly marked sample rows. Rows link to the coin on pump.fun and the wallet on Solscan, so every number can be checked. Bots with a coin that was not launched here, or whose fee split doesn’t match, are left off.</p>
       <p>The grid is where you pick a look and launch. Each of the nine family bots has its own shape and colour, and the one you pick becomes your coin’s picture unless you upload your own.</p>
     </Fragment>,
   ],
@@ -122,6 +122,7 @@ export function DocsPage({ onTour }: { onTour: () => void }) {
           {SECTIONS.map(([id, title], i) => (
             <a key={id} href={`#docs/${id}`} className={on === id ? 'on' : ''} onClick={(e) => {
               e.preventDefault()
+              history.replaceState(null, '', `#docs/${id}`)
               document.getElementById(`dc-${id}`)?.scrollIntoView({ behavior: 'smooth' })
             }}>
               <span className="mono">{String(i + 1).padStart(2, '0')}</span>

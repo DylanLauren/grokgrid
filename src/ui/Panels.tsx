@@ -10,12 +10,14 @@ export function CallsPanel({ feed, focus }: { feed: Feed; focus?: string }) {
     <>
       <PanelHead title="Calls" sub={`every trade he makes, called out as it happens. ${feed.mode === 'demo' ? 'sample calls until his wallet goes live.' : 'each one links to its transaction.'}`} />
       <div className="pn-list">
+        {!feed.calls.length && <p className="pn-none mono">no calls yet. his first trade shows up here, linked to its transaction.</p>}
         {feed.calls.slice(0, 40).map((c, i) => (
           <div key={c.id} className="pn-item" data-call={c.id} style={{ '--i': Math.min(i, 12) } as CSSProperties}>
             <CallCard call={c} focus={c.id === focus} />
           </div>
         ))}
       </div>
+      <p className="pn-foot mono">unofficial fan project, not affiliated with xAI or pump.fun. not financial advice.</p>
     </>
   )
 }
@@ -26,7 +28,7 @@ export function CostTable() {
     ['launching a bot', 'you', 'Solana network fees and pump.fun\'s coin-creation rent. your wallet shows the exact amount before you sign'],
     ['a first buy of your bot\'s coin', 'you, if you want one', 'whatever you choose, or nothing'],
     ['GrokGrid\'s cut', 'nobody', 'none. the site takes no fee on launches or trades'],
-    ['your bot\'s trading money', 'its coin\'s traders', '80% of creator fees is allocated to your connected wallet, also your bot’s trading wallet'],
+    ['your bot\'s trading money', 'its coin\'s traders', '80% of creator fees go to your agent wallet, which is also your bot’s trading wallet'],
     [`$${MAIN_TICKER} burns`, 'its coin\'s traders', 'the other 20% of those fees'],
   ]
   return (
@@ -59,7 +61,7 @@ export function Addresses() {
         <div key={k} className="card">
           <span>{k}</span>
           {v ? (
-            <a className="mono" href={solscan(kind, v)} target="_blank" rel="noreferrer">{short(v)} ↗</a>
+            <a className="mono" href={solscan(kind, v)} target="_blank" rel="noreferrer" aria-label={`${k} on Solscan`}>{short(v)} ↗</a>
           ) : (
             <span className="mono dim">not live yet</span>
           )}

@@ -6,6 +6,8 @@
 .boot { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 14px; color: var(--paper-50); font-size: 12px; }
 .boot svg { animation: boot-bob 1.4s ease-in-out infinite; }
 @keyframes boot-bob { 50% { transform: translateY(-6px); } }
+.boot.still svg { animation: none; }
+.boot.still span { padding: 0 24px; text-align: center; }
 
 /* one surface for everything that floats on the room */
 
@@ -177,3 +179,5 @@
 /* the closed panel still holds the same cards, so only its new picture is drawn while it slides */
 ::view-transition-old(calls-panel) { animation: none; opacity: 0; }
 ::view-transition-new(calls-panel) { animation: none; }
+/* phones: the sample pill would push the buy button off the bar; cards and pages carry their own sample tags */
+@media (max-width: 600px) { .bar-right .status:not(.live) { display: none; } }

@@ -16,7 +16,7 @@ export function StatsPage({ feed }: { feed: Feed }) {
   const burned = token?.burned ?? feed.burnedMain
   const tiles: [string, string, string?, string?][] = [
     ['trades', `${s.trades}`, `${feed.calls.filter((c) => c.side === 'sell').length} closed`],
-    ['win rate', `${(s.winRate === null ? '–' : s.winRate.toFixed(0))}%`, 'of closed trades'],
+    ['win rate', s.winRate === null ? '–' : `${s.winRate.toFixed(0)}%`, 'of closed trades'],
     ['best trade', s.best ? signedUsd(s.best.pnlUsd) : '–', s.best?.symbol, 'gain'],
     ['worst trade', s.worst ? signedUsd(s.worst.pnlUsd) : '–', s.worst?.symbol, 'loss'],
     ['fees in', `${feed.feesSol.toFixed(2)}`, 'SOL from creator fees'],
@@ -29,7 +29,7 @@ export function StatsPage({ feed }: { feed: Feed }) {
       label="stats"
       title="His numbers"
       sub={feed.mode === 'live' ? 'read from his wallet on chain, not from us. every trade links to its transaction.' : 'his wallet goes on chain at launch. until then, this is a sample of what he will look like.'}
-      side={feed.mode === 'live' && <span className="live-pill"><i />live</span>}
+      side={feed.mode === 'live' ? <span className="live-pill"><i />live</span> : <span className="live-pill">sample</span>}
     >
       <div className="st-hero">
         <div className="card st-wallet">
@@ -70,6 +70,7 @@ export function StatsPage({ feed }: { feed: Feed }) {
             <span className="r">when</span>
             <span />
           </div>
+          {!feed.calls.length && <p className="st-none mono">no trades yet. his first one shows up here, linked to its transaction.</p>}
           {feed.calls.slice(0, 14).map((c) => (
             <div className="st-tr" role="row" key={c.id}>
               <CoinChip call={c} size={34} />
@@ -85,7 +86,7 @@ export function StatsPage({ feed }: { feed: Feed }) {
               <span className={`r mono ${c.side === 'buy' ? 'dim' : c.pnlUsd === null ? 'dim' : c.pnlUsd >= 0 ? 'gain' : 'loss'}`}>{c.side === 'buy' ? '–' : signedUsd(c.pnlUsd)}</span>
               <span className="r mono dim">{ago(c.ts)}</span>
               {c.sig ? (
-                <a href={solscan('tx', c.sig)} target="_blank" rel="noreferrer" title="transaction on Solscan">↗</a>
+                <a href={solscan('tx', c.sig)} target="_blank" rel="noreferrer" title="transaction on Solscan" aria-label="transaction on Solscan">↗</a>
               ) : (
                 <span />
               )}
@@ -177,7 +178,7 @@ function WalletChart({ feed }: { feed: Feed }) {
     for (let i = 1; i < pts.length; i++) line += `H${x(pts[i].ts)}V${y(pts[i].sol)}`
     return { line, area: `${line}V300H0Z`, x, y, pts }
   }, [feed.curve])
-  if (!g) return <div className="card st-chart" />
+  if (!g) return <div className="card st-chart st-chart-empty mono">his wallet history starts with his first trade</div>
   const p = hover !== null ? g.pts[hover] : g.pts[g.pts.length - 1]
   return (
     <div className="card st-chart">

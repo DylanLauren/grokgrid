@@ -40,7 +40,7 @@ export async function GET() {
 
   const houseRecord: AgentRecord = {
     id: 'house',
-    name: 'grok grid',
+    name: 'Grok Bot',
     color: '#ffffff',
     shape: 'sphere',
     strategy: houseMode === 'execute' ? 'the house bot. trading on his own, inside hard limits' : houseMode === 'paper' ? 'the house bot. paper trading: real signals, simulated fills' : 'the house bot. wallet monitoring is active; automatic trading is paused',

@@ -13,8 +13,8 @@ export function AgentWalletSetup(props: AgentWalletSetupProps) {
   return <section className="card" style={{ padding: 24, marginBottom: 24 }} aria-label="Agent wallet setup">
     <h2>Your agent wallet</h2>
     <p>Create a wallet you own before launching. This same address will launch its coin, receive its 80% creator-fee share and trade for that agent. Phantom can fund this address; it is not the agent signer.</p>
-    <p>Public launches and automatic trading are paused. Creating a wallet does not fund it or authorize spending.</p>
-    {!appId ? <p role="status">Wallet setup is being configured.</p> : !open ?
+    <p>Creating a wallet does not fund it or authorize any spending.</p>
+    {!appId ? <p role="status">Agent wallet setup opens shortly, before launches do. Nothing to do yet.</p> : !open ?
       <button type="button" className="btn ghost" onClick={() => setOpen(true)}>Set up agent wallet</button> :
       <WalletLoadBoundary><Suspense fallback={<p role="status">Loading wallet setup…</p>}><PrivyAgentWallet {...props} appId={appId} /></Suspense></WalletLoadBoundary>}
   </section>

@@ -70,6 +70,8 @@
 .st-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
 .st-pills span { white-space: nowrap; border: 1px solid var(--hair-strong); border-radius: var(--r-pill); padding: 5px 11px; font-size: 12.5px; }
 .st-chart { padding: 18px 18px 10px; min-height: 280px; display: flex; flex-direction: column; }
+.st-chart-empty { align-items: center; justify-content: center; font-size: 12.5px; color: var(--paper-50); }
+.st-none { margin: 0; padding: 16px; font-size: 12.5px; color: var(--paper-50); }
 .st-chart-top { display: flex; justify-content: space-between; font-size: 12px; color: var(--paper-50); }
 .st-chart-top b { color: var(--paper); font-weight: 500; }
 .st-plot { position: relative; flex: 1; display: flex; min-height: 220px; margin-top: 10px; }
@@ -280,7 +282,11 @@
   .st-tiles { grid-template-columns: repeat(2, 1fr); }
   .st-tiles-5 > :last-child { grid-column: 1 / -1; }
   .st-tr { grid-template-columns: 1.4fr 56px 1fr 24px; }
-  .st-tr > :nth-child(1), .st-tr > :nth-child(6) { display: none; }
+  /* the coin chip sets its own display inline, so hiding it needs the !important */
+  .st-tr > :nth-child(1), .st-tr > :nth-child(4) { display: none !important; }
+  .dc-toc { grid-template-columns: 1fr; }
+  .dc-toc a { min-width: 0; }
+  .dc-toc a .roll { display: block; min-width: 0; white-space: nowrap; text-overflow: ellipsis; }
   .gd-line { grid-template-columns: repeat(3, 1fr); padding-top: 44px; }
   .gd-split, .gd-row, .gd-row.three, .gd-row:has(.narrow) { grid-template-columns: 1fr; }
 }

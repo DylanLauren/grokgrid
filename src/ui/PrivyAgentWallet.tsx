@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { PrivyProvider, usePrivy, useSigners } from '@privy-io/react-auth'
 import { defaultSolanaRpcsPlugin, useCreateWallet, useSignTransaction, useWallets } from '@privy-io/react-auth/solana'
 import { privyWalletAdapter } from '../data/privyWalletAdapter'
@@ -27,20 +27,16 @@ function WalletControls({ onWalletChange }: AgentWalletSetupProps) {
   const account = authenticated ? accounts.find(a => a.address === selected) ?? accounts[0] : undefined
   const connected = wallets.find(w => w.address === account?.address && 'isPrivyWallet' in w.standardWallet && w.standardWallet.isPrivyWallet === true)
   const current = useRef({ authenticated, address: account?.address, wallet: connected })
-  current.current = { authenticated, address: account?.address, wallet: connected }
+  useLayoutEffect(() => { current.current = { authenticated, address: account?.address, wallet: connected } })
   const address = account?.address
   const walletId = account?.walletId
-  const adapter = useMemo<WalletLike | null>(() => {
-    if (!address || !connected) return null
-    return privyWalletAdapter(address,
-      () => current.current.authenticated && current.current.address === address && current.current.wallet === connected,
-      async transaction => (await signTransaction({ wallet: connected, transaction, chain: 'solana:mainnet' })).signedTransaction)
-
-  }, [address, connected, signTransaction])
   useEffect(() => {
+    const adapter: WalletLike | null = address && connected ? privyWalletAdapter(address,
+      () => current.current.authenticated && current.current.address === address && current.current.wallet === connected,
+      async transaction => (await signTransaction({ wallet: connected, transaction, chain: 'solana:mainnet' })).signedTransaction) : null
     onWalletChange(address && walletId && adapter ? { address, walletId, wallet: adapter, accessToken: getAccessToken, authorizationReady: checked?.address === address && checked.readiness.walletAuthorizationReady } : null)
     return () => onWalletChange(null)
-  }, [address, walletId, adapter, checked, onWalletChange, getAccessToken])
+  }, [address, walletId, connected, signTransaction, checked, onWalletChange, getAccessToken])
   async function act(fn: () => Promise<void>) {
     setBusy(true); setMessage('')
     try { await fn() } catch { setMessage('Wallet action did not complete. Check your session and try again. No launch or trade was submitted.') }
@@ -61,7 +57,7 @@ function WalletControls({ onWalletChange }: AgentWalletSetupProps) {
     {!account && hasUnreadyWallet ? <p>This account has a wallet without a verified server wallet ID. Its setup needs review before agent access can be configured.</p> : !account ? <button type="button" className="btn" disabled={busy} onClick={() => void act(async () => { const created = await createWallet(); setSelected(created.wallet.address); setMessage('Wallet created. Verify its setup below. It has not been funded.') })}>Create my Solana agent wallet</button> : <>
       <button type="button" className="btn ghost" disabled={busy} onClick={() => void act(async () => { setChecked(null); setConsent(false); const created = await createWallet({ createAdditional: true }); setSelected(created.wallet.address); setMessage('Another agent wallet created. No funding or agent permission was added.') })}>Create another agent wallet</button>
       <p className="mono" style={{ overflowWrap: 'anywhere' }}>{address}</p>
-      <p>Use this public address when funding from Phantom or another Solana wallet. Check the full address before sending. No funds are required while launches are paused.</p>
+      <p>Use this public address when funding from Phantom or another Solana wallet. Check the full address before sending. Only fund it once you’re ready to launch.</p>
       <button type="button" className="btn ghost" disabled={busy} onClick={() => void act(async () => { await navigator.clipboard.writeText(address!); setMessage('Public address copied.') })}>Copy funding address</button>
       <button type="button" className="btn ghost" disabled={busy || !connected} onClick={() => void act(verify)}>Verify wallet setup</button>
       {checked && checked.address === address && checked.readiness.canAuthorize ? <div>
