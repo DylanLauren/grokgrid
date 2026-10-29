@@ -32,4 +32,4 @@ An agent signs only if all of these hold: `mode: "execute"`, the launch carries 
 
 ## Heartbeat
 
-Every tick posts `{type:"runtime", worker:"agent-runner", mode:"paper"|"execute", healthy, agents:<running>}`. The site opens launches only when this beat is healthy in execute mode **and** `LAUNCHES_ENABLED=1` is set in Vercel.
+Every tick posts `{type:"runtime", worker:"agent-runner", mode:"paper"|"execute", healthy, agents:<running>}`. The site opens launches only when this beat is healthy in execute mode **and** `LAUNCHES_ENABLED=1` is set in Vercel. They close again while the grid is full: registered bots at or above `AGENT_CAP` (Vercel env, default 100; keep it equal to the runner's `maxAgents`).

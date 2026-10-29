@@ -109,7 +109,25 @@ export async function launchStatus(): Promise<{ open: boolean; reason: string | 
   // Wallet connection supplies identity only. It cannot authorize an unattended signer.
   if (!(await executorReady())) return { ...model, open: false, reason: 'Agent trading is not ready yet. Coin launches are paused.' }
   if (!isAddress(BURN_WALLET)) return { ...model, open: false, reason: 'Launching opens once the burn wallet is set.' }
+  if (await gridFull()) return { ...model, open: false, reason: 'Every bot slot on the grid is taken right now. More open soon.' }
   return { ...model, open: true, reason: null }
+}
+
+// The runner trades at most AGENT_CAP bots, so a launch past it would make a bot that never
+// trades. Fails closed: no count, no launch.
+export const agentCap = (env = process.env.AGENT_CAP) => {
+  const n = Number(env)
+  return Number.isSafeInteger(n) && n >= 1 && n <= 500 ? n : 100
+}
+export const isFull = (cap: number, agents: unknown) => !Number.isSafeInteger(agents) || (agents as number) >= cap
+
+async function gridFull(): Promise<boolean> {
+  try {
+    const [agents] = await redis(['HLEN', 'gg:agents'])
+    return isFull(agentCap(), agents)
+  } catch {
+    return true
+  }
 }
 
 export async function executorReady(): Promise<boolean> {
