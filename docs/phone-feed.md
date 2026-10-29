@@ -325,3 +325,14 @@ the window also leaves this waiting state; a newly opened window with a new ID
 is never substituted automatically and requires an explicit operator repin.
 This handles temporary absence; it does not make background/off-Space capture
 available or prove continuously fresh frames while the window is hidden.
+
+## Phone guardian
+
+`scripts/phone-guardian.mjs` runs every 30 seconds (launchd `fun.grokgrid.phone-guardian`) and keeps the phone on. It acts only on the pinned window, the one whose active tab is on `browserUrl`:
+- **Full screen:** takes it out of full screen.
+- **Size:** puts it back to phone size (`bounds` in `phone-guardian-config.json`, default 406×851 at 10,40).
+- **Tabs:** returns it to the house profile if a viewer clicked into a profile tab.
+- **Scrollbar:** hides the page scrollbar with an injected style.
+- **Resume:** resumes the feed when the supervisor stopped it for one of those window problems. A manual pause and credential, identity or request failures stay with the operator.
+
+It cannot fix the window being on another Space: if an app is in macOS full screen, the phone window is off screen while that app is in front.
