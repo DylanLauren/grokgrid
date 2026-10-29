@@ -25,6 +25,7 @@ import { connect, readMint, buildBuy, buildSell, signatureStatus, signedSignatur
 import { postCallouts } from './trading-callouts.mjs';
 import { feesReceived24h } from './trade-budget.mjs';
 import { heartbeat } from './runtime-ingest.mjs';
+import { recordWhys } from './trade-why.mjs';
 
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
 const ORIGIN = 'https://grokgrid-alpha.vercel.app';
@@ -107,6 +108,7 @@ async function runLive(dir, agent, policy, c, market, ctx) {
   let fees = '0'; try { fees = feesReceived24h(await json(join(root, 'fee-distributor-state.json')), [agent.mint], 8000, now); } catch {}
   const sizing = { walletLamports: balance, feesLamports24h: fees };
   let pending = null, planned, execution = { reason: 'observe-only' };
+  const whys = {};
   const state = await withTradingStore(join(dir, 'trading'), policy, async s => {
     const verify = createFinalizedReceiptVerifier(rpcUrl);
     for (const i of s.intents.filter(x => x.state === 'held-ambiguous')) {
@@ -117,8 +119,8 @@ async function runLive(dir, agent, policy, c, market, ctx) {
     planned = livePlan({ tradingState: s, policy, c, peaks, entries, positions, market, now, liquidating, sizing });
     s = setAllowlist(s, policy, planned.allowlist, now);
     for (const p of planned.proposals) {
-      const { reason, ...proposal } = p; void reason;
-      try { s = planIntent(s, policy, proposal, observation, proposal.side === 'buy' ? journalRisk(s, policy.wallet, now) : null, now, positions); } catch {}
+      const { reason, why, ...proposal } = p; void reason;
+      try { s = planIntent(s, policy, proposal, observation, proposal.side === 'buy' ? journalRisk(s, policy.wallet, now) : null, now, positions); whys[p.id] = why; } catch {}
     }
     if (executes(policy)) {
       const signed = await signNext(s, policy, { stopFilePresent, signatureOf: signedSignature, sign: signerFor(agent),
@@ -133,6 +135,7 @@ async function runLive(dir, agent, policy, c, market, ctx) {
   });
   // Journaled; only now broadcast. A send error leaves the intent held for settlement.
   if (pending) try { await conn.sendRawTransaction(pending.serialize(), { skipPreflight: false, preflightCommitment: 'finalized', maxRetries: 0 }); execution.broadcast = 'sent'; } catch { execution.broadcast = 'error-held'; }
+  await recordWhys(join(dir, 'trade-why.json'), whys, now).catch(() => {});
   await savePrivate(join(dir, 'strategy-live.json'), { peaks: planned.peaks, entries: planned.entries, observedAt: now });
   const callouts = await postCallouts(root, state, { agent: agent.id, ledgerDir: dir }).catch(() => null);
   return { status: executes(policy) ? 'executing' : 'observing', execution, intents: state.intents.length, callouts, budget: planned.budget };

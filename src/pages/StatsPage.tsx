@@ -10,6 +10,7 @@ import { peek, PeekLayer } from '../ui/CoinPeek'
 import { atMc, avgMcs, avgRows, BestWorst, dur, rounds, sol } from '../ui/BestWorst'
 import { positions, Positions } from '../ui/Positions'
 import { Addresses } from '../ui/Panels'
+import { whyOf } from '../lib/why'
 import { Page, Section } from './Page'
 
 export function StatsPage({ feed }: { feed: Feed }) {
@@ -95,6 +96,7 @@ export function StatsPage({ feed }: { feed: Feed }) {
               <span className="st-coin" tabIndex={0} {...peek({
                 symbol: c.symbol, name: c.name, image: c.image, hue: c.hue, tag: `${c.side === 'buy' ? 'bought' : 'sold'} ${ago(c.ts)}`,
                 rows: [[`${c.side === 'buy' ? 'bought' : 'sold'} at`, `${atMc(c)} mc`], ...avgRows(avg.get(c.mint))],
+                why: whyOf(c.note),
               })}>
                 <span>
                   <b>${c.symbol}</b>

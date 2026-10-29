@@ -7,6 +7,7 @@ import { LiveBot, type Habit } from './LiveBot'
 import { CoinChip } from './CoinChip'
 import { peek, PeekLayer, type PeekCoin } from './CoinPeek'
 import { atMc, avgMcs, avgRows, dur, type AvgMc, type Round } from './BestWorst'
+import { whyOf } from '../lib/why'
 import './matrix.css'
 
 type Sort = 'mc' | 'newest'
@@ -39,7 +40,7 @@ export function houseRow(feed: Feed): Agent {
     winRate: s.winRate,
     burnedMain: feed.burnedMain,
     last: last && { side: last.side, symbol: last.symbol, spentSol: last.spentSol, pnlUsd: last.pnlUsd, ts: last.ts, sig: last.sig, mint: last.mint, image: last.image, hue: last.hue },
-    recent: feed.calls.slice(0, 12).map((c) => ({ mint: c.mint, side: c.side, sig: c.sig, ts: c.ts, symbol: c.symbol, name: c.name, image: c.image, hue: c.hue, spentSol: c.spentSol, pnlUsd: c.pnlUsd, pnlSol: c.pnlSol ?? null, coin: c.nowMc ? { mcUsd: c.nowMc, vol24hUsd: 0, change24h: 0 } : undefined })),
+    recent: feed.calls.slice(0, 12).map((c) => ({ mint: c.mint, side: c.side, sig: c.sig, ts: c.ts, symbol: c.symbol, name: c.name, image: c.image, hue: c.hue, spentSol: c.spentSol, note: c.note, pnlUsd: c.pnlUsd, pnlSol: c.pnlSol ?? null, coin: c.nowMc ? { mcUsd: c.nowMc, vol24hUsd: 0, change24h: 0 } : undefined })),
   }
 }
 
@@ -74,6 +75,7 @@ export function tradeCoin(t: BotTrade, now: number, solUsd: number, avg?: AvgMc,
       ...(t.side === 'sell' ? [['realised', pnl === null ? '–' : `${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} SOL${round ? ` (${round.pct >= 0 ? '+' : ''}${round.pct.toFixed(1)}%)` : ''}`, pnl === null ? '' : pnl >= 0 ? 'gain' : 'loss'] as [string, string, string]] : []),
       ...(round?.held != null ? [['held', dur(round.held)] as [string, string]] : []),
     ],
+    why: whyOf(t.note),
   }
 }
 

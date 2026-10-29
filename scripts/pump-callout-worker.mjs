@@ -8,6 +8,7 @@ import { validateTradingPolicy, validateTradingState } from './trading-policy.mj
 import { DEFAULT_CALLOUTS, pickCallout, calloutGate, thesis, runCallout } from './pump-callouts.mjs';
 import { marketMetrics } from './strategy-data.mjs';
 import { action } from './runtime-ingest.mjs';
+import { readWhys } from './trade-why.mjs';
 
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
 const args = process.argv.slice(2), dryRun = args.includes('--dry-run');
@@ -27,7 +28,7 @@ const gate = dryRun ? (mint ? 'ok' : 'nothing-held') : calloutGate(ledger, cfg, 
 let result = gate;
 if (gate === 'ok') {
   let symbol; try { symbol = (await marketMetrics([mint])).get(mint)?.symbol; } catch {}
-  result = await runCallout(cfg, mint, intent ? thesis(intent, symbol) : 'dry run', dryRun);
+  result = await runCallout(cfg, mint, intent ? thesis(intent, symbol, (await readWhys(root)).get(intent.id)) : 'dry run', dryRun);
   if (!dryRun) {
     ledger.calls = [...(ledger.calls || []), { at: now, mint, signature: intent.signature, outcome: result === 'create-http-200' || result === 'create-http-201' ? 'posted' : result }].slice(-200);
     await savePrivateJSON(join(root, 'pump-callouts.json'), ledger);

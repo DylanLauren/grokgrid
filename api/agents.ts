@@ -19,7 +19,7 @@ export interface AgentRecord {
   privyWalletId?: string // the verified Privy wallet the agent runner signs from
 }
 
-interface CallLite { mint: string; image?: string; hue?: string; name?: string; side: 'buy' | 'sell'; symbol: string; spentSol: number; sizeTokens?: number; pnlUsd: number | null; ts: number; sig?: string }
+interface CallLite { mint: string; image?: string; hue?: string; name?: string; side: 'buy' | 'sell'; symbol: string; spentSol: number; sizeTokens?: number; pnlUsd: number | null; ts: number; sig?: string; note?: string }
 
 const RECENT = 12 // trades per bot on the matrix; the profile gets the whole history
 const MAX_MINTS = 90 // traded coins looked up per request (three DexScreener batches)
@@ -78,6 +78,7 @@ export async function grid(only?: string) {
         mint: c.mint, side: c.side, sig: c.sig, ts: c.ts,
         symbol: tok?.symbol || c.symbol, name: tok?.name || c.name || '', image: tok?.image || c.image, hue: c.hue || r.color,
         tradeMc: mcs.get(`${c.sig}:${c.mint}`)?.mcUsd, tradeMcApprox: mcs.get(`${c.sig}:${c.mint}`)?.approx,
+        note: typeof c.note === 'string' ? c.note.slice(0, 280) : undefined,
         spentSol: c.spentSol, sizeTokens: c.sizeTokens, pnlUsd: c.pnlUsd ?? (p === undefined ? null : p * price), pnlSol: p ?? null,
         coin: tok ? { mcUsd: tok.mcUsd, vol24hUsd: tok.vol24hUsd, change24h: tok.change24h } : undefined,
       }

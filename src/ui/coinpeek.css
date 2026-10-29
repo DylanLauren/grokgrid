@@ -20,6 +20,8 @@
 .peek-rows { display: grid; gap: 4px; margin: 8px 0 0; padding: 8px 0 0; border-top: 1px solid var(--hair); }
 .peek-rows div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .peek-rows dd { margin: 0; font-size: 12px; }
+.peek-why { margin: 8px 0 0; padding: 8px 0 0; border-top: 1px solid var(--hair); font-size: 11.5px; line-height: 1.4; color: var(--paper-70); }
+.peek-why em { display: block; margin-bottom: 2px; font-style: normal; font-size: 9.5px; color: var(--paper-50); text-transform: uppercase; letter-spacing: 0.06em; }
 .peek .gain { color: var(--gain); }
 .peek .loss { color: var(--loss); }
 @media (prefers-reduced-motion: reduce) { .peek, .peek.snap { transition: opacity 0.15s; scale: 1; } }

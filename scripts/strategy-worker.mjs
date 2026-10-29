@@ -17,6 +17,7 @@ import { withTradingStore } from './trading-store.mjs';
 import { journalRisk } from './trading-executor.mjs';
 import { heartbeat, action } from './runtime-ingest.mjs';
 import { feesReceived24h } from './trade-budget.mjs';
+import { recordWhys } from './trade-why.mjs';
 
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
 if (process.argv.slice(2).some(x => x !== '--once')) { console.error('Usage: strategy-worker.mjs [--once]'); process.exit(1); }
@@ -82,20 +83,21 @@ async function tick() {
     for (const p of positions.positions) if (BigInt(p.spendableTokenUnits) > 0n) {
       try { const q = await quoteSell(conn, { mint: p.mint, tokenUnits: p.spendableTokenUnits, tokenProgram: p.tokenProgram }); if (q) market.sellQuotes.set(p.mint, q); } catch {}
     }
-    const outcomes = [];
+    const outcomes = [], whys = {};
     let planned;
     await withTradingStore(join(root, 'trading'), policy, async s => {
       planned = livePlan({ tradingState: s, policy, c, peaks, entries, positions, market, now, liquidating, sizing });
       s = setAllowlist(s, policy, planned.allowlist, now);
       for (const p of planned.proposals) {
-        const { reason, ...proposal } = p;
+        const { reason, why, ...proposal } = p;
         try {
           const risk = proposal.side === 'buy' ? (executes(policy) ? journalRisk(s, policy.wallet, now) : await json(join(root, 'trading-risk.json'))) : null;
-          s = planIntent(s, policy, proposal, observation, risk, now, positions); outcomes.push({ id: p.id, side: p.side, mint: p.mint, reason, planned: true });
+          s = planIntent(s, policy, proposal, observation, risk, now, positions); whys[p.id] = why; outcomes.push({ id: p.id, side: p.side, mint: p.mint, reason, planned: true });
         } catch (e) { outcomes.push({ id: p.id, side: p.side, mint: p.mint, reason, planned: false, refused: String(e?.message || e).slice(0, 120) }); }
       }
       return s;
     });
+    await recordWhys(join(root, 'trade-why-strategy.json'), whys, now).catch(() => {});
     await savePrivate('strategy-live.json', { peaks: planned.peaks, entries: planned.entries, observedAt: now });
     Object.assign(status, { scanned: market.scanned, preScreened: market.preScreened, chainChecked: market.facts.size, allowlisted: planned.allowlist.length, proposals: outcomes, budget: planned.budget });
   }

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { screen, exitDecision, approve, pruneAllowlist } from './strategy-policy.mjs';
 import { tradeBudget } from './trade-budget.mjs';
 import { journalRisk } from './trading-executor.mjs';
+import { buyWhy, sellWhy } from './trade-why.mjs';
 
 // One strategy pass. Paper mode simulates fills against observed prices and keeps its own
 // journal. Live mode returns proposals for the existing planIntent path; it signs nothing.
@@ -87,6 +88,7 @@ function costBasis(tradingState, decimalsByMint) {
  * `entries` holds the market price each buy was decided at. Exits measure moves from it,
  * because the wallet cost of a first buy includes one-time account rent (token account,
  * PumpSwap volume accumulator) that can exceed a small trade and would read as a loss.
+ * Each proposal carries `why` (trade-why.mjs); callers strip it before planIntent.
  */
 export function livePlan({ tradingState, policy, c, peaks, entries: entryPrices = {}, positions, market, now, liquidating, sizing = null }) {
   const proposals = [], nextPeaks = { ...peaks }, nextEntries = { ...entryPrices };
@@ -109,7 +111,8 @@ export function livePlan({ tradingState, policy, c, peaks, entries: entryPrices 
     if (Math.abs(dexExpected - Number(BigInt(quoted))) > 0.15 * Number(BigInt(quoted))) continue;
     const floor = BigInt(quoted) * BigInt(10000 - base.slippageBps) / 10000n;
     if (floor <= 0n) continue;
-    proposals.push({ ...base, id: `sell-${randomUUID()}`, mint: p.mint, side: 'sell', tokenUnits: p.spendableTokenUnits, tokenDecimals: p.decimals, minimumReceiveLamports: floor.toString(), reason });
+    proposals.push({ ...base, id: `sell-${randomUUID()}`, mint: p.mint, side: 'sell', tokenUnits: p.spendableTokenUnits, tokenDecimals: p.decimals, minimumReceiveLamports: floor.toString(), reason,
+      why: sellWhy(reason, { ...b, peakPriceSol: nextPeaks[p.mint] }, price, now) });
     break;
   }
   let allowlist = pruneAllowlist(tradingState.allowlist, now);
@@ -133,7 +136,7 @@ export function livePlan({ tradingState, policy, c, peaks, entries: entryPrices 
     if (pick) {
       allowlist = approve(allowlist, pick.mint, c, now, {});
       const spend = sizing ? budget.perTradeLamports : (BigInt(c.tradeLamports) < BigInt(policy.maxTradeLamports) ? c.tradeLamports : policy.maxTradeLamports);
-      proposals.push({ ...base, id: `buy-${randomUUID()}`, mint: pick.mint, side: 'buy', spendLamports: spend, reason: 'screen-passed' });
+      proposals.push({ ...base, id: `buy-${randomUUID()}`, mint: pick.mint, side: 'buy', spendLamports: spend, reason: 'screen-passed', why: buyWhy(pick.m, now) });
       if (pick.m.priceSol > 0) nextEntries[pick.mint] = { priceSol: pick.m.priceSol, at: now };
     }
   }
