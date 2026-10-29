@@ -6,7 +6,8 @@ import { connectWallet, rejected } from '../data/wallet'
 import type { AgentWalletSession } from '../data/agentWallet'
 import { AgentWalletSetup } from '../ui/AgentWalletSetup'
 import type { AgentsFeed } from '../data/types'
-import { BODY, EYES, FAMILY, type Shape } from '../ui/BotMark'
+import { BODY, FAMILY, type Shape } from '../ui/BotMark'
+import { eyeInk, eyePaths } from '../ui/eyes'
 import { LiveBot, type Habit } from '../ui/LiveBot'
 import { Roll } from '../ui/Roll'
 import { Page, Section } from './Page'
@@ -376,7 +377,7 @@ const tickerFrom = (name: string) => name.toUpperCase().replace(/[^A-Z0-9]/g, ''
 // The bot drawn as a square coin picture, used until the owner uploads their own.
 function botImage(look: number) {
   const f = FAMILY[look]
-  const eyes = EYES.map(([cx, cy]) => `<rect x="${cx - 5.5}" y="${cy - 12.5}" width="11" height="25" rx="5.5" fill="#fff" transform="rotate(-27 ${cx} ${cy})"/>`).join('')
+  const eyes = eyePaths(f.shape, 0.3, -0.2).map((d) => `<path d="${d}" fill="${eyeInk(f.color)}"/>`).join('')
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-14 -14 128 128"><rect x="-14" y="-14" width="128" height="128" fill="#f2f3f5"/><path d="${BODY[f.shape]}" fill="${f.color}"/>${eyes}</svg>`
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
