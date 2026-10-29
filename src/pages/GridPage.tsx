@@ -70,20 +70,12 @@ function check(d: Draft) {
 }
 
 export function GridPage({ grid }: { grid: AgentsFeed }) {
-  const [d, setD] = useState<Draft>(() => {
-    try {
-      return { ...EMPTY, ...(JSON.parse(sessionStorage.getItem(DRAFT_KEY) || '') as Partial<Draft>) }
-    } catch {
-      return EMPTY
-    }
-  })
+  // the form starts empty every time: leaving the page or reloading resets it, so an abandoned
+  // launch never leaves anything half-filled behind
+  const [d, setD] = useState<Draft>(EMPTY)
   useEffect(() => {
-    try {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d))
-    } catch {
-      /* private mode */
-    }
-  }, [d])
+    try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* private mode */ }
+  }, [])
   const [image, setImage] = useState<{ url: string; name: string } | null>(null)
   const [agentWallet, setAgentWallet] = useState<AgentWalletSession | null>(null)
   const [owner, setOwner] = useState<OwnerWallet | null>(null)
@@ -321,7 +313,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
                   : status === null
                   ? 'checking the launchpad'
                   : !status.open
-                    ? `${status.reason ?? 'launching is closed right now.'} your draft stays saved in this tab, except the picture.`
+                    ? `${status.reason ?? 'launching is closed right now.'}`
                     : Object.keys(errs).length
                         ? 'fill in the fields marked above to launch.'
                         : 'review the launch and locked fee split in your wallet. trading requires separate execution readiness.')}

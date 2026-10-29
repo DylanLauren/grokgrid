@@ -122,3 +122,17 @@ export function toHash(r: unknown): Record<string, string> {
   for (let i = 0; i < a.length; i += 2) o[a[i]] = a[i + 1]
   return o
 }
+
+// Public reads are served from the CDN; only cache misses reach a function. A visitor who
+// busts the cache on purpose (random query strings) gets cut off before any chain or market
+// lookup runs. Fails open: a limiter outage never takes the site down.
+export async function readLimited(req: Request | undefined, name: string, perMinute = 180) {
+  if (!req || !hasStore()) return null
+  const ip = (req.headers.get('x-real-ip') || req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown').trim().slice(0, 64)
+  const k = `gg:lim:read:${name}:${ip}:${Math.floor(Date.now() / 60_000)}`
+  try {
+    const [n] = await redis(['INCR', k], ['EXPIRE', k, 90])
+    if (Number(n) > perMinute) return new Response(JSON.stringify({ error: 'Too many requests. Wait a minute.' }), { status: 429, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Retry-After': '60' } })
+  } catch { /* fail open */ }
+  return null
+}

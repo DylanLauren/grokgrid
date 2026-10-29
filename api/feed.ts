@@ -1,11 +1,13 @@
 import { chainCurve } from './_curve.js'
 import { curveFrom, tally } from './_tally.js'
 import { tradeMcs } from './_trademc.js'
-import { balances, hasStore, HOUSE_WALLET, json, markets, parse, redis, solUsd, toHash } from './_lib.js'
+import { balances, hasStore, HOUSE_WALLET, json, markets, parse, redis, solUsd, toHash, readLimited } from './_lib.js'
 
 // The house bot's calls and wallet curve. Answers mode "demo" until Grok Bot has
 // posted its first trade, and the site plays the labelled demo story instead.
-export async function GET() {
+export async function GET(req?: Request) {
+  const slow = await readLimited(req, 'feed')
+  if (slow) return slow
   if (!hasStore()) return json({ mode: 'demo' })
   const [calls, curve, stats] = await redis(['LRANGE', 'gg:calls:house', 0, 199], ['LRANGE', 'gg:curve:house', -500, -1], ['HGETALL', 'gg:stats:house'])
   const list = ((calls as string[]) ?? []).map((c) => parse<{ mint: string; symbol: string; name: string; image?: string; side: 'buy' | 'sell'; spentSol: number; sizeTokens?: number; ts: number }>(c)).filter((c): c is NonNullable<typeof c> => !!c)
