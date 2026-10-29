@@ -31,3 +31,13 @@ test('the watcher fires the strategy exits from a quote alone, sells only, and n
   assert.equal(watch('1700000').proposals[0].reason, 'take-profit') // +70%
   assert.deepEqual(watch('1050000').proposals, []) // +5%: hold
 })
+
+test('a quote-triggered exit needs two agreeing checks a few seconds apart', async () => {
+  const { confirmExit, CONFIRM_WINDOW_MS } = await import('../scripts/exit-watcher-core.mjs')
+  const first = confirmExit({}, MINT, 'stop-loss', now)
+  assert.equal(first.fire, false); assert.deepEqual(first.pending, { reason: 'stop-loss', at: now })
+  assert.equal(confirmExit({ [MINT]: first.pending }, MINT, 'stop-loss', now + 5000).fire, true)
+  assert.equal(confirmExit({ [MINT]: first.pending }, MINT, 'take-profit', now + 5000).fire, false) // different trigger: start over
+  assert.equal(confirmExit({ [MINT]: first.pending }, MINT, 'stop-loss', now + CONFIRM_WINDOW_MS + 1).fire, false) // too old
+  assert.equal(confirmExit({ [MINT]: first.pending }, MINT, 'stop-loss', now).fire, false) // same instant does not count
+})

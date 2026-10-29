@@ -19,7 +19,7 @@ import { connect, quoteSell } from './pump-chain.mjs';
 import { validateTradingPolicy, planIntent, executes } from './trading-policy.mjs';
 import { withTradingStore } from './trading-store.mjs';
 import { action } from './runtime-ingest.mjs';
-import { quotePrices } from './exit-watcher-core.mjs';
+import { quotePrices, confirmExit } from './exit-watcher-core.mjs';
 
 const run = promisify(execFile);
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
@@ -40,8 +40,10 @@ const exists = p => access(p).then(() => true, () => false);
 async function tick(conn) {
   const now = Date.now();
   const policy = validateTradingPolicy(await json(join(root, 'trading-config.json')));
-  const c = validateStrategyConfig({ ...DEFAULT_STRATEGY, ...await json(join(root, 'strategy-config.json')), mode: 'live' });
-  if (!executes(policy) || (policy.stopFile && await exists(policy.stopFile))) return { state: 'idle', reason: executes(policy) ? 'stop-file' : 'observe-only' };
+  const c = validateStrategyConfig({ ...DEFAULT_STRATEGY, ...await json(join(root, 'strategy-config.json')) });
+  // Same gates as the live strategy: live mode, execute mode, a dynamic allowlist, no STOP file.
+  if (c.mode !== 'live') return { state: 'idle', reason: 'strategy-paper' };
+  if (!executes(policy) || policy.allowedMints !== 'dynamic' || (policy.stopFile && await exists(policy.stopFile))) return { state: 'idle', reason: executes(policy) ? 'stop-file-or-static-allowlist' : 'observe-only' };
   const positions = await json(join(root, 'trading-positions.json'));
   if (!positions?.complete || positions.wallet !== policy.wallet) return { state: 'idle', reason: 'positions-unavailable' };
   const held = positions.positions.filter(p => BigInt(p.spendableTokenUnits) > 0n);
@@ -58,9 +60,13 @@ async function tick(conn) {
   let sold = null;
   await withTradingStore(join(root, 'trading'), policy, async s => {
     const planned = livePlan({ tradingState: s, policy, c, peaks, entries: live.entries || {}, positions, market, now, liquidating: false });
-    await savePrivate('exit-watcher-state.json', { peaks: planned.peaks, observedAt: now });
     const sell = planned.proposals.find(p => p.side === 'sell');
-    if (!sell) return s;
+    // Two consecutive checks must agree before a quote-triggered sell is planned.
+    const pending = {};
+    let confirmed = false;
+    if (sell) { const r = confirmExit(mine.pending, sell.mint, sell.reason, now); confirmed = r.fire; if (r.pending) pending[sell.mint] = r.pending; }
+    await savePrivate('exit-watcher-state.json', { peaks: planned.peaks, pending, observedAt: now });
+    if (!sell || !confirmed) return s;
     const { reason, ...proposal } = sell;
     try { s = planIntent(s, policy, proposal, observation, null, now, positions); sold = { mint: sell.mint, reason }; } catch (e) { sold = { mint: sell.mint, reason, refused: String(e?.message || e).slice(0, 80) }; }
     return s;

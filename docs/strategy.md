@@ -49,8 +49,9 @@ The market scan runs about once a minute, and a memecoin can fall through a −2
 `scripts/exit-watcher.mjs` (launchd `fun.grokgrid.exit-watcher`, always running) closes that gap:
 - **Every 5 seconds:** it gets an on-chain sell quote for each coin the house holds. The quote is what selling would return now, net of pump.fun fees.
 - **Same rules:** it runs those prices through the strategy's own exit rules (`livePlan`, sells only): take-profit, stop-loss, trailing stop and max hold.
+- **Confirmed twice:** a quote-triggered exit is planned only when two checks in a row (5 seconds apart, within 20 seconds) agree, so one manipulated or glitched quote cannot force a sale.
 - **Sell at once:** a sell it plans goes into the house trading journal, and the trading worker is started immediately to sign it.
-- **Limits:** it never buys, never signs and changes no limits. It keeps its own peak prices in `exit-watcher-state.json`. The STOP file and observe-only mode pause it. Status is in `exit-watcher-status.json`.
+- **Limits:** it never buys, never signs and changes no limits. It keeps its own peak prices in `exit-watcher-state.json`. It runs only when the strategy is live, the house is in execute mode with a dynamic allowlist and there is no STOP file. Status is in `exit-watcher-status.json`.
 
 ## Heartbeats
 
