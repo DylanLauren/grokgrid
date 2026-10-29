@@ -3,15 +3,16 @@
 // coin the house is trading (or its profile when idle), stays phone size and out of full screen,
 // has no scrollbar, and the feed resumes if it stopped for a window problem.
 // Touches only that one window and never reads page contents. launchd keeps it running: a full
-// check every 30 seconds, and the scrollbar style re-applied within about 2 seconds of a reload.
+// check every 30 seconds or as soon as the house trades or calls out a coin, and the scrollbar
+// style re-applied within about 2 seconds of a reload.
 //   node scripts/phone-guardian.mjs [--once]
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFile, writeFile, rename, unlink, access } from 'node:fs/promises';
+import { readFile, writeFile, rename, unlink, access, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { DEFAULT_GUARDIAN, HIDE_SCROLLBAR_JS, windowFixes, shouldResume } from './phone-guardian-core.mjs';
-import { FOLLOW_FILE, followMints, targetPage } from './phone-follow-core.mjs';
+import { FOLLOW_FILE, followMints, targetPage, calloutMint } from './phone-follow-core.mjs';
 
 const run = promisify(execFile);
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
@@ -32,7 +33,8 @@ async function tick() {
   const follow = { mints, updatedAt: now };
   const ftmp = join(root, `.${FOLLOW_FILE}.tmp`);
   await writeFile(ftmp, JSON.stringify(follow) + '\n', { mode: 0o600 }); await rename(ftmp, join(root, FOLLOW_FILE));
-  const target = targetPage(mints, cfg.browserUrl);
+  const called = calloutMint(await read('pump-callouts.json', null), mints, now);
+  const target = targetPage(mints, cfg.browserUrl, called);
   let w = null;
   try {
     const [x1, y1, x2, y2] = (await osa(`tell application "Google Chrome" to get bounds of (${pick})`)).split(', ').map(Number);
@@ -57,7 +59,7 @@ async function tick() {
   if (w && !done.some(d => d.endsWith('-failed')) && shouldResume({ pausedFile, appState: app.state, supervisorState: sup.state, supervisorReason: sup.reason })) {
     await unlink(paused).catch(() => {}); resumed = true; // same as the phone app's "Resume" menu item
   }
-  const status = { observedAt: new Date(now).toISOString(), windowFound: !!w, showing: w?.url === target ? target : w?.url ?? null, target, fixes: done, resumed };
+  const status = { observedAt: new Date(now).toISOString(), windowFound: !!w, calledOut: called, showing: w?.url === target ? target : w?.url ?? null, target, fixes: done, resumed };
   const tmp = join(root, '.phone-guardian-status.json.tmp');
   await writeFile(tmp, JSON.stringify(status, null, 2) + '\n', { mode: 0o600 }); await rename(tmp, join(root, 'phone-guardian-status.json'));
   console.log(JSON.stringify(status));
@@ -73,8 +75,12 @@ async function keepScrollbarHidden() {
 
 async function main() {
   if (process.argv.includes('--once')) return tick();
+  // A new trade or callout (the journal or callout ledger changed) moves the phone right away.
+  const changed = async () => (await Promise.all(['trading/trading-journal.json', 'pump-callouts.json'].map(f => stat(join(root, f)).then(x => x.mtimeMs, () => 0)))).join();
+  let seen = '';
   for (let next = 0; ; await new Promise(r => setTimeout(r, 1500))) {
-    if (Date.now() >= next) { next = Date.now() + 30_000; await tick().catch(e => console.error(`phone guardian: ${String(e?.message || e).slice(0, 120)}`)); }
+    const now = await changed();
+    if (Date.now() >= next || now !== seen) { seen = now; next = Date.now() + 30_000; await tick().catch(e => console.error(`phone guardian: ${String(e?.message || e).slice(0, 120)}`)); }
     else await keepScrollbarHidden();
   }
 }

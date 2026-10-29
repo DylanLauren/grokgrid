@@ -6,6 +6,7 @@
 export const FOLLOW_FILE = 'phone-follow.json';
 export const FOLLOW_TTL_MS = 120_000;     // a list older than this allows only the profile
 export const RECENT_TRADE_MS = 180_000;   // keep showing a coin this long after its last trade
+export const CALLOUT_SHOW_MS = 30_000;    // show a coin this long after the house calls it out
 const MINT = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const COIN = /^https:\/\/pump\.fun\/coin\/([1-9A-HJ-NP-Za-km-z]{32,44})$/;
 
@@ -24,8 +25,19 @@ export function followMints(tradingState, now) {
   return out.sort((a, b) => b.at - a.at).map(x => x.mint);
 }
 
-/** The page the phone should show now: the newest followed coin, else the profile. */
-export const targetPage = (mints, browserUrl) => (mints.length ? coinUrl(mints[0]) : browserUrl);
+/**
+ * A coin the house just called out on pump.fun, if any: the latest posted callout in the
+ * callout ledger, within CALLOUT_SHOW_MS, for a coin already on the follow list (so only coins
+ * the house itself traded). The phone shows it first so viewers see the callout land.
+ */
+export function calloutMint(ledger, mints, now) {
+  const posted = (ledger?.calls || []).filter(c => c?.outcome === 'posted' && Number.isSafeInteger(c.at) && now - c.at >= 0 && now - c.at < CALLOUT_SHOW_MS);
+  const last = posted.sort((a, b) => b.at - a.at)[0];
+  return last && mints.includes(last.mint) ? last.mint : null;
+}
+
+/** The page the phone should show now: a just-called coin, else the newest followed coin, else the profile. */
+export const targetPage = (mints, browserUrl, called = null) => (called ? coinUrl(called) : mints.length ? coinUrl(mints[0]) : browserUrl);
 
 /** A page is allowed if it is the profile, or a coin page on a fresh follow list. */
 export function pageAllowed(url, browserUrl, follow, now) {
