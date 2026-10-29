@@ -64,13 +64,15 @@ function Body({ call, compact }: { call: Call; compact?: boolean }) {
           </div>
           <div className="cc-foot">
             <span><i>{call.side === 'sell' ? 'SOL in' : 'SOL out'}</i>{call.spentSol} SOL</span>
-            {call.entryMc !== null && call.nowMc !== null && <span><i>Avg entry</i>{mc(call.entryMc)} → {mc(call.nowMc)} MC</span>}
+            {call.tradeMc ? <span><i>At</i>{call.tradeMcApprox ? '≈' : ''}{mc(call.tradeMc)} MC</span> : call.entryMc !== null && call.nowMc !== null && <span><i>Avg entry</i>{mc(call.entryMc)} → {mc(call.nowMc)} MC</span>}
+            {call.side === 'sell' && typeof call.pnlSol === 'number' && <span><i>P&L</i><em className={call.pnlSol >= 0 ? 'gain' : 'loss'}>{call.pnlSol >= 0 ? '+' : ''}{call.pnlSol.toFixed(5)} SOL</em></span>}
           </div>
         </div>
         {(call.sample || (!compact && call.verified && call.verification === 'wallet-balance-movements')) && (
           <div className="cc-acts">
             {call.sample && <span className="cc-tag">sample trade</span>}
-            {!compact && call.verified && call.verification === 'wallet-balance-movements' && <span className="cc-tag ok" title="Finalized wallet token and SOL movements checked; profit is not verified">wallet flows checked</span>}
+            {/* the whole card already links to the transaction, so this reads as its button */}
+            {!compact && call.verified && call.verification === 'wallet-balance-movements' && call.sig && <span className="cc-tx" title="Open this transaction on Solscan"><img src="/brands/solscan.svg" alt="" width={14} height={14} />check tx</span>}
           </div>
         )}
       </div>
