@@ -16,7 +16,7 @@ class WalletLoadBoundary extends Component<{ children: ReactNode }, { error: str
   render() {
     if (!this.state.error) return <div key={this.state.key}>{this.props.children}</div>
     return <div role="alert" className="gd-note bad">
-      <p>Wallet sign-in couldn’t load. If you use Brave or an ad blocker, allow grokgrid.fun (it blocks the sign-in service), then reset.</p>
+      <p>Wallet sign-in hit a problem. Try again, or reset sign-in. If it keeps happening, send us the line below.</p>
       <p className="mono"><small>{this.state.error}</small></p>
       <button type="button" className="btn ghost" onClick={() => this.setState((s) => ({ error: null, key: s.key + 1 }))}>Try again</button>{' '}
       <button type="button" className="btn ghost" onClick={this.reset}>Reset sign-in</button>
@@ -36,6 +36,7 @@ export function AgentWalletSetup(props: AgentWalletSetupProps & { owner: OwnerWa
   // Privy already connected Phantom for sign-in, so this reconnect is silent; it gives the
   // launch the same wallet to approve with, and refuses a different Phantom account.
   const onSignedIn = useCallback(async (phantom: string | null) => {
+    if (latest.current === phantom) return
     latest.current = phantom
     setErr('')
     if (!phantom) return onOwnerChange(null)
