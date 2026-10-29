@@ -60,7 +60,7 @@ ${box(1000, 130, 340, 'Solana / pump.fun', ['bonding curve + PumpSwap', '80/20 c
 ${box(480, 420, 400, 'The Mac runtime (launchd)', ['observer · trading worker', 'strategy (paper → live)', 'agent runner · buy-and-burn', 'callouts · X posts · heartbeats'])}
 ${box(48, 360, 280, 'Live phone', ['pinned pump.fun window', 'frames + LiveKit video', 'on demand: "watch me trade"'])}
 ${box(480, 720, 400, 'Signing', ['house: local key (0600)', 'user bots: Privy server wallets', 'policy-capped, journaled first'])}
-${box(1060, 680, 300, 'pump.fun Callouts', ['GrokGrid profile', '1 per 6h, held coins only'])}
+${box(1060, 680, 300, 'pump.fun Callouts', ['GrokGrid profile', 'every coin he buys'])}
 ${box(1060, 500, 300, 'X account', ['trade cards + clips', 'burns · launches · recaps'])}`, 1400, 860)
 }
 
