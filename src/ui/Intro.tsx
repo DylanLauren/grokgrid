@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { soundPref, startJazz } from '../lib/jazz'
+import { preloadJazz, soundPref, startJazz } from '../lib/jazz'
 import { BODY, FAMILY, type Shape } from './BotMark'
 import { eyeInk, eyePaths } from './eyes'
 import './intro.css'
@@ -46,6 +46,8 @@ export function Intro({ onDone }: { onDone: () => void }) {
   useEffect(() => { done.current = onDone })
 
   useEffect(() => {
+    // the band's recorded notes start downloading while the friends fly in
+    if (soundPref()) preloadJazz().catch(() => {})
     const canvas = ref.current
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return done.current()
