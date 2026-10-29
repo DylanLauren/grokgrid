@@ -61,7 +61,7 @@ export function Addresses() {
         <div key={k} className="card">
           <span>{k}</span>
           {v ? (
-            <a className="mono" href={solscan(kind, v)} target="_blank" rel="noreferrer" aria-label={`${k} on Solscan`}>{short(v)} ↗</a>
+            <a className="mono" href={solscan(kind, v)} target="_blank" rel="noreferrer" aria-label={`${k} on Solscan`} title="View on Solscan"><img className="addr-sx" src="/brands/solscan.png" alt="" width={14} height={14} />{short(v)}</a>
           ) : (
             <span className="mono dim">not live yet</span>
           )}
