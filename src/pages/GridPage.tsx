@@ -47,6 +47,7 @@ const EMPTY: Draft = { look: 3, name: '', botName: '', ticker: '', description: 
 const DRAFT_KEY = 'gg-launch-draft'
 const MAX_TRADE = 0.05 // the signer policy's per-buy cap: a higher max could never be used
 const LIMITS = { name: 32, botName: 32, ticker: 10, description: 600, strategy: 140 }
+const RESERVED = ['house', 'housetrader', 'housebot', 'grokgrid', 'grokgridofficial', 'official', 'admin'] // matches api/_launch.ts
 const bytes = (s: string) => new TextEncoder().encode(s).length
 
 // What a field says is wrong with it, or nothing.
@@ -55,6 +56,7 @@ function check(d: Draft) {
   if (!d.name.trim()) e.name = 'give it a name'
   else if (bytes(d.name) > LIMITS.name) e.name = `${LIMITS.name} bytes at most`
   if (bytes(d.botName) > LIMITS.botName) e.botName = `${LIMITS.botName} bytes at most`
+  else if (RESERVED.includes((d.botName.trim() || d.name).toLowerCase().replace(/[^a-z0-9]/g, ''))) e.botName = 'that name belongs to the house'
   if (!d.ticker) e.ticker = 'pick a ticker'
   else if (!/^[A-Z0-9]{2,10}$/.test(d.ticker)) e.ticker = '2 to 10 letters or numbers'
   if (bytes(d.description) > LIMITS.description) e.description = `${LIMITS.description} bytes at most`

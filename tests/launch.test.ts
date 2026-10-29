@@ -23,6 +23,9 @@ test('a bot can have its own name, and shares the coin name when left blank', ()
   assert.equal(cleanDraft({ ...good, botName: '  Night Owl ' }).botName, 'Night Owl')
   assert.equal(metadataJson(cleanDraft({ ...good, botName: 'Night Owl' }), 'M').name, 'Night Shift') // the coin keeps its own name
   assert.throws(() => cleanDraft({ ...good, botName: 'x'.repeat(33) }), /Bot name/)
+  assert.throws(() => cleanDraft({ ...good, botName: 'House  Trader!' }), /belongs to the house/)
+  assert.throws(() => cleanDraft({ ...good, name: 'GrokGrid' }), /belongs to the house/) // a blank bot name takes the coin's
+  assert.equal(cleanDraft({ ...good, botName: 'House of Degens' }).botName, 'House of Degens')
 })
 
 test('metadata points pump.fun at our picture and the bot\'s own GrokGrid profile', () => {
