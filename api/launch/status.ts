@@ -12,6 +12,11 @@ export async function GET(req?: Request) {
   if(req){const slow=launcher?await limited(req,'owner-status',30,true):await limited(req,'status',30);if(slow)return slow}
   const [open] = await redis(['SRANDMEMBER', OPEN, 2]).catch(() => [[]])
   await Promise.all(((open as string[]) ?? []).filter(isAddress).map((m) => finishLaunch(m).catch(() => null)))
-  const ownerState=launcher?await launchOwnerState(launcher).catch(()=>({state:'review' as const})):undefined
+  let ownerState=launcher?await launchOwnerState(launcher).catch(()=>({state:'review' as const})):undefined
+  // this wallet's own held launch is settled first, so a dropped one frees it right away
+  if(launcher&&ownerState&&ownerState.state!=='available'&&ownerState.state!=='confirmed'&&'mint' in ownerState&&isAddress(ownerState.mint)){
+    await finishLaunch(ownerState.mint).catch(()=>null)
+    ownerState=await launchOwnerState(launcher).catch(()=>({state:'review' as const}))
+  }
   return noStore({ ...await launchStatus(), ...(ownerState?{ownerState}:{}) })
 }

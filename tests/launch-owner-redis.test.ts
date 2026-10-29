@@ -96,3 +96,14 @@ test('real Redis: unsafe stored event timestamps cannot commit an unreadable out
  assert.equal(await evalLua(r,FINALIZE_OWNER_LUA,finishKeys(mintA),finishArgs(mintA)),'!event-conflict')
  assert.equal(await r.command('EXISTS',ownerKeys()[1]),0);assert.equal(await r.command('ZCARD','gg:launch:event-order'),0)
 }))
+
+test('real Redis: a dead signed launch frees only its own hold so the owner can launch again',{skip:!binary},async()=>fixture(async r=>{
+ const {RELEASE_LUA}=await import('../api/_finish.ts')
+ await r.command('SET',`gg:launch:${mintA}`,prepared(mintA),'EX',900)
+ assert.equal(await claim(r,mintA),'claimed')
+ assert.equal(JSON.parse(await evalLua(r,OWNER_CHECK_LUA,ownerKeys(),[owner])).state,'reserved')
+ assert.equal(await evalLua(r,RELEASE_LUA,[`gg:launch:${mintA}`,ownerKeys()[0],'gg:launch:open'],['stale-record',mintA,'{"phase":"released"}']),0)
+ assert.equal(await evalLua(r,RELEASE_LUA,[`gg:launch:${mintA}`,ownerKeys()[0],'gg:launch:open'],[recovery(mintA),mintA,'{"phase":"released"}']),1)
+ assert.equal(JSON.parse(await evalLua(r,OWNER_CHECK_LUA,ownerKeys(),[owner])).state,'available')
+ assert.equal(await r.command('SISMEMBER','gg:launch:open',mintA),0)
+}))

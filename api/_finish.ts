@@ -8,7 +8,7 @@ import { ownerKeys } from './_launch-owner.js'
 import { FINALIZE_OWNER_LUA } from './_launch-finalize.js'
 import { launchProgress, verifyLaunch } from './_pump.js'
 
-type Pending = { routingVersion?: number; phase?: string; privyWalletId?: string; draft: Draft; launcher: string; bot: string; burn: string; signature: string | null; raw?: string; lastValidBlockHeight?: number }
+type Pending = { routingVersion?: number; phase?: string; privyWalletId?: string; draft: Draft; launcher: string; bot: string; burn: string; signature: string | null; authorizedSignature?: string; raw?: string; lastValidBlockHeight?: number }
 type Result = { status: number; body: Record<string, unknown> }
 
 export const OPEN = 'gg:launch:open'
@@ -22,16 +22,22 @@ export async function finishLaunch(mint: string): Promise<Result> {
   }
 
   if(!routable(p))return out({error:'This older launch requires review. Its wallet reservation has been retained.'},409)
+  if (p.phase === 'released') return out({ error: RELEASED, released: true }, 410)
+  // A signed launch that can never land (its blockhash expired unsent, or it failed on chain,
+  // which undoes the whole transaction) frees the wallet, so one dropped approval never
+  // blocks the owner from launching again.
+  const sig = p.signature ?? p.authorizedSignature
+  if (sig && p.raw && (p.phase === 'setup-pending' || p.phase === 'launch-submitted')) {
+    const state = await launchProgress(p.raw, sig, p.lastValidBlockHeight ?? 0)
+    if ((state === 'failed' || state === 'expired') && !(await verifyLaunch(mint, p.bot, p.burn)).ok) {
+      const [freed] = await redis(['EVAL', RELEASE_LUA, 3, keys.pending(mint), ownerKeys.hold(p.launcher), OPEN, raw as string, mint, JSON.stringify({ ...p, phase: 'released', releasedAt: Date.now() })])
+      if (Number(freed) === 1) return out({ error: RELEASED, released: true }, 410)
+    }
+  }
   if (!p.signature) return out({ retry: true }, 202)
   if(p.phase!=='launch-submitted')return out({error:'This signed launch setup requires review before reconciliation.'},409)
   const check = await verifyLaunch(mint, p.bot, p.burn)
-  if (!check.ok && check.reason === 'not on chain yet') {
-    if (p.signature && p.raw && p.lastValidBlockHeight) {
-      const state = await launchProgress(p.raw, p.signature, p.lastValidBlockHeight)
-      if (state === 'failed' || state === 'expired') return out({ error: 'This signed launch needs chain reconciliation before its wallet can be reused. The reservation remains held.' }, 409)
-    }
-    return out({ retry: true }, 202)
-  }
+  if (!check.ok && check.reason === 'not on chain yet') return out({ retry: true }, 202)
   if (!check.ok) return out({ error: check.reason }, 400)
   // The coin being on chain isn't enough: it must have come from the transaction we prepared
   // and checked, or someone could create the same mint with their own name and link.
@@ -70,5 +76,13 @@ export async function finishLaunch(mint: string): Promise<Result> {
 // funded a separate bot wallet in the same approval.
 export const routable = (p: { routingVersion?: number; bot?: string; launcher?: string }) =>
   (p.routingVersion === 2 && p.bot === p.launcher) || (p.routingVersion === 3 && typeof p.bot === 'string' && p.bot !== p.launcher)
+
+const RELEASED = "That launch didn't go through, so nothing was created. You can launch again."
+// Only the exact record we read is released, and only this mint's hold on the owner.
+export const RELEASE_LUA = `if redis.call('GET',KEYS[1])~=ARGV[1] then return 0 end
+if redis.call('GET',KEYS[2])==ARGV[2] then redis.call('DEL',KEYS[2]) end
+redis.call('SREM',KEYS[3],ARGV[2])
+redis.call('SET',KEYS[1],ARGV[3],'EX',86400)
+return 1`
 
 const out = (body: Record<string, unknown>, status = 200): Result => ({ status, body })

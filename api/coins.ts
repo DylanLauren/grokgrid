@@ -1,4 +1,4 @@
-import { json, markets } from './_lib.js'
+import { json, markets, readLimited } from './_lib.js'
 
 // Real pump.fun coins with their logos and live market data, for the sample grid shown
 // before the first bot launches: the coins DexScreener is boosting right now, plus a
@@ -25,7 +25,9 @@ async function boosted(): Promise<string[]> {
   return out
 }
 
-export async function GET() {
+export async function GET(req?: Request) {
+  const slow = await readLimited(req, 'coins')
+  if (slow) return slow
   const mints = [...new Set([...STEADY, ...(await boosted())])].slice(0, 30)
   const m = await markets(mints)
   const coins = Object.entries(m)

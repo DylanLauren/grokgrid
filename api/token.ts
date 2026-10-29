@@ -1,9 +1,11 @@
-import { balances, HOUSE_WALLET, json, MAIN_MINT, markets, rpc } from './_lib.js'
+import { balances, HOUSE_WALLET, json, MAIN_MINT, markets, rpc, readLimited } from './_lib.js'
 import { burnedTokens, readMint, START_SUPPLY } from './_token.js'
 
 // Public, read-only proof numbers for $GRID: supply and burns from the mint account,
 // treasury and burn wallets from the chain, price from DexScreener.
-export async function GET() {
+export async function GET(req?: Request) {
+  const slow = await readLimited(req, 'token')
+  if (slow) return slow
   const burnWallet = process.env.VITE_BURN_WALLET || ''
   const [bal, acc, mkt] = await Promise.all([
     balances([HOUSE_WALLET, burnWallet]),

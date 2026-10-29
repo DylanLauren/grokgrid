@@ -1,7 +1,7 @@
 import { beats, fresh } from './_heartbeat.js'
 import { chainCurve } from './_curve.js'
 import { curveFrom, tally } from './_tally.js'
-import { balances, hasStore, HOUSE_WALLET, json, MAIN_MINT, markets, parse, redis, solUsd, toHash } from './_lib.js'
+import { balances, hasStore, HOUSE_WALLET, json, MAIN_MINT, markets, parse, redis, solUsd, toHash, readLimited } from './_lib.js'
 import { tradeMcs } from './_trademc.js'
 
 // Registry entry, written once by /api/ingest when Grok Bot launches an agent's coin.
@@ -117,7 +117,9 @@ export async function grid(only?: string) {
   return { agents, records, price, solUsd: price }
 }
 
-export async function GET() {
+export async function GET(req?: Request) {
+  const slow = await readLimited(req, 'agents')
+  if (slow) return slow
   if (!hasStore()) return json({ mode: 'demo' })
   const g = await grid()
   if (!g) return json({ mode: 'demo' })
