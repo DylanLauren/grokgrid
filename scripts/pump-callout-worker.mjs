@@ -20,7 +20,7 @@ const now = Date.now();
 let intent = null;
 const policy = validateTradingPolicy(await read('trading-config.json', null));
 const journal = await read('trading/trading-journal.json', null);
-if (journal) intent = pickCallout(validateTradingState(journal.state, policy), await read('trading-positions.json', null));
+if (journal) intent = pickCallout(validateTradingState(journal.state, policy), await read('trading-positions.json', null), ledger, now);
 // A dry run may name any mint to probe eligibility; it never creates.
 const mint = dryRun && args.includes('--mint') ? args[args.indexOf('--mint') + 1] : intent?.mint;
 const gate = dryRun ? (mint ? 'ok' : 'nothing-held') : calloutGate(ledger, cfg, intent, now);

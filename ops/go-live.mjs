@@ -125,7 +125,7 @@ try {
   if (cmd === 'house') await house();
   else if (cmd === 'buyback') await buyback(arg);
   else if (cmd === 'runner') await runner();
-  else if (cmd === 'callouts') await flag('callout-config.json', 'pumpCalloutsEnabled', arg, 'The GrokGrid pump.fun profile will make a public Callout (max 1 per 6h) for coins the house really holds.', 'go live callouts');
+  else if (cmd === 'callouts') await flag('callout-config.json', 'pumpCalloutsEnabled', arg, 'The GrokGrid pump.fun profile will make a public Callout for every coin the house really holds.', 'go live callouts');
   else if (cmd === 'x') await flag('x-config.json', 'xPostsEnabled', arg, 'Real trades will be posted publicly to X.', 'go live x');
   else if (cmd === 'stop') touch('STOP');
   else if (cmd === 'resume') remove('STOP');
