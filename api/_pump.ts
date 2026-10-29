@@ -11,6 +11,7 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  SystemProgram,
   TransactionMessage,
   VersionedMessage,
   VersionedTransaction,
@@ -134,7 +135,7 @@ export type Prepared = {
   setup: { table: string; expected: string[]; txs: string[]; messages: string[] } | null
 }
 
-export async function prepareLaunch(o: { launcher: string; mint: string; name: string; ticker: string; uri: string; firstBuy: string; bot: string; burn: string }): Promise<Prepared> {
+export async function prepareLaunch(o: { launcher: string; mint: string; name: string; ticker: string; uri: string; firstBuy: string; bot: string; burn: string; fundLamports?: bigint }): Promise<Prepared> {
   const user = key(o.launcher, 'wallet')
   const mint = key(o.mint, 'mint')
   if (!PublicKey.isOnCurve(user.toBytes()) || !PublicKey.isOnCurve(mint.toBytes())) throw Error('Wallet and mint must be signing keys.')
@@ -170,6 +171,12 @@ export async function prepareLaunch(o: { launcher: string; mint: string; name: s
     await PUMP_SDK.createFeeSharingConfig({ creator: user, mint, pool: null }),
     await PUMP_SDK.updateFeeShares({ authority: user, mint, currentShareholders: [user], newShareholders: split, bondingCurveComplete: false }),
   ]
+  // Launched from the owner's own wallet: the same approval funds the bot's trading wallet.
+  const fund = o.fundLamports ?? 0n
+  if (fund > 0n) {
+    if (o.bot === o.launcher) throw Error('A bot funds itself only from a separate owner wallet.')
+    ixs.push(SystemProgram.transfer({ fromPubkey: user, toPubkey: key(o.bot, 'bot'), lamports: fund }))
+  }
 
   if (lamports > 0n) {
     const buyback = global.buybackFeeRecipients.find((k) => !k.equals(PublicKey.default))
@@ -203,7 +210,7 @@ export async function prepareLaunch(o: { launcher: string; mint: string; name: s
 
   if (setup) {
     // The table isn't on chain yet so the launch can't be dry run; check the wallet can pay.
-    if ((await conn.getBalance(user, 'confirmed')) < 0.05e9 + Number(lamports)) throw Error('Not enough SOL in this wallet for the launch and first buy.')
+    if ((await conn.getBalance(user, 'confirmed')) < 0.05e9 + Number(lamports) + Number(fund)) throw Error('Not enough SOL in this wallet for the launch and first buy.')
   } else {
     const sim = await conn.simulateTransaction(tx, { sigVerify: false, commitment: 'confirmed', replaceRecentBlockhash: true })
     if (sim.value.err) {

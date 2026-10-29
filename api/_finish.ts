@@ -21,7 +21,7 @@ export async function finishLaunch(mint: string): Promise<Result> {
     return out({ error: 'This launch record is unavailable or incomplete. Its reservation has not been released and needs review.' }, 409)
   }
 
-  if(p.routingVersion!==2||p.bot!==p.launcher)return out({error:'This older launch requires review. Its wallet reservation has been retained.'},409)
+  if(!routable(p))return out({error:'This older launch requires review. Its wallet reservation has been retained.'},409)
   if (!p.signature) return out({ retry: true }, 202)
   if(p.phase!=='launch-submitted')return out({error:'This signed launch setup requires review before reconciliation.'},409)
   const check = await verifyLaunch(mint, p.bot, p.burn)
@@ -61,9 +61,14 @@ export async function finishLaunch(mint: string): Promise<Result> {
     `gg:mint:${mint}`, ownerKeys.hold(p.launcher), ownerKeys.agent(p.launcher), 'gg:agents', keys.pending(mint),
     keys.image(mint), keys.meta(mint), 'gg:launches', OPEN,
     'gg:launch:event-payloads', 'gg:launch:event-order', 'gg:launch:event-sequence',
-    mint, p.launcher, id, JSON.stringify(rec), JSON.stringify({id,mint,wallet:p.bot,ts:Date.now(),...(p.privyWalletId?{privyWalletId:p.privyWalletId}:{})}), raw as string])
+    mint, p.launcher, id, JSON.stringify(rec), JSON.stringify({id,mint,wallet:p.bot,ts:Date.now(),...(p.privyWalletId?{privyWalletId:p.privyWalletId}:{})}), raw as string, p.bot])
   if (typeof saved !== 'string' || saved.startsWith('!')) return out({ error: 'The owner wallet reservation or launch record needs review.' }, 409)
   return out({ id }, 200)
 }
+
+// v2: the launching wallet is the bot's trading wallet. v3: the owner's own wallet launched and
+// funded a separate bot wallet in the same approval.
+export const routable = (p: { routingVersion?: number; bot?: string; launcher?: string }) =>
+  (p.routingVersion === 2 && p.bot === p.launcher) || (p.routingVersion === 3 && typeof p.bot === 'string' && p.bot !== p.launcher)
 
 const out = (body: Record<string, unknown>, status = 200): Result => ({ status, body })

@@ -66,8 +66,26 @@ export async function svgToImage(svgUrl: string): Promise<string> {
   return canvas.toDataURL('image/png')
 }
 
-export async function launchBot(o: { wallet: WalletLike; launcher: string; walletId: string; accessToken: () => Promise<string | null>; draft: LaunchDraft; image: string; onStep: (i: number) => void }): Promise<{ id: string; mint: string }> {
+const SYSTEM = '11111111111111111111111111111111'
+
+// A top-level System instruction may only be the one transfer that funds this bot.
+export function onlyFunding(tx: import('@solana/web3.js').VersionedTransaction, launcher: string, bot: string, lamports: bigint): boolean {
+  const keys = tx.message.staticAccountKeys
+  const sys = tx.message.compiledInstructions.filter((ix) => keys[ix.programIdIndex]?.toBase58() === SYSTEM)
+  if (lamports === 0n) return sys.length === 0
+  if (sys.length !== 1) return false
+  const ix = sys[0], d = ix.data
+  if (d.length !== 12 || new DataView(d.buffer, d.byteOffset, 12).getUint32(0, true) !== 2) return false
+  const amount = new DataView(d.buffer, d.byteOffset, 12).getBigUint64(4, true)
+  const [from, to] = ix.accountKeyIndexes.map((i) => keys[i]?.toBase58())
+  return amount === lamports && from === launcher && to === bot
+}
+
+export async function launchBot(o: { wallet: WalletLike; launcher: string; bot?: string; fundSol?: number; walletId: string; accessToken: () => Promise<string | null>; draft: LaunchDraft; image: string; onStep: (i: number) => void }): Promise<{ id: string; mint: string }> {
   const { wallet, launcher, walletId, accessToken, draft, image, onStep } = o
+  // Launched from the owner's own wallet, the same approval funds the bot's trading wallet.
+  const bot = o.bot && o.bot !== launcher ? o.bot : undefined
+  const fund = bot ? BigInt(Math.round((o.fundSol ?? 0) * 1e9)) : 0n
   if (!wallet.signTransaction) throw new Error("This wallet can't sign transactions. Try Phantom, Solflare or Backpack.")
   const { Keypair, PublicKey, VersionedTransaction } = await import('@solana/web3.js')
   // The mint key is made here and never leaves this tab. It signs once, then it's gone.
@@ -75,13 +93,13 @@ export async function launchBot(o: { wallet: WalletLike; launcher: string; walle
   const mintAddr = mint.publicKey.toBase58()
 
   onStep(0)
-  await post('/api/launch/asset', { mint: mintAddr, image, launcher, walletId }, (await accessToken()) ?? undefined)
+  await post('/api/launch/asset', { mint: mintAddr, image, launcher, ...(bot ? { bot } : {}), walletId }, (await accessToken()) ?? undefined)
   onStep(1)
-  const prepared = await post<{ tx: string; setup: string[] | null }>('/api/launch/prepare', { mint: mintAddr, launcher, walletId, draft }, (await accessToken()) ?? undefined)
+  const prepared = await post<{ tx: string; setup: string[] | null }>('/api/launch/prepare', { mint: mintAddr, launcher, ...(bot ? { bot, fundSol: o.fundSol } : {}), walletId, draft }, (await accessToken()) ?? undefined)
   const tx = VersionedTransaction.deserialize(fromB64(prepared.tx))
   const keys = tx.message.staticAccountKeys
   const programs = tx.message.compiledInstructions.map((ix) => keys[ix.programIdIndex].toBase58())
-  if (!keys[0].equals(new PublicKey(launcher)) || !keys.some((k) => k.equals(mint.publicKey)) || programs.some((id) => !ALLOWED_PROGRAMS.has(id)))
+  if (!keys[0].equals(new PublicKey(launcher)) || !keys.some((k) => k.equals(mint.publicKey)) || programs.some((id) => !ALLOWED_PROGRAMS.has(id)) || !onlyFunding(tx, launcher, bot ?? launcher, fund))
     throw new Error("The launch didn't match what was asked for, so it wasn't signed.")
   // The site's very first launch also creates the shared lookup table, in the same approval.
   const setup = (prepared.setup ?? []).map((s) => VersionedTransaction.deserialize(fromB64(s)))

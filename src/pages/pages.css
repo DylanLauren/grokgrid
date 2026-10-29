@@ -384,3 +384,8 @@
 .gd-limits summary { cursor: pointer; font-size: 12px; color: var(--paper-50); }
 .gd-limits p { margin: 8px 0; font-size: 13px; }
 @media (max-width: 600px) { .gd-connect-row { flex-direction: column; align-items: stretch; } }
+.gd-owner { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--paper-70); margin-bottom: 12px; }
+.gd-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gain); box-shadow: 0 0 0 3px #3ddc8422; }
+.gd-link { background: none; border: 0; padding: 0; margin-left: 4px; color: var(--paper-50); font: inherit; text-decoration: underline; cursor: pointer; }
+.gd-link:hover { color: var(--paper); }
+.gd-addr small { color: var(--paper-50); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; margin-right: 6px; }
