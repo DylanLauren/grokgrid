@@ -1,18 +1,21 @@
 import { solscan } from '../config'
-import { ago, usd } from '../lib/format'
+import { ago, mc, usd } from '../lib/format'
 import { CoinChip } from './CoinChip'
 import { peek, type PeekCoin } from './CoinPeek'
 
 // Every closed round trip: the sell, what it made, and how long he held.
 // Live sells carry the SOL that came back; the demo story records what went in.
-export interface Trade { ts: number; side: 'buy' | 'sell'; mint: string; symbol: string; name: string; image?: string; hue?: string; spentSol: number; sizeTokens?: number; positionUsd?: number | null; pnlSol?: number | null; pnlUsd: number | null; sig?: string; coin?: { mcUsd: number; vol24hUsd: number; change24h: number } }
-export interface Round { sell: Trade; pnl: number; cost: number; pct: number; held: number | null }
+export interface Trade { ts: number; side: 'buy' | 'sell'; mint: string; symbol: string; name: string; image?: string; hue?: string; spentSol: number; sizeTokens?: number; positionUsd?: number | null; tradeMc?: number; tradeMcApprox?: boolean; pnlSol?: number | null; pnlUsd: number | null; sig?: string; coin?: { mcUsd: number; vol24hUsd: number; change24h: number } }
+export interface Round { sell: Trade; buy?: Trade; pnl: number; cost: number; pct: number; held: number | null }
+
+// The coin's market cap when he traded; ≈ marks an estimate from the fill price.
+export const atMc = (t?: Trade) => (t?.tradeMc ? `${t.tradeMcApprox ? '≈' : ''}${mc(t.tradeMc)}` : '–')
 export function rounds(trades: Trade[], live: boolean, solUsd: number): Round[] {
-  const open = new Map<string, number>() // mint to the first buy of the holding
+  const open = new Map<string, Trade>() // mint to the first buy of the holding
   const out: Round[] = []
   for (const c of [...trades].sort((a, b) => a.ts - b.ts)) {
     if (c.side === 'buy') {
-      if (!open.has(c.mint)) open.set(c.mint, c.ts)
+      if (!open.has(c.mint)) open.set(c.mint, c)
       continue
     }
     const pnl = typeof c.pnlSol === 'number' ? c.pnlSol : c.pnlUsd !== null && solUsd ? c.pnlUsd / solUsd : null
@@ -20,7 +23,7 @@ export function rounds(trades: Trade[], live: boolean, solUsd: number): Round[] 
     open.delete(c.mint)
     if (pnl === null || !Number.isFinite(pnl)) continue
     const cost = live ? c.spentSol - pnl : c.spentSol
-    out.push({ sell: c, pnl, cost, pct: cost > 0 ? (pnl / cost) * 100 : 0, held: start === undefined ? null : c.ts - start })
+    out.push({ sell: c, buy: start, pnl, cost, pct: cost > 0 ? (pnl / cost) * 100 : 0, held: start === undefined ? null : c.ts - start.ts })
   }
   return out
 }
@@ -46,6 +49,8 @@ export function BestWorst({ done, solUsd }: { done: Round[]; solUsd: number }) {
             symbol: c.symbol, name: c.name, image: c.image, hue: c.hue ?? '#5a5a66', tag: label,
             ...(c.coin ?? {}),
             rows: [
+              ['bought at', `${atMc(r.buy)} mc`],
+              ['sold at', `${atMc(c)} mc`],
               ['in', `${r.cost.toFixed(4)} SOL`],
               ['out', `${(r.cost + r.pnl).toFixed(4)} SOL`],
               ['realised', `${sol(r.pnl)} (${r.pct >= 0 ? '+' : ''}${r.pct.toFixed(1)}%)`, r.pnl >= 0 ? 'gain' : 'loss'],
@@ -66,6 +71,7 @@ export function BestWorst({ done, solUsd }: { done: Round[]; solUsd: number }) {
               <b className={`st-bw-pct ${r.pnl >= 0 ? 'gain' : 'loss'}`}>{r.pct >= 0 ? '+' : ''}{r.pct.toFixed(1)}%</b>
               <span className="st-bw-sub mono">
                 <span className={r.pnl >= 0 ? 'gain' : 'loss'}>{sol(r.pnl)}</span>
+                {(r.buy?.tradeMc || c.tradeMc) && <span>{atMc(r.buy)} → {atMc(c)} mc</span>}
                 <span>{usd(Math.abs(r.pnl * solUsd))}</span>
                 {r.held !== null && <span>held {dur(r.held)}</span>}
                 {c.sig && <a href={solscan('tx', c.sig)} target="_blank" rel="noreferrer">tx ↗</a>}

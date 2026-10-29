@@ -1,7 +1,8 @@
 import { ingestScope } from './_ingest-auth.js'
 import type { AgentRecord } from './agents.js'
-import { HOUSE_WALLET, isAddress, isSig, json, parse, redis } from './_lib.js'
+import { HOUSE_WALLET, isAddress, isSig, json, markets, parse, redis } from './_lib.js'
 import { verifyTradeReceipt } from './_trade-receipt.js'
+import { MC_KEY } from './_trademc.js'
 import { readBeat, saveBeat } from './_heartbeat.js'
 
 // Grok Bot posts what it just did here, one event per request, with
@@ -13,6 +14,7 @@ import { readBeat, saveBeat } from './_heartbeat.js'
 //     "sizeTokens", "spentSol", "positionUsd", "pnlUsd", "entryMc", "nowMc", "sig" }
 //   { "type": "fees",   "agent": "house", "feesSol": 1.2, "burnedMain": 350000 }   (running totals)
 //   { "type": "wallet", "agent": "house", "sol": 2.31 }
+//   { "type": "tradeMc", "agent": "house", "sig", "mint", "mcUsd": 41000, "approx": true }  (backfill; only fills a gap)
 //   { "type": "action", "text": "reading the trader list" }           (what he is doing right now)
 //   { "type": "runtime", "worker": "agent-runner", "mode": "execute", "healthy": true, "agents": 3, "note": "" }
 //   { "type": "screen", "jpeg": "<base64 jpeg of his phone screen>" }  (live view, about one every 2s)
@@ -51,6 +53,8 @@ export async function POST(req: Request) {
   switch (ev.type) {
     case 'trade':
       return trade(ev)
+    case 'tradeMc':
+      return tradeMc(ev)
     case 'fees':
       return fees(ev)
     case 'wallet':
@@ -118,7 +122,25 @@ async function trade(ev: Record<string, unknown>) {
   `, 3, 'gg:trade:receipts', `gg:calls:${id}`, `gg:stats:${id}`,
   `${owner}:${ev.sig}:${ev.mint}`, JSON.stringify(call), ts])
   if (saved !== 0 && saved !== 1) return json({ error: 'Trade store unavailable; retry the same receipt.' }, 503)
+  // the coin's market cap as he traded, read seconds after the fill; never overwrites
+  if (saved === 1) {
+    const m = (await markets([ev.mint as string]).catch(() => ({})) as Record<string, { mcUsd: number }>)[ev.mint as string]
+    if (m?.mcUsd > 0) await redis(['HSETNX', MC_KEY, `${ev.sig}:${ev.mint}`, JSON.stringify({ mcUsd: Math.round(m.mcUsd) })]).catch(() => {})
+  }
   return new Response(JSON.stringify({ ok: true, duplicate: saved === 0, verified: true, verification: receipt.verification, accountingVerified: false }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
+}
+
+// Fills in the market cap of a trade recorded before stamping existed. Only for a trade the
+// site already verified, and only where nothing is stored yet.
+async function tradeMc(ev: Record<string, unknown>) {
+  const mcUsd = num(ev.mcUsd, 1, 1e13)
+  if (!isId(ev.agent) || !isSig(ev.sig) || !isAddress(ev.mint) || mcUsd === null) return json({ error: 'fields' }, 400)
+  const owner = await walletOf(ev.agent)
+  if (!owner) return json({ error: 'unknown agent' }, 404)
+  const [known] = await redis(['SISMEMBER', 'gg:trade:receipts', `${owner}:${ev.sig}:${ev.mint}`])
+  if (known !== 1) return json({ error: 'unknown trade' }, 404)
+  const [set] = await redis(['HSETNX', MC_KEY, `${ev.sig}:${ev.mint}`, JSON.stringify({ mcUsd: Math.round(mcUsd), ...(ev.approx === true ? { approx: true } : {}) })])
+  return json({ ok: true, stored: set === 1 })
 }
 
 async function fees(ev: Record<string, unknown>) {

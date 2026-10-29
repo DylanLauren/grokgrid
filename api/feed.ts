@@ -1,5 +1,6 @@
 import { chainCurve } from './_curve.js'
 import { curveFrom, tally } from './_tally.js'
+import { tradeMcs } from './_trademc.js'
 import { balances, hasStore, HOUSE_WALLET, json, markets, parse, redis, solUsd, toHash } from './_lib.js'
 
 // The house bot's calls and wallet curve. Answers mode "demo" until Grok Bot has
@@ -20,7 +21,7 @@ export async function GET() {
   else if (solNow !== undefined) points.push({ ts: Date.now(), sol: solNow })
   if (!points.length) points.push({ ts: Date.now(), sol: 0 })
 
-  const metadata = await markets(list.map((call) => call.mint))
+  const [metadata, mcs] = await Promise.all([markets(list.map((call) => call.mint)), tradeMcs(list as { sig?: string; mint: string }[])])
   // realised SOL on each sell, from the verified buys before it (pnlUsd stays as recorded)
   const t = tally(list)
   const h = toHash(stats)
@@ -29,7 +30,8 @@ export async function GET() {
     wallet: HOUSE_WALLET || null,
     solUsd: price,
     calls: list.map((c) => {
-      const call = t.pnl.has(c) ? { ...c, pnlSol: t.pnl.get(c) } : c
+      const at = mcs.get(`${(c as { sig?: string }).sig}:${c.mint}`)
+      const call = { ...c, ...(t.pnl.has(c) ? { pnlSol: t.pnl.get(c) } : {}), ...(at ? { tradeMc: at.mcUsd, tradeMcApprox: at.approx } : {}) }
       const token = metadata[c.mint]
       return token ? { ...call, symbol: token.symbol || call.symbol, name: token.name || call.name, image: token.image || call.image, coin: { mcUsd: token.mcUsd, vol24hUsd: token.vol24hUsd, change24h: token.change24h } } : call
     }),

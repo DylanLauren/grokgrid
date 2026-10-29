@@ -82,7 +82,7 @@ export function StatsPage({ feed }: { feed: Feed }) {
             <span>coin</span>
             <span>side</span>
             <span className="r">spent</span>
-            <span className="r">mc</span>
+            <span className="r">mc at trade</span>
             <span className="r">p&l</span>
             <span className="r">when</span>
             <span />
@@ -99,7 +99,7 @@ export function StatsPage({ feed }: { feed: Feed }) {
               </span>
               <em className={`mono ${c.side}`}>{c.side}</em>
               <span className="r mono">{c.spentSol} SOL</span>
-              <span className="r mono">{mc(c.coin?.mcUsd || c.nowMc)}</span>
+              <span className="r mono" title={c.tradeMcApprox ? 'estimated from the fill price' : undefined}>{c.tradeMc ? `${c.tradeMcApprox ? '≈' : ''}${mc(c.tradeMc)}` : c.sample ? mc(c.side === 'buy' ? c.entryMc : c.nowMc) : '–'}</span>
               {typeof c.pnlSol === 'number' && c.side === 'sell' ? (
                 <span className={`r mono ${c.pnlSol >= 0 ? 'gain' : 'loss'}`}>{sol(c.pnlSol)}</span>
               ) : (

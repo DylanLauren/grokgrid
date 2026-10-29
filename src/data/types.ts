@@ -22,6 +22,8 @@ export interface Call {
   sample?: boolean
   sig?: string // transaction signature, links to solscan
   coin?: { mcUsd: number; vol24hUsd: number; change24h: number } // the coin's market now (live)
+  tradeMc?: number // the coin's market cap when he traded
+  tradeMcApprox?: boolean // estimated from the fill price, for trades before stamping
   verification?: 'wallet-balance-movements'
   verified?: boolean // receipt checks only the wallet token/SOL flows, not profit
 }
@@ -85,6 +87,8 @@ export interface BotTrade {
   hue?: string
   spentSol: number // SOL out for a buy, SOL in for a sell (checked on chain)
   sizeTokens?: number // tokens bought or sold
+  tradeMc?: number // market cap when traded
+  tradeMcApprox?: boolean
   pnlUsd: number | null
   pnlSol: number | null // realised on a sell
   coin?: { mcUsd: number; vol24hUsd: number; change24h: number }
