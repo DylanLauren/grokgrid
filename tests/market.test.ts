@@ -30,3 +30,12 @@ test('one entry per coin per rule; filters fail closed on missing data', () => {
   assert.equal(passes(row(0, 1, { c5m: null }), f), false)
   assert.equal(passes(row(0, 1, { b5m: 10, s5m: 30 }), f), false)
 })
+
+test('scale-out: half is sold at the first target and the rest trails the peak', () => {
+  const x = { tp: 3, sl: 0.15, holdMin: 240, partial: { at: 0.3, frac: 0.5 }, trail: 0.2 }
+  const s = series([row(0, 1), row(60000, 1.4), row(120000, 2), row(180000, 1.5)]).get(MINT)!
+  const t = simulate(s, 0, x)!
+  assert.equal(t.reason, 'trail')
+  const entry = 1.03, net = (p: number) => (p * 0.97 / entry) * 0.9875 * 0.9875
+  assert.ok(Math.abs(t.ret - (0.5 * net(1.4) + 0.5 * net(1.5) - 1)) < 1e-9)
+})

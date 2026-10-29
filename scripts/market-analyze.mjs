@@ -19,18 +19,26 @@ export function series(lines) {
   return by;
 }
 
-/** Net return of one trade entered at s[i] under exit rule x. */
+/**
+ * Net return of one trade entered at s[i] under exit rule x. Optional x.partial sells
+ * x.partial.frac of the position once price reaches +x.partial.at; the remainder then exits on
+ * x.tp, x.sl, a trailing stop x.trail off the peak (if set) or max hold.
+ */
 export function simulate(s, i, x) {
   const entry = s[i].price * (1 + SLIP), until = s[i].t + x.holdMin * 60000;
-  let j = i + 1;
+  let left = 1, booked = 0, peak = entry, reason = 'time', j = i + 1, last = i;
+  const sell = (frac, price) => { booked += frac * (price * (1 - SLIP) / entry) * (1 - FEE) * (1 - FEE); left -= frac; };
   for (; j < s.length && s[j].t <= until; j++) {
-    const p = s[j].price;
-    if (p >= entry * (1 + x.tp) || p <= entry * (1 - x.sl)) break;
+    const p = s[j].price; last = j; peak = Math.max(peak, p);
+    if (x.partial && left === 1 && p >= entry * (1 + x.partial.at)) sell(x.partial.frac, p);
+    if (p >= entry * (1 + x.tp)) { reason = 'tp'; break; }
+    if (p <= entry * (1 - x.sl)) { reason = 'sl'; break; }
+    if (x.trail && peak >= entry * (1 + (x.partial?.at ?? x.tp / 2)) && p <= peak * (1 - x.trail)) { reason = 'trail'; break; }
   }
-  if (j >= s.length || s[j].t > until) j = Math.max(i, j - 1);
-  if (j === i) return null; // no later data yet
-  const exit = s[j].price * (1 - SLIP);
-  return { ret: (exit / entry) * (1 - FEE) * (1 - FEE) - 1, mins: (s[j].t - s[i].t) / 60000, reason: s[j].price >= entry * (1 + x.tp) ? 'tp' : s[j].price <= entry * (1 - x.sl) ? 'sl' : 'time' };
+  if (last === i) return null; // no later data yet
+  const k = reason === 'time' ? last : j;
+  sell(left, s[k].price);
+  return { ret: booked - 1, mins: (s[k].t - s[i].t) / 60000, reason };
 }
 
 const between = (v, [lo, hi]) => v !== null && v !== undefined && v >= lo && v <= hi;
@@ -46,6 +54,8 @@ export function grid() {
       F.push({ age, liq, mc, v5m, ratio, c5m, c1h });
   const X = [];
   for (const tp of [0.25, 0.5, 1]) for (const sl of [0.15, 0.25, 0.4]) for (const holdMin of [20, 60, 180]) X.push({ tp, sl, holdMin });
+  // Scale-out variants from the top-wallet study: take half early, trail the rest.
+  for (const at of [0.2, 0.3]) for (const sl of [0.12, 0.18]) for (const trail of [0.15, 0.25]) X.push({ tp: 3, sl, holdMin: 240, partial: { at, frac: 0.5 }, trail });
   return { F, X };
 }
 
