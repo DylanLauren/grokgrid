@@ -51,7 +51,12 @@ async function syncAgents(state, token, now) {
     const r = await fetch(`${ORIGIN}/api/launch/events?after=${cursor}&limit=50`, { headers: { authorization: `Bearer ${token}` }, redirect: 'error', signal: AbortSignal.timeout(10000) });
     if (!r.ok) break;
     const batch = validateLaunchEvents(await r.json(), cursor, now);
-    for (const e of batch.events) state.agents[e.id] ??= { id: e.id, wallet: e.wallet, mint: e.mint, queuedAt: e.ts, status: 'awaiting-rules' };
+    for (const e of batch.events) {
+      if (state.agents[e.id]) continue;
+      // One agent per wallet and per mint, across all batches: a second claim is quarantined, never run.
+      const clash = Object.values(state.agents).find(a => a.wallet === e.wallet || a.mint === e.mint);
+      state.agents[e.id] = { id: e.id, wallet: e.wallet, mint: e.mint, queuedAt: e.ts, status: clash ? `quarantined-duplicate-of:${clash.id}` : 'awaiting-rules' };
+    }
     cursor = batch.nextCursor;
     if (!batch.hasMore) break;
   }
@@ -59,6 +64,7 @@ async function syncAgents(state, token, now) {
   let registry = [];
   try { registry = (await (await fetch(`${ORIGIN}/api/agents`, { redirect: 'error', signal: AbortSignal.timeout(10000) })).json()).agents || []; } catch {}
   for (const a of Object.values(state.agents)) {
+    if (a.status.startsWith('quarantined')) continue;
     const record = registry.find(r => r.id === a.id);
     if (!record) continue;
     try {
@@ -141,7 +147,9 @@ async function tick() {
 
   let global = { ...DEFAULT_STRATEGY }; try { global = await json(join(root, 'strategy-config.json')); } catch {}
   global = validateStrategyConfig({ ...global, mode: c.mode === 'execute' ? 'live' : 'paper' });
-  const ready = Object.values(state.agents).filter(a => a.status === 'ready').slice(0, c.maxAgents);
+  // Defence in depth: never run two agents on one wallet, whatever the state file says.
+  const wallets = new Set();
+  const ready = Object.values(state.agents).filter(a => a.status === 'ready' && !wallets.has(a.wallet) && wallets.add(a.wallet)).slice(0, c.maxAgents);
   const liquidating = await exists(c.exitFile), stopFilePresent = await exists(c.stopFile);
   let privy = null, authorizationKey = null;
   const signerFor = agent => async tx => {
