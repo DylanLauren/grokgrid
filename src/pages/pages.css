@@ -5,12 +5,13 @@
   overflow-y: auto; overscroll-behavior: contain;
   background:
     radial-gradient(70% 50% at 50% -10%, #ffffff12, transparent 70%),
-    linear-gradient(#ffffff06 1px, transparent 1px) 0 0 / 100% 64px,
-    linear-gradient(90deg, #ffffff06 1px, transparent 1px) 0 0 / 64px 100%,
     var(--ink);
   animation: page-in 0.5s cubic-bezier(.2,.8,.2,1);
 }
 @keyframes page-in { from { opacity: 0; transform: translateY(14px); } }
+/* the live grid sits under the content and never takes the pointer */
+.pg-grid { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+.pg { position: relative; z-index: 1; }
 .page::-webkit-scrollbar { width: 8px; }
 .page::-webkit-scrollbar-thumb { background: var(--hair-strong); border-radius: 4px; }
 

@@ -1,6 +1,7 @@
 import { useRef, type CSSProperties, type ReactNode } from 'react'
 import { LiveBot, useEyesFollow } from '../ui/LiveBot'
 import { Scramble } from '../ui/Scramble'
+import { GridBackdrop } from '../ui/GridBackdrop'
 import './pages.css'
 
 // The frame every page shares: an index and label, a big title whose letters lift
@@ -21,6 +22,7 @@ export function Page({ n, label, title, sub, side, say, children }: { n: number;
         card.style.setProperty('--my', `${e.clientY - r.top}px`)
       }}
     >
+      <GridBackdrop />
       <div className="pg">
         <header className="pg-head">
           <div className="pg-eyebrow mono">

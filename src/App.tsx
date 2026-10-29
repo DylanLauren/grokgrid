@@ -12,6 +12,7 @@ import { useAgents } from './data/useAgents'
 import { useLive } from './data/useLive'
 import { seenTour, Tour } from './ui/Tour'
 import { Roll } from './ui/Roll'
+import { Intro, introDue } from './ui/Intro'
 import { StatsPage } from './pages/StatsPage'
 import { MatrixPage } from './pages/MatrixPage'
 import { GridPage } from './pages/GridPage'
@@ -68,6 +69,7 @@ export default function App() {
   const live = useLive(!onPage, view === 'phone', feed)
   // the first-visit tour only starts on his desk, never over a page someone linked to
   const [touring, setTouring] = useState(() => !seenTour() && !location.hash.slice(1))
+  const [intro, setIntro] = useState(introDue)
   const tucked = useTuck()
   const [focusCall, setFocusCall] = useState<string>()
 
@@ -201,7 +203,9 @@ export default function App() {
       {tab === 'grid' && <GridPage grid={grid} />}
       {tab === 'docs' && <DocsPage onTour={() => setTouring(true)} />}
 
-      {touring && (
+      {intro && <Intro onDone={() => setIntro(false)} />}
+
+      {touring && !intro && (
         <Tour
           go={(t, v) => {
             setTab(t)
