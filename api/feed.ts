@@ -1,3 +1,4 @@
+import { chainCurve } from './_curve.js'
 import { curveFrom, tally } from './_tally.js'
 import { balances, hasStore, HOUSE_WALLET, json, markets, parse, redis, solUsd, toHash } from './_lib.js'
 
@@ -11,9 +12,10 @@ export async function GET() {
 
   const points = ((curve as string[]) ?? []).map((p) => parse<{ ts: number; sol: number }>(p)).filter((p): p is { ts: number; sol: number } => !!p)
   // the last point always comes from the chain, not from the bot
-  const [bal, price] = await Promise.all([HOUSE_WALLET ? balances([HOUSE_WALLET]) : Promise.resolve({} as Record<string, number>), solUsd()])
+  const [bal, price, chain] = await Promise.all([HOUSE_WALLET ? balances([HOUSE_WALLET]) : Promise.resolve({} as Record<string, number>), solUsd(), HOUSE_WALLET ? chainCurve('house', HOUSE_WALLET) : null])
   const solNow = HOUSE_WALLET ? bal[HOUSE_WALLET] : undefined
-  // no snapshots posted: rebuild the history from his own verified trades
+  // his wallet as the chain recorded it, top-ups included; failing that, rebuilt from his trades
+  if (chain && chain.length) points.splice(0, points.length, ...chain.map(({ ts, sol }) => ({ ts, sol })))
   if (points.length < 2 && solNow !== undefined) points.splice(0, points.length, ...curveFrom(list, solNow))
   else if (solNow !== undefined) points.push({ ts: Date.now(), sol: solNow })
   if (!points.length) points.push({ ts: Date.now(), sol: 0 })

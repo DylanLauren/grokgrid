@@ -82,13 +82,27 @@ export function stats(feed: Feed) {
   const wins = sells.filter((c) => c.pnlUsd > 0)
   const best = sells.reduce((a, c) => (c.pnlUsd > (a?.pnlUsd ?? -Infinity) ? c : a), sells[0])
   const worst = sells.reduce((a, c) => (c.pnlUsd < (a?.pnlUsd ?? Infinity) ? c : a), sells[0])
-  const pct = (from: number) => (from ? ((solNow - from) / from) * 100 : 0)
+  // live: the return on what he closed in the window, so a top-up or withdrawal never reads
+  // as a gain or loss. The demo story has no deposits and keeps the wallet change.
+  const closed = (ms: number) => {
+    if (feed.mode === 'demo') {
+      const from = ms === Infinity ? feed.curve[0]?.sol ?? 0 : at(ms)
+      return from ? ((solNow - from) / from) * 100 : 0
+    }
+    let pnl = 0, cost = 0
+    for (const c of feed.calls) {
+      if (c.side !== 'sell' || typeof c.pnlSol !== 'number' || now - c.ts > ms) continue
+      pnl += c.pnlSol
+      cost += c.spentSol - c.pnlSol
+    }
+    return cost > 0 ? (pnl / cost) * 100 : 0
+  }
   return {
     solNow,
     usdNow: solNow * feed.solUsd,
-    pnl1h: pct(at(3.6e6)),
-    pnl24h: pct(at(8.64e7)),
-    pnlAll: pct(feed.curve[0]?.sol ?? 0),
+    pnl1h: closed(3.6e6),
+    pnl24h: closed(8.64e7),
+    pnlAll: closed(Infinity),
     trades: feed.calls.length,
     winRate: sells.length ? (wins.length / sells.length) * 100 : null,
     best,
