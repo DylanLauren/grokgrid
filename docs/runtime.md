@@ -66,7 +66,8 @@ operational requirements; no paid keep-alive was enabled.
 
 `ops/install-launchd.sh` (run it yourself) points every `fun.grokgrid.*` job at this checkout:
 - the runtime observer, trading worker and phone renewal;
-- new jobs for buy-and-burn (off), strategy (paper) and agent runner (paper).
+- new jobs for buy-and-burn (off), strategy (paper) and agent runner (paper);
+- pump.fun Callouts and X posts, both off until enabled (see `docs/x-posts.md`).
 
 Before it installs anything, it:
 - runs the test suite;

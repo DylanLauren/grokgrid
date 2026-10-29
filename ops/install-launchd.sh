@@ -10,7 +10,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 RUNTIME="${GROKGRID_RUNTIME_DIR:-$HOME/.config/grokgrid/runtime}"
 AGENTS="$HOME/Library/LaunchAgents"
 NODE="$(command -v node)"
-JOBS=(runtime-observer trading-observer phone-renewal buyback strategy agent-runner)
+JOBS=(runtime-observer trading-observer phone-renewal buyback strategy agent-runner pump-callouts x-posts)
 UID_N="$(id -u)"
 APPLY=""; CHECK=""
 for a in "$@"; do case "$a" in --apply-limits) APPLY="$a";; --check) CHECK=1;; esac; done
@@ -62,7 +62,7 @@ console.log("  all configs execution-off");
 '
 
 echo "== one tick of each worker"
-for w in "runtime-observer.mjs --once" "trading-worker.mjs --once --reconcile" "buyback-worker.mjs --once" "strategy-worker.mjs --once" "agent-runner.mjs --once"; do
+for w in "runtime-observer.mjs --once" "trading-worker.mjs --once --reconcile" "buyback-worker.mjs --once" "strategy-worker.mjs --once" "agent-runner.mjs --once" "x-post-worker.mjs --once"; do
   # shellcheck disable=SC2086
   GROKGRID_RUNTIME_DIR="$RUNTIME" "$NODE" scripts/$w >/dev/null || { echo "  $w failed; not installing."; exit 1; }
   echo "  ok: $w"
