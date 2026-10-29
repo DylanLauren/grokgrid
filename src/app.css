@@ -33,31 +33,20 @@
 }
 .mini-wrap.on .mini { opacity: 1; transform: none; pointer-events: auto; transition-delay: 0.12s; }
 .mini:hover, .mini-wrap:focus-within .mini { border-color: var(--paper-50); }
-.mini-menu {
-  position: absolute; top: 100%; left: 0; display: grid; gap: 2px; width: max-content; min-width: 200px;
-  margin-top: 8px; padding: 6px; border-radius: 16px;
-  background: #101012f2; border: 1px solid var(--hair-strong); backdrop-filter: blur(14px);
-  box-shadow: 0 18px 40px #000a, inset 0 1px 0 #ffffff12;
-  opacity: 0; translate: 0 -8px; scale: 0.96; transform-origin: 27px 0; pointer-events: none;
-  transition: opacity 0.2s, translate 0.35s cubic-bezier(.22,1,.36,1), scale 0.35s cubic-bezier(.22,1,.36,1);
-}
-/* a bridge over the gap, so the pointer can travel from the box to the list */
-.mini-menu::before { content: ''; position: absolute; left: 0; right: 0; top: -10px; height: 10px; }
-.mini-wrap.on:hover .mini-menu, .mini-wrap.on:focus-within .mini-menu { opacity: 1; translate: 0 0; scale: 1; pointer-events: auto; }
+/* the links: two small round icons that grow out from under the box, one after the other */
+.mini-menu { position: absolute; top: 100%; left: 0; width: 54px; display: grid; justify-items: center; gap: 8px; padding-top: 10px; pointer-events: none; }
 .mini-menu a {
-  display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px 0 6px; border-radius: 11px;
-  font-size: 13.5px; color: var(--paper-70);
-  opacity: 0; translate: 0 -4px;
-  transition: background 0.2s, color 0.2s, opacity 0.3s, translate 0.35s cubic-bezier(.22,1,.36,1);
+  display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+  color: var(--paper-70); background: var(--glass); border: 1px solid var(--hair-strong); backdrop-filter: blur(14px);
+  box-shadow: 0 8px 22px #0009, inset 0 1px 0 #ffffff14;
+  opacity: 0; scale: 0.4; translate: 0 -14px;
+  transition: opacity 0.2s, scale 0.45s cubic-bezier(.3,1.5,.5,1), translate 0.45s cubic-bezier(.22,1,.36,1), color 0.2s, background 0.2s, border-color 0.2s, box-shadow 0.3s;
 }
-.mini-wrap.on:hover .mini-menu a, .mini-wrap.on:focus-within .mini-menu a { opacity: 1; translate: 0 0; }
-.mini-wrap.on:hover .mini-menu a:nth-child(2), .mini-wrap.on:focus-within .mini-menu a:nth-child(2) { transition-delay: 0s, 0s, 0.05s, 0.05s; }
-.mini-menu a:hover, .mini-menu a:focus-visible { background: #ffffff0f; color: var(--paper); }
-.mini-ico { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 9px; background: #ffffff0d; border: 1px solid var(--hair); color: var(--paper); transition: background 0.2s, scale 0.35s cubic-bezier(.3,1.6,.5,1); }
-.mini-menu a:hover .mini-ico { background: #ffffff1a; scale: 1.08; }
-.mini-go { margin-left: auto; padding-left: 14px; font-size: 12px; color: var(--paper-30); transition: translate 0.3s cubic-bezier(.22,1,.36,1), color 0.2s; }
-.mini-menu a:hover .mini-go { translate: 2px -2px; color: var(--paper); }
-@media (prefers-reduced-motion: reduce) { .mini-menu, .mini-menu a { transition: opacity 0.15s; translate: none; scale: none; } }
+.mini-wrap.on:hover .mini-menu, .mini-wrap.on:focus-within .mini-menu { pointer-events: auto; }
+.mini-wrap.on:hover .mini-menu a, .mini-wrap.on:focus-within .mini-menu a { opacity: 1; scale: 1; translate: 0 0; }
+.mini-wrap.on:hover .mini-menu a:nth-child(2), .mini-wrap.on:focus-within .mini-menu a:nth-child(2) { transition-delay: 0.06s; }
+.mini-menu a:hover, .mini-menu a:focus-visible { color: var(--paper); background: #ffffff16; border-color: var(--paper-30); box-shadow: 0 0 0 4px #ffffff0d, 0 8px 22px #0009; scale: 1.08; transition-delay: 0s; }
+@media (prefers-reduced-motion: reduce) { .mini-menu a { transition: opacity 0.15s; translate: none; scale: none; } }
 .mb { position: relative; width: 32px; height: 32px; display: block; }
 /* the logo bot brings its own eyes; the box only floats it */
 .mb .logo-bot { position: absolute; inset: -1px; animation: mb-float 5.6s ease-in-out infinite; transition: rotate 0.7s cubic-bezier(.2,.8,.2,1), scale 0.7s cubic-bezier(.2,.8,.2,1); }
