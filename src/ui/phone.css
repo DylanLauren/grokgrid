@@ -90,6 +90,7 @@
 .pt-sub { display: flex; gap: 8px; font-size: 8.5px; color: #ffffff80; white-space: nowrap; overflow: hidden; }
 .pt-row.sell .pt-sol.up, .pt-sub .up { color: var(--gain); }
 .pt-row.sell .pt-sol.down, .pt-sub .down { color: var(--loss); }
+.pt-why { font-size: 8px; line-height: 1.25; color: #ffffff8c; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .pt-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pt-sol { flex: none; font-size: 9px; }
 .pt-row.buy .pt-sol { color: var(--gain); }

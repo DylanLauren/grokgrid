@@ -16,6 +16,7 @@ export interface PeekCoin {
   change24h?: number
   tag?: string // a small label over the name: "his coin", "bought", "sold"
   rows?: [string, ReactNode, string?][] // extra lines under the market stats
+  why?: string // why he made this trade, in his words
 }
 
 type State = { coin: PeekCoin; rect: DOMRect } | null
@@ -109,6 +110,7 @@ export function PeekLayer() {
               ))}
             </dl>
           )}
+          {c.why && <p className="peek-why"><em className="mono">why</em>{c.why}</p>}
         </>
       )}
     </div>,

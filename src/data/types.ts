@@ -89,6 +89,7 @@ export interface BotTrade {
   sizeTokens?: number // tokens bought or sold
   tradeMc?: number // market cap when traded
   tradeMcApprox?: boolean
+  note?: string // his callout note; starts with the strategy's reason when it recorded one
   pnlUsd: number | null
   pnlSol: number | null // realised on a sell
   coin?: { mcUsd: number; vol24hUsd: number; change24h: number }

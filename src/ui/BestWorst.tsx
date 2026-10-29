@@ -3,11 +3,12 @@ import { ago, mc, usd } from '../lib/format'
 import { CoinChip } from './CoinChip'
 import { peek, type PeekCoin } from './CoinPeek'
 import { avgRows, type AvgMc } from '../lib/avgMc'
+import { whyOf } from '../lib/why'
 export { avgMcs, avgRows, type AvgMc } from '../lib/avgMc'
 
 // Every closed round trip: the sell, what it made, and how long he held.
 // Live sells carry the SOL that came back; the demo story records what went in.
-export interface Trade { ts: number; side: 'buy' | 'sell'; mint: string; symbol: string; name: string; image?: string; hue?: string; spentSol: number; sizeTokens?: number; positionUsd?: number | null; tradeMc?: number; tradeMcApprox?: boolean; pnlSol?: number | null; pnlUsd: number | null; sig?: string; coin?: { mcUsd: number; vol24hUsd: number; change24h: number } }
+export interface Trade { ts: number; side: 'buy' | 'sell'; mint: string; symbol: string; name: string; image?: string; hue?: string; spentSol: number; sizeTokens?: number; positionUsd?: number | null; tradeMc?: number; tradeMcApprox?: boolean; note?: string; pnlSol?: number | null; pnlUsd: number | null; sig?: string; coin?: { mcUsd: number; vol24hUsd: number; change24h: number } }
 export interface Round { sell: Trade; buy?: Trade; pnl: number; cost: number; pct: number; held: number | null }
 
 // The coin's market cap when he traded; ≈ marks an estimate from the fill price.
@@ -62,6 +63,7 @@ export function BestWorst({ done, solUsd, avg }: { done: Round[]; solUsd: number
               ['held', r.held === null ? '–' : dur(r.held)],
               ['sold', ago(c.ts)],
             ],
+            why: whyOf(c.note),
           }
           return (
             <div key={label} className={`card st-bw-card ${r.pnl >= 0 ? 'up' : 'down'}`}>

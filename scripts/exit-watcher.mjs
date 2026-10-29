@@ -21,6 +21,7 @@ import { withTradingStore } from './trading-store.mjs';
 import { action } from './runtime-ingest.mjs';
 import { quotePrices, confirmExit, sellJustExpired } from './exit-watcher-core.mjs';
 import { safeError } from './log-safe.mjs';
+import { recordWhys } from './trade-why.mjs';
 
 const run = promisify(execFile);
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
@@ -72,11 +73,12 @@ async function tick(conn) {
     }
     await savePrivate('exit-watcher-state.json', { peaks: planned.peaks, pending, observedAt: now });
     if (!sell || !confirmed) return s;
-    const { reason, ...proposal } = sell;
-    try { s = planIntent(s, policy, proposal, observation, null, now, positions); sold = { mint: sell.mint, reason }; } catch (e) { sold = { mint: sell.mint, reason, refused: String(e?.message || e).slice(0, 80) }; }
+    const { reason, why, ...proposal } = sell;
+    try { s = planIntent(s, policy, proposal, observation, null, now, positions); sold = { mint: sell.mint, reason, id: sell.id, why }; } catch (e) { sold = { mint: sell.mint, reason, refused: String(e?.message || e).slice(0, 80) }; }
     return s;
   });
   if (sold && !sold.refused) {
+    await recordWhys(join(root, 'trade-why-exit.json'), { [sold.id]: sold.why }, now).catch(() => {});
     // Sign now instead of waiting for the trading worker's next 30-second tick.
     await run('launchctl', ['kickstart', `gui/${process.getuid()}/fun.grokgrid.trading-observer`], { timeout: 10000 }).catch(() => {});
     await action(root, `exit ${sold.reason} planned within seconds`).catch(() => {});

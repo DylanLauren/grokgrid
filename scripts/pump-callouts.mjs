@@ -10,6 +10,7 @@
 // Off unless pumpCalloutsEnabled. Real trades only: paper fills never reach this.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { whyText } from './trade-why.mjs';
 
 const run = promisify(execFile);
 const DAY = 24 * 3600000, RETRY_MS = 10 * 60000;
@@ -36,9 +37,13 @@ export function calloutGate(ledger, cfg, intent, now) {
   return 'ok';
 }
 
-export function thesis(intent, symbol) {
+/** `why` is the strategy's recorded reason (trade-why.mjs); without one the generic screen line stands. */
+export function thesis(intent, symbol, why = null) {
   const sol = (Number(BigInt(intent.receipt.spentLamports)) / 1e9).toFixed(3);
-  return `Grok Bot bought ${sol} SOL of ${symbol ? '$' + String(symbol).replace(/[^\w]/g, '').slice(0, 12) : 'this'} on its own. Screened for liquidity, rising buyers and holder spread. Live at grokgrid.fun. Not financial advice.`.slice(0, 280);
+  const coin = symbol ? '$' + String(symbol).replace(/[^\w]/g, '').slice(0, 12) : 'this';
+  const reason = whyText(why, coin)?.replace(/^bought [^:]+: /, '');
+  const because = reason ? `Why: ${reason}` : 'Screened for liquidity, rising buyers and holder spread.';
+  return `Grok Bot bought ${sol} SOL of ${coin} on its own. ${because} Live at grokgrid.fun. Not financial advice.`.slice(0, 280);
 }
 
 // Page script. Arguments are JSON-encoded; only a short result string is written back.
