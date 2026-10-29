@@ -1,5 +1,5 @@
 // Pure policy and one-frame pipeline. No capture or network side effects at import.
-export const PHONE_ORIGINS = ['https://grokgrid-alpha.vercel.app', 'https://www.grokgrid.fun']
+const PHONE_ORIGINS = ['https://grokgrid-alpha.vercel.app', 'https://www.grokgrid.fun']
 export function capabilityExpiry(token, now = Date.now()) {
   const match = /^screen-v1\.(\d{10})\.[a-f0-9]{32}\.[a-f0-9]{64}$/.exec(token)
   const expiry = Number(match?.[1]) * 1000
@@ -37,10 +37,10 @@ export function verifyWindow(snapshot, config) {
   if (config.bundleId === 'com.google.Chrome') verifyViewport(snapshot)
   return snapshot
 }
-export function sameWindow(a, b) {
+function sameWindow(a, b) {
   return ['id', 'pid', 'bundleId', 'title', 'onScreen', 'layer', 'browserUrl'].every(k => a[k] === b[k]) && ['x', 'y', 'width', 'height'].every(k => a.bounds[k] === b.bounds[k]) && (a.bundleId !== 'com.google.Chrome' || ['innerWidth', 'innerHeight', 'outerWidth', 'outerHeight', 'devicePixelRatio', 'href'].every(k => a.viewport?.[k] === b.viewport?.[k]))
 }
-export function verifyViewport(snapshot) {
+function verifyViewport(snapshot) {
   const v = snapshot?.viewport, bounds = snapshot?.bounds
   if (!v || !bounds || !['innerWidth', 'innerHeight', 'outerWidth', 'outerHeight'].every(k => Number.isSafeInteger(v[k]) && v[k] > 0 && v[k] <= 16384) || !Number.isFinite(v.devicePixelRatio) || v.devicePixelRatio <= 0 || v.devicePixelRatio > 16 || v.href !== snapshot.browserUrl || Math.abs(v.outerWidth - bounds.width) > 2 || Math.abs(v.outerHeight - bounds.height) > 2) throw Error('browser-viewport-invalid')
   return v
@@ -58,7 +58,7 @@ export function browserViewportCrop(snapshot, pixelWidth, pixelHeight) {
   if (height <= 0 || top < 0 || top > pixelHeight * 0.35) throw Error('browser-viewport-invalid')
   return { top, left: 0, width: pixelWidth, height }
 }
-export function validateJpeg(bytes) {
+function validateJpeg(bytes) {
   if (!Buffer.isBuffer(bytes) || bytes.length < 4 || bytes.length > 330_000 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes.at(-2) !== 0xff || bytes.at(-1) !== 0xd9) throw Error('capture-invalid')
 }
 // Each encode callback must start from the original lossless screenshot. A

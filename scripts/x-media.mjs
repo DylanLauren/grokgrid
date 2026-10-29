@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const FONTS = new URL('../public/fonts/', import.meta.url);
 const font = name => `data:font/woff2;base64,${readFileSync(fileURLToPath(new URL(name, FONTS))).toString('base64')}`;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-export const FFMPEG = ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'].find(p => existsSync(p)) || null;
+const FFMPEG = ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'].find(p => existsSync(p)) || null;
 
 // Same hosts the site accepts for coin pictures. Anything else, any redirect, or more than
 // 2 MB is refused; the body is read with a running byte cap.

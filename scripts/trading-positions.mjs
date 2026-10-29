@@ -36,7 +36,7 @@ function metadataMatches(data,mint) {
   const decoded=unpackMetadata(data);
   return decoded.mint.toBase58()===mint&&Buffer.from(packMetadata(decoded)).equals(data);
 }
-export function token2022PositionEligible(wallet,row,evidence,minimumSlot) {
+function token2022PositionEligible(wallet,row,evidence,minimumSlot) {
   try{
     const info=row.account.data.parsed.info;
     if(info.extensions!==undefined&&(!Array.isArray(info.extensions)||info.extensions.some(e=>!e||e.extension!=='immutableOwner')||info.extensions.length>1))return false;

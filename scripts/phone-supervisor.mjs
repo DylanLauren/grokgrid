@@ -11,7 +11,7 @@ import { validateConfig } from './phone-feed-core.mjs'
 import { decidePhoneRestart, planPhoneLockRecovery } from './phone-supervisor-core.mjs'
 const uid = () => process.getuid?.() ?? -1
 const metadata = s => ({ isFile: s.isFile(), isSymbolicLink: s.isSymbolicLink(), uid: s.uid, mode: s.mode, nlink: s.nlink, dev: s.dev, ino: s.ino })
-export async function readPrivatePhoneFile(path, limit = 32_768) {
+async function readPrivatePhoneFile(path, limit = 32_768) {
   const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
   try {
     const s = await handle.stat()
@@ -19,7 +19,7 @@ export async function readPrivatePhoneFile(path, limit = 32_768) {
     return { contents: await handle.readFile('utf8'), metadata: metadata(s) }
   } finally { await handle.close() }
 }
-export function phoneProcessState(pid) {
+function phoneProcessState(pid) {
   try { process.kill(pid, 0); return 'alive' } catch (e) { return e?.code === 'ESRCH' ? 'dead' : 'unknown' }
 }
 export async function recoverPhoneLock(path, processState = phoneProcessState) {

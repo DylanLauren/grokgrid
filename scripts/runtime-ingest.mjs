@@ -6,9 +6,10 @@ import { readPrivateText } from './runtime-observation-store.mjs';
 const ORIGIN = 'https://grokgrid-alpha.vercel.app';
 const WORKERS = ['trading', 'buyback', 'strategy', 'agent-runner', 'phone'];
 const MODES = ['observe-only', 'paper', 'execute'];
+// eslint-disable-next-line no-control-regex -- strip control characters from outgoing text
 const clean = (s, max) => String(s ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/api-key=[^&\s]+/gi, '').trim().slice(0, max);
 
-export async function postIngest(root, event, fetchImpl = fetch) {
+async function postIngest(root, event, fetchImpl = fetch) {
   if (process.env.GROKGRID_INGEST === 'off') return false; // tests and dry runs
   try {
     const cfg = JSON.parse(await readPrivateText(join(root, 'observer-config.json')));

@@ -56,7 +56,7 @@ test('live planning writes an expiring allowlist, and planIntent buys only allow
   const s0 = emptyTradingState(policy)
   const plan = livePlan({ tradingState: s0, policy, c, peaks: {}, positions, market: market(), now, liquidating: false })
   assert.equal(plan.proposals.length, 1); assert.equal(plan.proposals[0].side, 'buy')
-  const { reason, ...proposal } = plan.proposals[0]
+  const { reason: _reason, ...proposal } = plan.proposals[0]
   assert.throws(() => planIntent(s0, policy, proposal, observation, risk, now, positions), /Invalid or expired proposal/)
   const s1 = setAllowlist(s0, policy, plan.allowlist, now)
   assert.equal(planIntent(s1, policy, proposal, observation, risk, now, positions).intents[0].mint, MINT)
@@ -72,7 +72,7 @@ test('a held position is sold on liquidation even after its allowlist entry expi
   const plan = livePlan({ tradingState: emptyTradingState(policy), policy, c, peaks: {}, positions: held, market: quoted('5000'), now, liquidating: true })
   assert.equal(plan.proposals[0].side, 'sell'); assert.equal(plan.proposals[0].reason, 'liquidate')
   assert.equal(plan.proposals[0].minimumReceiveLamports, String(5000n * 8500n / 10000n))
-  const { reason, ...proposal } = plan.proposals[0]
+  const { reason: _reason, ...proposal } = plan.proposals[0]
   assert.equal(planIntent(emptyTradingState(policy), policy, proposal, observation, null, now, held).intents[0].side, 'sell')
 })
 

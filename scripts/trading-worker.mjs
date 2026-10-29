@@ -66,7 +66,7 @@ async function tick() {
       await savePrivate('trading-position-refresh.json',attempt);
     }
     s=expireIntents(s,Date.now());
-    if(observerIsFresh(policy,observation,Date.now())){const intake=observeLaunchQueue(s,policy,observation.pendingLaunches,Date.now());s=intake.state;const {state:ignored,...diagnostics}=intake;launchIntake=diagnostics;}
+    if(observerIsFresh(policy,observation,Date.now())){const intake=observeLaunchQueue(s,policy,observation.pendingLaunches,Date.now());s=intake.state;const {state:_state,...diagnostics}=intake;launchIntake=diagnostics;}
     if(args.includes('--reconcile')&&s.intents.some(i=>i.state==='held-ambiguous')) {
       const verify=createFinalizedReceiptVerifier(await rpcUrl());
       for(const intent of s.intents.filter(i=>i.state==='held-ambiguous'))s=await reconcileHeldIntent(s,policy,intent.id,verify);
