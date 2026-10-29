@@ -9,11 +9,11 @@
 3. **Chain screen** (RPC/Helius). This runs only for coins that passed step 2:
    - no mint authority and no freeze authority;
    - holder floor (Helius DAS);
-   - top-10 wallet share (program-owned curve and pool vaults are excluded);
-   - creator wallet share.
+   - top-10 holder share. Only this coin's own bonding curve and canonical PumpSwap pool are excluded; every other account counts, including program-owned ones;
+   - creator share, summed across all of the creator's token accounts for the mint.
    Any missing fact fails the screen.
 4. **Entry.** Among coins that pass, it ranks by buy/sell ratio × (5m volume / liquidity) and takes one entry per tick. A coin already held or already in flight is skipped. An approved coin goes on an **expiring allowlist** (`allowedMints: "dynamic"`). Buys need a live entry. Sells of a held position never do, so an exit can't be blocked.
-5. **Exits** for each position: take-profit, stop-loss, a trailing stop armed after a gain, and max hold time. If the **exit file** (`exitFile`) exists, it sells everything and stops buying. The trading `stopFile` freezes all signing.
+5. **Exits** for each position. A sell's minimum comes from an **on-chain quote** on the same route the sell uses. If DexScreener's price differs from that quote by more than 15%, no sell is planned that tick. The exit rules: take-profit, stop-loss, a trailing stop armed after a gain, and max hold time. If the **exit file** (`exitFile`) exists, it sells everything and stops buying. The trading `stopFile` freezes all signing.
 
 pump.fun's own APIs are behind a Cloudflare bot check. The engine does not use them.
 
@@ -51,3 +51,11 @@ The trading, buyback and strategy workers each `POST /api/ingest` once per tick:
 ```
 
 Posts are best effort and never include secrets. Set `GROKGRID_INGEST=off` to send nothing in tests and dry runs.
+
+## Callouts and the live feed
+
+- After a real trade reconciles, the trading worker posts it once as a `trade` event (`scripts/trading-callouts.mjs`). The site re-verifies the signature on chain and dedupes by signature. A private ledger (`trading-callouts.json`) records each signature.
+  - A 4xx rejection is recorded and not retried.
+  - An outage, 429 or 5xx is retried on the next tick.
+- Each posted trade also writes one `action` line, for example "bought $X for 0.050 SOL · strategy unvalidated".
+- Paper fills post as `action` lines prefixed **`paper:`**. They are never `trade` events, which need real signatures.

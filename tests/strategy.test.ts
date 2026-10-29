@@ -66,8 +66,12 @@ test('live planning writes an expiring allowlist, and planIntent buys only allow
 
 test('a held position is sold on liquidation even after its allowlist entry expired', () => {
   const held = { ...positions, positions: [{ mint: MINT, tokenUnits: '5000000', spendableTokenUnits: '5000000', decimals: 6, tokenProgram: 'x' }] }
-  const plan = livePlan({ tradingState: emptyTradingState(policy), policy, c, peaks: {}, positions: held, market: market(), now, liquidating: true })
+  const quoted = (q?: string) => ({ ...market(), sellQuotes: new Map(q ? [[MINT, q]] : []) })
+  assert.equal(livePlan({ tradingState: emptyTradingState(policy), policy, c, peaks: {}, positions: held, market: quoted(), now, liquidating: true }).proposals.length, 0) // no on-chain quote, no sell
+  assert.equal(livePlan({ tradingState: emptyTradingState(policy), policy, c, peaks: {}, positions: held, market: quoted('2000'), now, liquidating: true }).proposals.length, 0) // DexScreener disagrees >15%
+  const plan = livePlan({ tradingState: emptyTradingState(policy), policy, c, peaks: {}, positions: held, market: quoted('5000'), now, liquidating: true })
   assert.equal(plan.proposals[0].side, 'sell'); assert.equal(plan.proposals[0].reason, 'liquidate')
+  assert.equal(plan.proposals[0].minimumReceiveLamports, String(5000n * 8500n / 10000n))
   const { reason, ...proposal } = plan.proposals[0]
   assert.equal(planIntent(emptyTradingState(policy), policy, proposal, observation, null, now, held).intents[0].side, 'sell')
 })
@@ -80,4 +84,15 @@ test('allowlist entries expire; heartbeat refuses unknown workers and sends noth
   process.env.GROKGRID_INGEST = 'off'
   assert.equal(await heartbeat('/nonexistent', 'strategy', { mode: 'paper', healthy: true }, async () => { called = true; return { ok: true } as Response }), false)
   assert.equal(called, false)
+})
+
+test('callouts post each reconciled trade once; site rejections are not retried; outages are', async () => {
+  const { pendingCallouts } = await import('../scripts/trading-callouts.mjs')
+  const sig = (n: number) => '5'.repeat(87) + n
+  const state = { intents: [
+    { state: 'reconciled-confirmed', signature: sig(1), side: 'buy', mint: MINT, receipt: { spentLamports: '50000000' } },
+    { state: 'held-ambiguous', signature: sig(2), side: 'buy', mint: MINT },
+    { state: 'reconciled-confirmed', signature: sig(3), side: 'sell', mint: MINT, receipt: { receivedLamports: '70000000' } } ] }
+  assert.deepEqual(pendingCallouts(state, { posted: {} }).map((i: { signature: string }) => i.signature), [sig(1), sig(3)])
+  assert.deepEqual(pendingCallouts(state, { posted: { [sig(1)]: { outcome: 'posted' }, [sig(3)]: { outcome: 'rejected-422' } } }), [])
 })

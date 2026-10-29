@@ -8,7 +8,7 @@ import { NATIVE_MINT, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, createBurnChecked
 const require = createRequire(import.meta.url);
 const sdk = require('@pump-fun/pump-sdk');
 const BN = require('bn.js');
-const { PUMP_SDK, OnlinePumpSdk, getBuyTokenAmountFromSolAmount } = sdk;
+const { PUMP_SDK, OnlinePumpSdk, getBuyTokenAmountFromSolAmount, getSellSolAmountFromTokenAmount } = sdk;
 const amm = require('@pump-fun/pump-swap-sdk');
 
 export const connect = rpcUrl => new Connection(rpcUrl, { commitment: 'finalized', disableRetryOnRateLimit: true,
@@ -118,6 +118,25 @@ export async function buildSell(conn, { wallet, mint, tokenUnits, minimumReceive
   const sim = await conn.simulateTransaction(built.tx, { sigVerify: false, commitment: 'finalized', replaceRecentBlockhash: true });
   if (sim.value.err) throw Object.assign(Error('Sell failed simulation'), { logs: (sim.value.logs || []).slice(-4) });
   return { ...built, route };
+}
+
+/**
+ * What selling `tokenUnits` returns right now, from on-chain reserves on the same route
+ * buildSell uses (bonding curve, or canonical PumpSwap pool). Lamports string, or null.
+ */
+export async function quoteSell(conn, { mint, tokenUnits, tokenProgram }) {
+  const online = new OnlinePumpSdk(conn), mintKey = new PublicKey(mint), amount = new BN(tokenUnits);
+  const [global, feeConfig, curve] = await Promise.all([online.fetchGlobal(), online.fetchFeeConfig(), online.fetchBondingCurve(mintKey)]);
+  if (!curve.complete) return getSellSolAmountFromTokenAmount({ global, feeConfig, mintSupply: curve.tokenTotalSupply, bondingCurve: curve, amount }).toString();
+  const pool = amm.canonicalPumpPoolPda(mintKey);
+  if (!(await conn.getAccountInfo(pool, 'confirmed'))) return null;
+  const st = await new amm.OnlinePumpAmmSdk(conn).swapSolanaState(pool, mintKey); // user only selects token accounts; reserves are what we need
+  if (!st.pool.quoteMint.equals(NATIVE_MINT)) return null;
+  const { uiQuote } = amm.sellBaseInput({ base: amount, slippage: 0, baseReserve: st.poolBaseAmount, quoteReserve: st.poolQuoteAmount, virtualQuoteReserves: st.pool.virtualQuoteReserves,
+    globalConfig: st.globalConfig, baseMintAccount: st.baseMintAccount, baseMint: st.baseMint, coinCreator: st.pool.coinCreator, creator: st.pool.creator,
+    feeConfig: st.feeConfig, quoteMint: st.pool.quoteMint, isMayhemMode: st.pool.isMayhemMode, creatorFeeBps: st.pool.creatorFeeBps });
+  void tokenProgram;
+  return uiQuote.toString();
 }
 
 /** A real SPL BurnChecked of the wallet's own tokens. Supply drops on chain. */

@@ -94,8 +94,13 @@ export function livePlan({ tradingState, policy, c, peaks, positions, market, no
     nextPeaks[p.mint] = Math.max(nextPeaks[p.mint] || 0, price || 0);
     const reason = liquidating ? 'liquidate' : b ? exitDecision({ ...b, peakPriceSol: nextPeaks[p.mint] }, price, c, now) : null;
     if (!reason || !(price > 0)) continue;
-    const expected = Number(BigInt(p.spendableTokenUnits)) / 10 ** p.decimals * price;
-    const floor = lamports(expected * (1 - base.slippageBps / 10000));
+    // The floor comes from an on-chain quote on the sell's own route. A DexScreener price
+    // that disagrees with it by more than 15% is not trusted to plan anything.
+    const quoted = market.sellQuotes?.get(p.mint);
+    if (!quoted || BigInt(quoted) <= 0n) continue;
+    const dexExpected = Number(BigInt(p.spendableTokenUnits)) / 10 ** p.decimals * price * 1e9;
+    if (Math.abs(dexExpected - Number(BigInt(quoted))) > 0.15 * Number(BigInt(quoted))) continue;
+    const floor = BigInt(quoted) * BigInt(10000 - base.slippageBps) / 10000n;
     if (floor <= 0n) continue;
     proposals.push({ ...base, id: `sell-${randomUUID()}`, mint: p.mint, side: 'sell', tokenUnits: p.spendableTokenUnits, tokenDecimals: p.decimals, minimumReceiveLamports: floor.toString(), reason });
     break;
