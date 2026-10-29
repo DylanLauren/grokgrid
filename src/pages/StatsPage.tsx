@@ -8,6 +8,7 @@ import { ago, compact, mc, pct, signedUsd, usd } from '../lib/format'
 import { CoinChip } from '../ui/CoinChip'
 import { PeekLayer } from '../ui/CoinPeek'
 import { BestWorst, dur, rounds, sol } from '../ui/BestWorst'
+import { positions, Positions } from '../ui/Positions'
 import { Addresses } from '../ui/Panels'
 import { Page, Section } from './Page'
 
@@ -17,6 +18,7 @@ export function StatsPage({ feed }: { feed: Feed }) {
   const workers = useWorkers(true)
   const burned = token?.burned ?? feed.burnedMain
   const done = useMemo(() => rounds(feed.calls, feed.mode === 'live', feed.solUsd), [feed])
+  const open = useMemo(() => positions(feed.calls, feed.solUsd), [feed])
   const real = done.length ? done.reduce((n, r) => n + r.pnl, 0) : null
   const holds = done.flatMap((r) => (r.held === null ? [] : [r.held]))
   const avgHold = holds.length ? holds.reduce((a, b) => a + b, 0) / holds.length : null
@@ -62,6 +64,10 @@ export function StatsPage({ feed }: { feed: Feed }) {
           </div>
         ))}
       </div>
+
+      <Section title="Open positions" note={open.length ? `${open.length} held · value from market cap now` : 'none right now'}>
+        {open.length ? <Positions open={open} solUsd={feed.solUsd} /> : <p className="pos-empty mono">He isn’t holding anything right now. New buys show here until he sells.</p>}
+      </Section>
 
       {done.length > 0 && (
         <Section title="Best and worst" note={`of ${done.length} closed`}>
