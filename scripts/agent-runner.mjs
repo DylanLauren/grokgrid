@@ -165,7 +165,9 @@ async function tick() {
     await mkdir(dir, { recursive: true, mode: 0o700 });
     try {
       const c2 = agentStrategy(global, agent.rules);
-      const agentMarket = { ...market, metrics: new Map(market.metrics), facts: market.facts };
+      // Privy agents can only buy on the bonding curve (their policy allows no SOL wrap), so they
+      // never pick graduated coins (paper mode too, so its results stay honest). Held coins are priced later.
+      const agentMarket = { ...market, metrics: new Map([...market.metrics].filter(([, m]) => m.dexId === 'pumpfun')), facts: market.facts };
       if (c.mode === 'paper') report[agent.id] = await runPaper(dir, c2, agentMarket, now, liquidating);
       else {
         const policy = agentTradingPolicy(c, { ...agent, maxTradeLamports: agent.rules.maxTradeLamports });
