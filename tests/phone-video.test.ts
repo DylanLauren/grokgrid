@@ -110,3 +110,30 @@ test('opted-in preparation must succeed and pass a fresh read-only check before 
   await assert.rejects(preparePhoneVideoSource(config,{checkOnly:false,prepare:async()=>{throw Error('binding-mismatch')},inspect:async()=>assert.fail('failed binding cannot proceed')}),/binding-mismatch/)
   await assert.rejects(preparePhoneVideoSource(config,{checkOnly:false,prepare:async()=>{},inspect:async()=>{throw Error('size-not-restored')}}),/size-not-restored/)
 })
+
+test('WHIP compatibility removes TCP only where the same media or BUNDLE has usable UDP', async () => {
+  const {udpCompatibleSdp}=await import('../scripts/phone-video-whip.mjs')
+  const udp='a=candidate:1 1 udp 123 192.0.2.1 50000 typ host'
+  const tcp='a=candidate:2 1 tcp 122 192.0.2.1 7881 typ host tcptype passive'
+  const retained=['v=0','a=ice-ufrag:unit-test','a=ice-pwd:synthetic-unit-test-only','a=fingerprint:sha-256 TEST','m=video 9 UDP/TLS/RTP/SAVPF 96','a=mid:video',udp,'a=end-of-candidates',''].join('\r\n')
+  const mixed=Buffer.from(retained.replace(udp,udp+'\r\n'+tcp))
+  assert.equal(udpCompatibleSdp(mixed).body.toString(),retained)
+  assert.equal(udpCompatibleSdp(mixed).removed,1)
+  const unchanged=Buffer.from(retained);assert.equal(udpCompatibleSdp(unchanged).body,unchanged)
+  assert.throws(()=>udpCompatibleSdp(Buffer.from(retained.replace(udp,tcp))),/udp-candidate-required/)
+  assert.throws(()=>udpCompatibleSdp(Buffer.from(retained.replace(udp,udp.replace('50000','0')+'\r\n'+tcp))),/udp-candidate-required/)
+  const twoMedia='v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=mid:video\r\n'+udp+'\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\na=mid:audio\r\n'+tcp+'\r\n'
+  assert.throws(()=>udpCompatibleSdp(Buffer.from(twoMedia)),/udp-candidate-required/)
+  assert.equal(udpCompatibleSdp(Buffer.from(twoMedia.replace('v=0','v=0\r\na=group:BUNDLE video audio'))).removed,1)
+})
+test('WHIP proxy rewrites only successful SDP POST bodies and frames the new body length', async () => {
+  const answer='v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=mid:v\r\na=candidate:1 1 udp 123 192.0.2.1 50000 typ host\r\na=candidate:2 1 tcp 122 192.0.2.1 7881 typ host tcptype passive\r\n'
+  const proxy=await createWhipProxy('https://test.livekit.cloud/w/test-only-key',{fetchImpl:async()=>new Response(answer,{status:201,headers:{'content-type':'application/sdp','content-length':String(Buffer.byteLength(answer))}})})
+  try {
+    const response=await fetch(proxy.url,{method:'POST',body:'offer'}),body=await response.text()
+    assert.equal(response.status,201);assert.ok(!body.includes(' 1 tcp '));assert.ok(body.includes(' 1 udp '))
+    assert.ok(response.headers.get('content-length')===null || Number(response.headers.get('content-length'))===Buffer.byteLength(body))
+  }finally{await proxy.close()}
+  const plain=await createWhipProxy('https://test.livekit.cloud/w/test-only-key',{fetchImpl:async()=>new Response(answer,{status:200,headers:{'content-type':'text/plain'}})})
+  try{assert.equal(await (await fetch(plain.url,{method:'POST',body:'offer'})).text(),answer)}finally{await plain.close()}
+})
