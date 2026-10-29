@@ -25,7 +25,8 @@ export const keys = {
 
 export interface Draft {
   look: number
-  name: string
+  name: string // the coin's name on pump.fun
+  botName: string // the bot's own name on the grid; the coin name when left blank
   ticker: string
   description: string
   x: string
@@ -67,6 +68,7 @@ export function cleanDraft(value: unknown): Draft {
   const d: Draft = {
     look: Number.isInteger(v.look) && (v.look as number) >= 0 && (v.look as number) < LOOKS.length ? (v.look as number) : 0,
     name: str('name'),
+    botName: str('botName') || str('name'),
     ticker: str('ticker').replace(/^\$/, '').toUpperCase(),
     description: str('description'),
     x: link(str('x'), ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com'], 'X'),
@@ -78,6 +80,7 @@ export function cleanDraft(value: unknown): Draft {
     firstBuy: str('firstBuy'),
   }
   if (!d.name || bytes(d.name) > 32 || CONTROL.test(d.name)) throw Error('Name needs 1 to 32 characters.')
+  if (bytes(d.botName) > 32 || CONTROL.test(d.botName)) throw Error('Bot name needs 32 characters at most.')
   if (!/^[A-Z0-9]{2,10}$/.test(d.ticker)) throw Error('Ticker needs 2 to 10 letters or numbers.')
   if (bytes(d.description) > 600 || CONTROL.test(d.description)) throw Error('Description must be 600 bytes or fewer.')
   if (!d.strategy || bytes(d.strategy) > 140 || CONTROL.test(d.strategy)) throw Error('Strategy needs one line, 140 bytes at most.')

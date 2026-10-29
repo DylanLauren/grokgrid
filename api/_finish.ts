@@ -51,7 +51,7 @@ export async function finishLaunch(mint: string): Promise<Result> {
   const id = agentId(d.ticker, mint)
   const rec: AgentRecord = {
     id,
-    name: d.name,
+    name: d.botName || d.name, // launches prepared before bot names had only the coin name
     color,
     shape,
     strategy: d.strategy,

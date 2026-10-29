@@ -18,6 +18,13 @@ test('a launch draft is cleaned and checked before anything is built', () => {
   assert.equal(cleanDraft({ ...good, look: 99 }).look, 0)
 })
 
+test('a bot can have its own name, and shares the coin name when left blank', () => {
+  assert.equal(cleanDraft(good).botName, 'Night Shift')
+  assert.equal(cleanDraft({ ...good, botName: '  Night Owl ' }).botName, 'Night Owl')
+  assert.equal(metadataJson(cleanDraft({ ...good, botName: 'Night Owl' }), 'M').name, 'Night Shift') // the coin keeps its own name
+  assert.throws(() => cleanDraft({ ...good, botName: 'x'.repeat(33) }), /Bot name/)
+})
+
 test('metadata points pump.fun at our picture and the bot\'s own GrokGrid profile', () => {
   const m = metadataJson(cleanDraft(good), 'So11111111111111111111111111111111111111112')
   assert.match(m.image, /\/i\/So111/)
