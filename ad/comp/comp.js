@@ -314,103 +314,198 @@ scene(6.4, 11.0, (root) => {
   }
 })
 
-// 4. the real site: window with the room, cursor clicks "calls", a call card comes forward
+// ---------- the real UI, redrawn as code ----------
+// scripts/snapshot.js saves each page's real markup and stylesheet; ui.js rebuilds it in a shadow root.
+// So every card, number, chart and button here is the site's own DOM and CSS: crisp at any zoom, and
+// animated piece by piece. A "camera" (translate + scale) moves over it like over a design file.
+const UIDIR = Q.get('uidom') || '../ui-dom'
+const UI_LOADS = []
+function uiView(parent, snap) {
+  const wrap = el('div', 'abs', parent)
+  css(wrap, { inset: '0', overflow: 'hidden' })
+  const host = el('div', 'abs', wrap)
+  css(host, { left: '0', top: '0', transformOrigin: '0 0' })
+  const v = { wrap, host, sr: null, rects: {}, h: 0 }
+  UI_LOADS.push(window.siteUI(host, snap, UIDIR).then((sr) => {
+    v.sr = sr
+    // the room is drawn by Blender here; its HTML monitor and background stay out
+    const st = document.createElement('style')
+    st.textContent = `.mon, .stage canvas { display: none !important; } :host, .gg-body, .app { background: transparent !important; } .page { overflow: visible !important; }
+    .page, .pg > *, .pg-sub, .pg-eyebrow, .pg-title, .pg-title span, .st-hero > *, .pg-sec .card, .pn-item, .lb, aside.panel { animation-name: none !important; }`
+    sr.appendChild(st)
+    const pg = sr.querySelector('.page')
+    v.h = Math.max(host._snap.vh, pg ? pg.scrollHeight : 0)
+    css(host, { width: host._snap.vw + 'px', height: v.h + 'px' })
+  }))
+  return v
+}
+const $ = (v, sel) => (v.sr ? v.sr.querySelector(sel) : null)
+const $$ = (v, sel) => (v.sr ? [...v.sr.querySelectorAll(sel)] : [])
+// an element's box in UI pixels (measured once with the camera at rest)
+function box(v, key, sel, nth = 0) {
+  if (v.rects[key]) return v.rects[key]
+  const e = $$(v, sel)[nth]
+  if (!e) return { x: 0, y: 0, w: 0, h: 0 }
+  const keep = v.host.style.transform
+  v.host.style.transform = 'none'
+  const hr = v.host.getBoundingClientRect(), r = e.getBoundingClientRect()
+  v.host.style.transform = keep
+  return (v.rects[key] = { x: r.x - hr.x, y: r.y - hr.y, w: r.width, h: r.height })
+}
+// camera keys: [t, cx, cy, scale] with cx, cy the UI point at the centre of the frame
+function camera(v, t, keys) {
+  // the page's full height can only be read once its scene is showing
+  if (!v.sized) {
+    const pg = $(v, '.page')
+    if (pg && pg.scrollHeight) { v.h = Math.max(v.host._snap.vh, pg.scrollHeight); css(v.host, { height: v.h + 'px' }); v.sized = true }
+  }
+  let [, cx, cy, sc] = keys[0]
+  for (let i = 0; i < keys.length - 1; i++) {
+    const [ta, xa, ya, sa] = keys[i], [tb, xb, yb, sb] = keys[i + 1]
+    if (t >= ta) { const k = eInOut(rng(t, ta, tb)); cx = lerp(xa, xb, k); cy = lerp(ya, yb, k); sc = lerp(sa, sb, k) }
+  }
+  v.cam = [cx, cy, sc]
+  css(v.host, { transform: `translate(${W / 2 - cx * sc}px, ${H / 2 - cy * sc}px) scale(${sc})` })
+}
+// a UI point on stage under the current camera
+const onStage = (v, x, y) => [W / 2 + (x - v.cam[0]) * v.cam[2], H / 2 + (y - v.cam[1]) * v.cam[2]]
+const centre = (v, b, fx = 0.5, fy = 0.5) => onStage(v, b.x + b.w * fx, b.y + b.h * fy)
+// rise-in for a list of elements, one after another
+function cascade(els, t, t0, gap, dist = 36) {
+  els.forEach((e, i) => {
+    const k = expoOut(rng(t, t0 + i * gap, t0 + i * gap + 0.6))
+    e.style.opacity = clamp(k * 1.6)
+    e.style.transform = `translateY(${(1 - k) * dist}px)`
+  })
+}
+const fmt = (x, d) => x.toFixed(d)
+let CURSOR = null
+
+// the page's own title block rises in as the scene starts (the site's entrance, driven by video time)
+const pageIn = (v, t, t0) => cascade($$(v, '.pg > *').slice(0, 4), t, t0, 0.09, 30)
+
+// 4. his calls: the real Calls panel fills in card by card beside him
 scene(10.8, 16.0, (root) => {
-  const ww = L(1500, 700), wh = V ? Math.round(ww * 2796 / 1290) : Math.round(ww * 1000 / 1600) + 44
-  const win = V ? phoneCard(root, 'm-desk') : windowCard(root, 'desk')
-  const calls = addShot(win, V ? 'm-calls' : 'calls')
-  const head = words(root, L('Every trade, <span class="dim">called out loud.</span>', 'Every trade,<br><span class="dim">called out loud.</span>'), 'h1 abs')
-  css(head, { fontSize: L(96, 116) + 'px', textAlign: 'center' })
-  const call = el('div', 'call', root, `
-    <div class="top"><div style="width:40px;height:40px">${markSVG('house', 'sphere')}</div>grokgrid <span class="ago">3m ago</span><span class="tag sell">SELL</span></div>
-    <div class="body">cut Pnut, down 2%. i am just like you.</div>
-    <div class="row"><span style="width:34px;height:34px;border-radius:9px;background:#1683ff;display:inline-block"></span>Peanut the… · 0.33 SOL · $42.24M MC</div>`)
+  const bot = clipImg('phone'); root.appendChild(bot)
+  const v = uiView(root, V ? 'm-calls' : 'calls')
+  const head = words(root, 'Every trade,<br><span class="dim">called out loud.</span>', 'h1 abs')
+  css(head, { fontSize: L(96, 104) + 'px', lineHeight: 1.04, textAlign: L('left', 'center') })
   return (t) => {
-    const k = expoOut(rng(t, 10.85, 11.7))
-    const out = eIn(rng(t, 15.55, 16.0))
-    const x = (W - ww) / 2, y = L(H - wh + 70, 560)
-    place(win, x, y + (1 - k) * 260, ww, wh)
-    css(win, { opacity: clamp(k * 2) * (1 - out), transform: `perspective(2400px) rotateX(${(1 - k) * 24 + Math.sin(t * 0.5) * 1.2}deg) rotateY(${Math.sin(t * 0.4) * 2}deg) scale(${lerp(0.94, 1, k) * (1 - out * 0.06)})` })
-    // switch tab to calls on click
-    css(calls, { opacity: 0 })
-    win._img.style.opacity = 1
-    // slow push into the shot
-    const z = lerp(1, 1.06, eInOut(rng(t, 11, 15.5)))
-    win._shots.forEach((im) => css(im, { transform: `scale(${z})` }))
-    playWords(head, t, 11.0, 0.09, 15.5)
-    if (V) place(head, (W - head.offsetWidth) / 2, 270)
-    else place(head, (W - head.offsetWidth) / 2, 70)
-    // cursor: in from bottom right, to the "calls" tab (approx 18% across the tab bar), click
-    const tabX = x + ww * (V ? 0.312 : 0.322) * 0.5 + (V ? 0 : ww * 0.0), tabY = y + 44 + 28 * (ww / 1600) * (2000 / 1000) * 0.5
-    const zz = lerp(1, 1.06, eInOut(rng(t, 11, 15.5)))
-    const top = V ? 0 : 44, tab = V ? [0.2, 0.705] : [0.1, 0.835]
-    runCursor(t, [[11.9, x + ww * 0.85, y + L(wh * 0.9, 900)], [12.95, x + ww * tab[0] * zz, y + top + (wh - top) * tab[1] * zz]], [13.0])
-    const kc = pop(rng(t, 13.7, 14.4))
-    const cw = L(600, 820)
-    css(call, { width: cw + 'px', left: L(x + 40, (W - cw) / 2) + 'px', top: L(y + wh * 0.38, 1340) + 'px', opacity: clamp(kc * 3) * (1 - out), transform: `scale(${(0.7 + 0.3 * kc) * L(1, 1.1)}) rotate(${(1 - kc) * -4}deg)` })
+    if (!v.sr) return
+    const panel = box(v, 'panel', 'aside.panel'), first = box(v, 'first', '.pn-item')
+    const k = expoOut(rng(t, 10.8, 11.6)), out = eIn(rng(t, 15.55, 16.0))
+    if (V) camera(v, t, [[10.8, 215, 354, 2.2], [13.4, 215, 370, 2.22], [14.4, 215, first.y + first.h * 0.5, 2.9], [16, 215, first.y + first.h * 0.5 + 10, 2.98]])
+    else camera(v, t, [[10.8, 830, 520, 1.25], [13.3, 842, 520, 1.28], [14.4, panel.x + panel.w * 0.5, first.y + first.h * 0.5 + 60, 1.95], [16, panel.x + panel.w * 0.5 - 6, first.y + first.h * 0.5 + 66, 2.02]])
+    css(v.wrap, { opacity: (1 - out) })
+    // vertical: the headline owns the top, the UI fades in under it
+    if (V) css(v.wrap, { maskImage: 'linear-gradient(transparent 330px, #000 470px)', webkitMaskImage: 'linear-gradient(transparent 330px, #000 470px)' })
+    // the panel slides in from the right like on the site, then the calls land one by one
+    const pe = $(v, 'aside.panel')
+    if (pe) css(pe, { transform: `translateX(${(1 - k) * 420}px)`, opacity: clamp(k * 1.5) })
+    cascade($$(v, '.pn-item'), t, 11.2, 0.28, 60)
+    // him, trading on his phone in the room the panel sits over
+    playClip(bot, t, 10.8, { loop: true })
+    // he sits in the room where the site's own 3D bot is, so he moves with the camera
+    const bs = 760 * v.cam[2]
+    const [bx, by] = onStage(v, 560, 640)
+    place(bot, bx - bs * 0.5, by - bs * 0.5, bs, bs)
+    css(bot, { opacity: V ? 0 : clamp(k * 2) * (1 - out) })
+    playWords(head, t, 11.1, 0.1, 13.5)
+    if (V) place(head, (W - head.offsetWidth) / 2, 110)
+    else place(head, 96, 120)
+    // the cursor comes to rest on the newest call (its real hover style shows)
+    const [fx, fy] = centre(v, first, 0.6, 0.35)
+    CURSOR = [[[13.9, fx + 260, fy + 320], [14.7, fx, fy], [15.6, fx + 6, fy + 4]], []]
   }
 })
 
-// 5. his numbers: zoom into the real stats page
+// 5. his numbers: the real stats page, the wallet counting up and the chart drawing itself
 scene(15.8, 20.2, (root) => {
-  const ww = L(1600, 700), wh = V ? Math.round(ww * 2796 / 1290) : Math.round(ww * 1000 / 1600) + 44
-  const win = V ? phoneCard(root, 'm-stats-full') : windowCard(root, 'stats')
-  const head = words(root, L('Every number <span class="hl-gain">on chain.</span>', 'Every number<br><span class="hl-gain">on chain.</span>'), 'h1 abs')
-  css(head, { fontSize: L(96, 120) + 'px', textAlign: 'center' })
-  const sub = words(root, 'wallet, trades, wins and losses. nothing hidden.', 'sub abs')
-  css(sub, { fontSize: L(38, 38) + 'px' })
+  const v = uiView(root, V ? 'm-stats' : 'stats')
+  let target = null
   return (t) => {
-    const k = expoOut(rng(t, 15.85, 16.7))
-    const out = eIn(rng(t, 19.75, 20.2))
-    const x = (W - ww) / 2, y = L(H * 0.36, 640)
-    place(win, x, y + (1 - k) * 200, ww, wh)
-    // camera move across the page: from the headline down to the wallet + chart
-    const m = eInOut(rng(t, 16.4, 19.6))
-    const s = lerp(1.0, L(1.55, 1.35), m)
-    const ox = lerp(0, L(-0.06, -0.05), m) * ww, oy = lerp(0, L(-0.12, -0.2), m) * wh
-    css(win._img, { transform: `translate(${ox}px, ${oy}px) scale(${s})` })
-    css(win, { opacity: clamp(k * 2) * (1 - out), transform: `perspective(2400px) rotateX(${(1 - k) * 20 + 3}deg) rotateZ(${lerp(-1.2, 0.4, m)}deg)` })
-    playWords(head, t, 16.0, 0.1, 19.7)
-    playWords(sub, t, 16.45, 0.05, 19.7)
-    if (V) { place(head, (W - head.offsetWidth) / 2, 260); place(sub, (W - sub.offsetWidth) / 2, 545) }
-    else { place(head, (W - head.offsetWidth) / 2, 80); place(sub, (W - sub.offsetWidth) / 2, 200) }
+    if (!v.sr) return
+    const title = box(v, 'title', '.pg-head h1, h1'), wal = box(v, 'wallet', '.st-wallet'), chart = box(v, 'chart', '.st-chart')
+    const tiles = $$(v, '.st-tile'), rows = $$(v, '.pos-row')
+    const tl = box(v, 'tiles', '.st-tile', 0), pr = box(v, 'rows', '.pos-row', 0)
+    const k = expoOut(rng(t, 15.8, 16.6)), out = eIn(rng(t, 19.8, 20.2))
+    void title; void wal; void chart
+    const top = title.y - 40
+    if (V) camera(v, t, [[15.8, 215, top + 380, 2.3], [16.9, 215, top + 400, 2.3], [17.8, 215, chart.y + chart.h * 0.5, 2.3], [18.9, 215, tl.y + 120, 2.3], [20.2, 215, pr.y + 160, 2.2]])
+    else camera(v, t, [[15.8, 760, top + 300, 1.62], [16.9, 770, top + 320, 1.6], [17.8, 796, chart.y + chart.h * 0.5, 1.5], [18.9, 800, tl.y + 80, 1.4], [20.2, 800, pr.y + 120, 1.34]])
+    pageIn(v, t, 15.85)
+    css(v.wrap, { opacity: clamp(k * 2) * (1 - out) })
+    // the wallet counts up to its real value
+    const big = $(v, '.st-big')
+    if (big) {
+      if (target == null) target = parseFloat(big.firstChild.textContent)
+      big.firstChild.textContent = fmt(target * eOut(rng(t, 16.9, 18.0), 4), 3)
+    }
+    // the chart draws left to right
+    const plot = $(v, '.st-plot')
+    if (plot) css(plot, { clipPath: `inset(0 ${(1 - eInOut(rng(t, 17.0, 18.4))) * 100}% 0 0)` })
+    cascade([...$$(v, '.st-pills span')], t, 17.6, 0.08, 14)
+    cascade(tiles, t, 18.2, 0.07, 40)
+    cascade(rows, t, 19.1, 0.08, 40)
+    const [cx, cy] = centre(v, chart, 0.25, 0.55), [dx, dy] = centre(v, chart, 0.85, 0.45)
+    CURSOR = [[[17.3, cx + 120, cy + 300], [17.9, cx, cy], [18.7, dx, dy], [19.4, dx + 40, dy + 200]], []]
   }
 })
 
-// 6. launch your own: grid page, cursor picks teal, the family hops across
+// 6. launch your own: the real Grid page; the cursor picks violet and names it, then the family runs
 scene(20.0, 25.4, (root) => {
-  const ww = L(960, 700), wh = V ? Math.round(ww * 2796 / 1290) : Math.round(ww * 1000 / 1600) + 44
-  const win = V ? phoneCard(root, 'm-grid-full') : windowCard(root, 'grid')
-  const head = words(root, 'Launch <span class="hl-teal">your own</span><br>Grok Bot.', 'h1 abs')
-  css(head, { fontSize: L(100, 124) + 'px', lineHeight: 1.05, textAlign: L('left', 'center') })
-  const sub = words(root, 'its own coin. its own wallet.<br>it trades for you.', 'sub abs')
-  css(sub, { fontSize: L(40, 46) + 'px', lineHeight: 1.35, textAlign: L('left', 'center') })
+  const v = uiView(root, V ? 'm-grid' : 'grid')
   const run = clipImg('family_run'); root.appendChild(run)
-  const run2 = words(root, L('Pick a colour. <span class="hl-teal">Launch.</span> Done.', 'Pick a colour.<br><span class="hl-teal">Launch.</span> Done.'), 'h1 abs')
+  const run2 = words(root, L('Pick a colour. <span class="hl-violet">Launch.</span> Done.', 'Pick a colour.<br><span class="hl-violet">Launch.</span> Done.'), 'h1 abs')
   css(run2, { fontSize: L(110, 120) + 'px', textAlign: 'center' })
   const rw = L(W * 1.0, W * 1.5)
-  // the teal swatch in the grid screenshot, as a fraction of the page
-  const SW = L([0.42, 0.575], [0.212, 0.722]), ZS = L(1.7, 1.25)
+  const NAME = 'night shift'
+  const PICK = 4 // violet
+  let swapped = false
   return (t) => {
-    const k = expoOut(rng(t, 20.05, 20.9))
-    const out = eIn(rng(t, 23.0, 23.5))
-    const x = L(W - ww - 80, (W - ww) / 2), y = L((H - wh) / 2 + 20, 700)
-    place(win, x + (1 - k) * L(300, 0), y + (1 - k) * L(0, 200), ww, wh)
-    const ih = wh - (V ? 0 : 44)
-    const m = eInOut(rng(t, 20.7, 22.2))
-    const s = lerp(1, ZS, m)
-    const ox = lerp(0, clamp(-(SW[0] * ww * ZS - ww * 0.5), -(ZS - 1) * ww, 0), m), oy = lerp(0, clamp(-(SW[1] * ih * ZS - ih * 0.5), -(ZS - 1) * ih, 0), m)
-    css(win._img, { transform: `translate(${ox}px, ${oy}px) scale(${s})` })
-    css(win, { opacity: clamp(k * 2) * (1 - out), transform: `perspective(2400px) rotateY(${L(-(1 - k) * 25 - 5, 0)}deg) rotateX(${L(0, (1 - k) * 20 + 3)}deg) scale(${1 - out * 0.05})` })
-    const fx = clamp(-(SW[0] * ww * ZS - ww * 0.5), -(ZS - 1) * ww, 0), fy = clamp(-(SW[1] * ih * ZS - ih * 0.5), -(ZS - 1) * ih, 0)
-    const sx = x + SW[0] * ww * ZS + fx, sy = y + (V ? 0 : 44) + SW[1] * ih * ZS + fy
-    runCursor(t, [[21.5, x + ww * 0.85, y + wh * 0.95], [22.5, sx + 4, sy + 4]], [22.6])
-    playWords(head, t, 20.2, 0.1, 22.75)
-    playWords(sub, t, 20.7, 0.05, 22.75)
+    if (!v.sr) return
+    const title = box(v, 'title', 'h1'), line = box(v, 'line', '.gd-line'), pick = box(v, 'pick', '.gd-pick', PICK), name = box(v, 'name', 'input[placeholder="night shift"]')
+    const side = box(v, 'side', '.gd-side')
+    const k = expoOut(rng(t, 20.0, 20.7)), out = eIn(rng(t, 22.95, 23.4))
+    void title; void line; void name
+    const gtop = title.y - 40, ly = line.y + line.h * 0.5, nmy = name.y + name.h * 0.5
+    if (V) camera(v, t, [[20.0, 215, gtop + 400, 2.2], [20.8, 215, ly, 2.0], [21.85, 215, ly + 10, 2.02], [22.35, 215, nmy - 80, 2.0], [23.4, 215, nmy - 70, 2.05]])
+    else camera(v, t, [[20.0, 760, gtop + 290, 1.6], [20.8, 790, ly + 40, 1.36], [21.85, 795, ly + 50, 1.38], [22.35, 760, nmy - 40, 1.5], [23.4, 765, nmy - 35, 1.55]])
+    pageIn(v, t, 20.05)
+    css(v.wrap, { opacity: clamp(k * 2) * (1 - out) })
+    // the picker bots pop in left to right
+    $$(v, '.gd-pick').forEach((e, i) => { const p = pop(rng(t, 20.4 + i * 0.06, 21.0 + i * 0.06)); e.style.transform = `scale(${0.4 + 0.6 * p})`; e.style.opacity = clamp(p * 2) })
+    // click: violet becomes the pick, the preview bot becomes violet
+    if (t >= 21.6 && !swapped) {
+      swapped = true
+      $$(v, '.gd-pick').forEach((e, i) => { e.classList.toggle('on', i === PICK); e.setAttribute('aria-checked', String(i === PICK)) })
+      const from = $$(v, '.gd-pick')[PICK].querySelector('.lb'), to = $(v, '.gd-side .lb')
+      if (from && to) { const c = from.cloneNode(true); c.style.cssText = to.style.cssText; c.setAttribute('class', to.getAttribute('class').replace(/lb-\w+/, from.className.match(/lb-\w+/)?.[0] || '')); to.replaceWith(c) }
+      // the coin picture is the picked bot on the site's light tile, so it turns violet too
+      const sv = $$(v, '.gd-pick')[PICK].querySelector('svg')
+      if (sv) {
+        const art = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-14 -14 128 128"><rect x="-14" y="-14" width="128" height="128" fill="#f2f3f5"/>${sv.innerHTML}</svg>`
+        $$(v, 'img[src^="data:image/svg"]').forEach((im) => { im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(art) })
+      }
+    }
+    if (t < 21.6 && swapped) swapped = false // scrubbing backwards in previews
+    // typing the name: field, preview card and coin card all follow, ticker fills itself
+    const n = clamp(Math.floor((t - 22.45) / 0.05), 0, NAME.length)
+    const typed = NAME.slice(0, n)
+    const inp = $(v, 'input[placeholder="night shift"]')
+    if (inp) { inp.value = typed; inp.setAttribute('value', typed) }
+    const tk = $(v, 'input[placeholder="NIGHT"]')
+    if (tk) tk.value = typed.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10)
+    const pv = $(v, '.gd-side b'); if (pv) pv.textContent = typed || 'your bot'
+    const cn = $(v, '.gd-coin-top b'); if (cn) cn.textContent = typed || 'coin name'
+    const ct = $(v, '.gd-coin-top span'); if (ct) ct.textContent = '$' + (typed.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) || 'TICKER')
+    if (inp && n > 0 && n < NAME.length + 1) inp.focus()
+    const [px, py] = centre(v, pick, 0.5, 0.45), [nx, ny] = centre(v, name, 0.25, 0.5)
+    CURSOR = [[[20.95, px + 300, py + 260], [21.5, px, py], [21.9, px + 4, py + 2], [22.3, nx, ny], [22.95, nx + 30, ny + 26]], [21.6, 22.32]]
+    void side
+    // then the page clears and the family runs across
     playWords(run2, t, 23.15, 0.08, 25.0)
     place(run2, (W - run2.offsetWidth) / 2, L(150, 330))
-    if (V) { place(head, (W - head.offsetWidth) / 2, 220); place(sub, (W - sub.offsetWidth) / 2, 520) }
-    else { place(head, 96, H * 0.5 - 190); place(sub, 100, H * 0.5 + 60) }
     playClip(run, t, 22.9)
     const rk = rng(t, 22.9, 23.0) * (1 - rng(t, 25.05, 25.4))
     const rh = rw * 900 / 1600
@@ -552,14 +647,24 @@ window.seek = function (t) {
     s.root.style.display = on ? 'block' : 'none'
     if (on) s.update(t)
   }
-  // the cursor belongs to scenes 4 and 6 only
-  if (!((t > 11 && t < 16) || (t > 21 && t < 23.4))) runCursor(t, null)
+  if (CURSOR && t > 11 && t < 23.4) runCursor(t, CURSOR[0], CURSOR[1])
+  else runCursor(t, null)
+  CURSOR = null
 }
 window.ready = async function () {
+  await Promise.all(UI_LOADS)
   await document.fonts.ready
   const imgs = [...document.images].filter((i) => i.src)
   await Promise.all(imgs.map((i) => (i.complete ? Promise.resolve() : i.decode().catch(() => {}))))
 }
 window.DURATION = DURATION
+// for render.js: where the real mouse goes, what to send, which pages to scroll
+// render.js moves the real mouse here so the redrawn UI shows its real hover states
+window.mouseAt = function () {
+  const c = stage.querySelector('.cursor')
+  if (!(c.style.opacity > 0.01)) return null
+  const m = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(c.style.transform)
+  return m ? [+m[1], +m[2]] : null
+}
 window.FPS = FPS
 seek(+(Q.get('t') || 0))

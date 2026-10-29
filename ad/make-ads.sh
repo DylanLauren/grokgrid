@@ -11,19 +11,22 @@ GPU=${GPU:-METAL}
 SAMPLES=${SAMPLES:-64}
 RES=${RES:-1080}
 SECS=40
-mkdir -p ui clips out assets
+mkdir -p ui ui-dom clips out assets
+DSF=${DSF:-2}
 
-echo "== 1/5 tools and assets"
+echo "== 1/6 tools and assets"
 [ -d node_modules/playwright ] || npm i --no-save --no-audit --no-fund playwright@1.49.1
 npx playwright install chromium >/dev/null
 command -v ffmpeg >/dev/null || brew install ffmpeg
 cp ../public/fonts/*.woff2 assets/
 
-echo "== 2/5 live UI from grokgrid.fun"
-BASE=${BASE:-https://grokgrid.fun/} node scripts/capture.js "$PWD/ui"
+echo "== 2/6 live UI from grokgrid.fun (markup + styles, redrawn as code in the ad)"
+BASE=${BASE:-https://grokgrid.fun/} node scripts/snapshot.js "$PWD/ui-dom"
+# the phone screen in the 3D clips still uses a picture of the mobile matrix page
+BASE=${BASE:-https://grokgrid.fun/} ONLY=m-matrix-full node scripts/capture.js "$PWD/ui"
 
 if [ -z "$SKIP_CLIPS" ]; then
-  echo "== 3/5 3D clips in Blender"
+  echo "== 3/6 3D clips in Blender"
   for c in hero phone lineup lineup_v family_run; do
     "$BLENDER" -b --python scripts/chars.py -- --clip $c --res $RES --samples $SAMPLES --gpu $GPU \
       --phone-tex "$PWD/ui/m-matrix-full.png" --out "$PWD/clips/$c" > "clips/$c.log" 2>&1
@@ -36,14 +39,22 @@ SRV=$!
 trap 'kill $SRV' EXIT
 sleep 1
 
-echo "== 4/5 soundtrack (UI sounds timed to the picture)"
+echo "== 4/6 soundtrack (the ad's own synth-pop bed + UI sounds timed to the picture)"
 node scripts/audio.js out/soundtrack.wav $SECS
 
-echo "== 5/5 motion design frames + encode"
+echo "== 5/6 motion design frames (drawn at ${DSF}x, two halves at once)"
 for cut in "1920 1080 16x9" "1080 1920 9x16"; do
   set -- $cut
-  QS="&ui=../ui&clips=../clips" node scripts/render.js $1 $2 "out/frames-$3"
+  DSF=$DSF QS="&ui=../ui&clips=../clips" node scripts/render.js $1 $2 "out/frames-$3" 0 20 > "out/$3-a.log" 2>&1 &
+  DSF=$DSF QS="&ui=../ui&clips=../clips" node scripts/render.js $1 $2 "out/frames-$3" 20 $SECS > "out/$3-b.log" 2>&1 &
+  wait
+done
+
+echo "== 6/6 encode (supersampled down to full HD, so type and UI stay razor sharp)"
+for cut in "1920 1080 16x9" "1080 1920 9x16"; do
+  set -- $cut
   ffmpeg -y -loglevel error -framerate 30 -i "out/frames-$3/f_%05d.png" -i out/soundtrack.wav \
-    -c:v libx264 -preset slow -crf 15 -pix_fmt yuv420p -af alimiter=limit=0.89 -c:a aac -b:a 192k -shortest -movflags +faststart "out/grokgrid-ad-$3.mp4"
+    -vf "scale=$1:$2:flags=lanczos" -c:v libx264 -preset slow -crf 14 -pix_fmt yuv420p \
+    -af alimiter=limit=0.89 -c:a aac -b:a 256k -shortest -movflags +faststart "out/grokgrid-ad-$3.mp4"
   echo "   out/grokgrid-ad-$3.mp4"
 done

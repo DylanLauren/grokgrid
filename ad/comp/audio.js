@@ -1,222 +1,174 @@
-// Soundtrack for the ad: the site's own late-night jazz trio (same tune, voicings and samples as
-// src/lib/jazz.ts), rendered offline with a fixed seed, plus small UI sounds timed to the picture.
-// renderAudio(seconds) -> Float32 interleaved stereo at 48 kHz, as base64 for the encoder.
+// Soundtrack for the ad: an upbeat synth-pop bed (120 bpm, Am F C G) written for this cut, plus small UI
+// sounds timed to the picture. Everything is synthesised offline, so every render is identical.
+// renderAudio(seconds) -> 16-bit stereo PCM at 48 kHz, as base64 for the encoder.
 ;(function () {
   const SR = 48000
-  // dlao dropped the site's jazz (2026-10-29), so the ad ships with UI sounds only; MUSIC=true brings the trio back
-  const MUSIC = new URLSearchParams(location.search).get('music') === '1'
-  const BPM = 84, BEAT = 60 / BPM, BAR = BEAT * 4, SWING = 0.64, VOLUME = 0.55
-  const BASE = '../assets/jazz/'
-  const PIANO = { 33: 'A1', 36: 'C2', 39: 'Ds2', 42: 'Fs2', 45: 'A2', 48: 'C3', 51: 'Ds3', 54: 'Fs3', 57: 'A3', 60: 'C4', 63: 'Ds4', 66: 'Fs4', 69: 'A4', 72: 'C5', 75: 'Ds5', 78: 'Fs5', 81: 'A5', 84: 'C6' }
-  const BASS = { 28: 'E1', 31: 'G1', 34: 'As1', 37: 'Cs2', 40: 'E2', 43: 'G2', 46: 'As2', 49: 'Cs3', 52: 'E3' }
-  const QUAL = {
-    maj7: { tones: [0, 4, 7, 11], scale: [0, 2, 4, 7, 9, 11], a: [4, 7, 11, 14], b: [11, 14, 16, 19] },
-    m7: { tones: [0, 3, 7, 10], scale: [0, 2, 3, 5, 7, 9, 10], a: [3, 7, 10, 14], b: [10, 14, 15, 19] },
-    '7': { tones: [0, 4, 7, 10], scale: [0, 2, 4, 7, 9, 10], a: [4, 9, 10, 14], b: [10, 14, 16, 21] },
-    '9': { tones: [0, 4, 7, 10], scale: [0, 2, 4, 5, 7, 9, 10], a: [4, 7, 10, 14], b: [10, 14, 16, 19] },
-    '7b9': { tones: [0, 4, 7, 10], scale: [0, 1, 3, 4, 7, 8, 10], a: [4, 8, 10, 13], b: [10, 13, 16, 20] },
-    m7b5: { tones: [0, 3, 6, 10], scale: [0, 3, 5, 6, 8, 10], a: [3, 6, 10, 14], b: [10, 14, 15, 18] },
-    m6: { tones: [0, 3, 7, 9], scale: [0, 2, 3, 5, 7, 9, 11], a: [3, 7, 9, 14], b: [9, 14, 15, 19] },
-    dim7: { tones: [0, 3, 6, 9], scale: [0, 2, 3, 5, 6, 8, 9, 11], a: [3, 6, 9, 12], b: [6, 9, 12, 15] },
-  }
-  const c = (pc, q) => ({ pc, q })
-  const F = 5, D = 2, G = 7, C = 0, A = 9, Bb = 10, Ab = 8, E = 4
-  const FORM = [
-    [c(F, 'maj7')], [c(D, '7b9')], [c(G, 'm7')], [c(C, '7')],
-    [c(A, 'm7')], [c(D, '7b9')], [c(G, 'm7')], [c(C, '9')],
-    [c(F, 'maj7')], [c(F, '7')], [c(Bb, 'maj7')], [c(Bb, 'm6')],
-    [c(A, 'm7')], [c(Ab, 'dim7')], [c(G, 'm7'), c(C, '7')], [c(F, 'maj7'), c(E, 'm7b5')],
-  ]
-  // fixed seed so every render of the ad has the same take
+  const BPM = 120, BEAT = 60 / BPM, BAR = BEAT * 4
+  // bars land on the cuts: the logo reveal (3.4 s) is a downbeat, and so is the end card (33.4 s)
+  const T0 = 3.4 - 2 * BAR
+  const DROP = 3.4, BREAK = 29.4, END_DROP = 33.4
+  // a minor, F, C, G: one chord a bar, as midi notes (root, then the chord tones)
+  const CHORDS = [[45, 57, 60, 64, 67], [41, 57, 60, 65, 69], [48, 55, 60, 64, 67], [43, 55, 59, 62, 67]]
   let seed = 20261029
   const rand = () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
-  const pick = (a) => a[Math.floor(rand() * a.length)]
-  const chance = (p) => rand() < p
-  const human = (ms = 12) => ((rand() - 0.5) * 2 * ms) / 1000
-  const near = (pc, to) => { let m = pc + 12 * Math.round((to - pc) / 12); if (m - to > 6) m -= 12; if (to - m > 6) m += 12; return m }
+  const hz = (m) => 440 * Math.pow(2, (m - 69) / 12)
 
-  let ctx, out, room, pianoBus, bassBus, kitBus, sfxBus, noise
-  const buffers = { piano: new Map(), bass: new Map() }
-  let lhLow = 53, bassNote = 41, melNote = 72, phraseLeft = 0, rest = 1
+  let ctx, out, room, echo, drumBus, musicBus, duck, sfxBus, noise
 
   function impulse(a, secs) {
     const len = Math.floor(a.sampleRate * secs)
     const b = a.createBuffer(2, len, a.sampleRate)
     for (let ch = 0; ch < 2; ch++) {
       const d = b.getChannelData(ch)
-      for (let i = 0; i < len; i++) {
-        const early = i < a.sampleRate * 0.08 && rand() < 0.002 ? 0.6 : 0
-        d[i] = ((rand() * 2 - 1) * Math.pow(1 - i / len, 4) + early) * 0.9
-      }
+      for (let i = 0; i < len; i++) d[i] = (rand() * 2 - 1) * Math.pow(1 - i / len, 3.5) * 0.8
     }
     return b
   }
-  function bus(a, level, wet, pan) {
-    const g = a.createGain(); g.gain.value = level
-    const p = a.createStereoPanner(); p.pan.value = pan
-    g.connect(p).connect(out)
-    const send = a.createGain(); send.gain.value = wet
-    g.connect(send).connect(room)
-    return g
-  }
-  const at = (t0, k) => t0 + (Math.floor(k / 2) + (k % 2 ? SWING : 0)) * BEAT
-
-  function playBar(t0, n) {
-    const chords = FORM[n % FORM.length]
-    const nextChord = FORM[(n + 1) % FORM.length][0]
-    const chorus = Math.floor(n / FORM.length)
-    const beatsEach = 4 / chords.length
-    chords.forEach((ch, i) => {
-      const start = t0 + i * beatsEach * BEAT
-      const following = chords[i + 1] || nextChord
-      walk(ch, following, start, beatsEach, chorus === 0 && n % FORM.length < 4)
-      comp(ch, start, beatsEach, i)
-    })
-    melody(chords, t0, n)
-    drums(t0, n)
-  }
-  function walk(ch, next, t, beats, twoFeel) {
-    const root = near(ch.pc, bassNote)
-    const r = root < 29 ? root + 12 : root > 45 ? root - 12 : root
-    const target = near(next.pc, r)
-    const q = QUAL[ch.q]
-    const notes = [r]
-    if (twoFeel && beats === 4) {
-      const fifth = r + 7 > 47 ? r - 5 : r + 7
-      note('bass', r, t + human(6), BEAT * 1.9, 0.82)
-      note('bass', fifth, t + 2 * BEAT + human(6), BEAT * 1.9, 0.74)
-      bassNote = fifth
-      return
-    }
-    for (let b = 1; b < beats - 1; b++) {
-      const prev = notes[b - 1]
-      const dir = target > prev ? 1 : -1
-      const pool = (b % 2 ? q.scale : q.tones).flatMap((x) => [r + x - 12, r + x, r + x + 12]).filter((m) => m >= 28 && m <= 50 && m !== prev)
-      const ahead = pool.filter((m) => (m - prev) * dir > 0 && Math.abs(m - prev) <= 5)
-      notes.push(ahead.length ? pick(ahead) : pool.reduce((x, y) => (Math.abs(y - prev) < Math.abs(x - prev) ? y : x)))
-    }
-    if (beats > 1) {
-      const last = notes[notes.length - 1]
-      notes.push(chance(0.75) ? target + (last > target ? 1 : -1) : target + 7 > 50 ? target - 5 : target + 7)
-    }
-    notes.forEach((m, b) => note('bass', m, t + b * BEAT + human(6), BEAT * 0.92, b === 0 ? 0.86 : 0.74 + rand() * 0.08))
-    bassNote = notes[notes.length - 1]
-  }
-  function voicing(ch) {
-    const q = QUAL[ch.q]
-    const options = [q.a, q.b].flatMap((shape) => [-12, 0, 12].map((o) => shape.map((x) => ch.pc + 48 + o + x)))
-    const fit = options.filter((v) => v[0] >= 50 && v[0] <= 60)
-    const best = (fit.length ? fit : options).reduce((x, y) => (Math.abs(y[0] - lhLow) < Math.abs(x[0] - lhLow) ? y : x))
-    lhLow = best[0]
-    return best
-  }
-  const COMPS = [[0], [3], [0, 3], [1, 5], [3, 6], [0, 5], [2, 7], [5]]
-  function comp(ch, t, beats, i) {
-    const v = voicing(ch)
-    const hits = beats === 4 ? pick(COMPS) : chance(0.6) ? [0] : [1]
-    hits.forEach((k, j) => {
-      const when = at(t, k) + human(10)
-      const len = j === hits.length - 1 && chance(0.5) ? BEAT * 1.4 : BEAT * (0.35 + rand() * 0.25)
-      const vel = 0.36 + rand() * 0.1 + (i === 0 && k === 0 ? 0.04 : 0)
-      v.forEach((m, x) => note('piano', m, when + x * 0.006, len, vel - x * 0.015))
-    })
-  }
-  function melody(chords, t0, n) {
-    if (phraseLeft <= 0) {
-      if (rest > 0) { rest--; return }
-      phraseLeft = chance(0.55) ? 2 : 1
-    }
-    phraseLeft--
-    const endsHere = phraseLeft === 0
-    let k = n % 4 === 0 ? 0 : pick([0, 1, 2, 3])
-    while (k < 8) {
-      const ch = chords[chords.length === 2 && k >= 4 ? 1 : 0]
-      const q = QUAL[ch.q]
-      const strong = k % 2 === 0
-      const last = endsHere && k >= 5
-      const set = (strong || last ? [...q.tones, ...(ch.q === 'maj7' || ch.q === 'm7' ? [14] : [])] : q.scale).flatMap((x) => [48, 60, 72, 84].map((o) => ch.pc + o + x)).filter((m) => m >= 64 && m <= 86)
-      const around = set.filter((m) => m !== melNote && Math.abs(m - melNote) <= (strong ? 5 : 3))
-      const m = around.length ? pick(around) : set.reduce((x, y) => (Math.abs(y - melNote) < Math.abs(x - melNote) ? y : x))
-      const len = last ? BEAT * (1.5 + rand()) : chance(0.2) ? BEAT : BEAT * 0.5
-      const vel = (strong ? 0.48 : 0.56) + rand() * 0.08 - (chance(0.12) ? 0.2 : 0)
-      note('piano', m, at(t0, k) + human(14), len * 0.95, vel)
-      melNote = m
-      if (last) break
-      k += len >= BEAT ? 2 : 1
-    }
-    if (endsHere) { rest = pick([1, 1, 2]); if (melNote > 80) melNote -= 5; if (melNote < 66) melNote += 5 }
-  }
-  function note(kind, m, t, len, vel) {
-    const a = ctx, table = buffers[kind]
-    if (!table.size || t < 0) return
-    let src = 0, best = Infinity
-    for (const k of table.keys()) if (Math.abs(k - m) < best) (best = Math.abs(k - m)), (src = k)
-    const s = a.createBufferSource()
-    s.buffer = table.get(src)
-    s.playbackRate.value = Math.pow(2, (m - src) / 12)
-    const tone = a.createBiquadFilter()
-    tone.type = 'lowpass'
-    tone.frequency.value = kind === 'bass' ? 800 + vel * 600 : 2600 + vel * 9000
-    tone.Q.value = 0.5
-    const g = a.createGain()
-    const level = Math.max(0.02, vel) ** 1.6 * (kind === 'bass' ? 1.5 : 0.9)
-    const release = kind === 'bass' ? 0.07 : 0.32
-    const end = t + Math.max(0.05, len)
-    g.gain.setValueAtTime(level, t)
-    g.gain.setValueAtTime(level, end)
-    g.gain.exponentialRampToValueAtTime(0.0001, end + release)
-    s.connect(tone).connect(g).connect(kind === 'bass' ? bassBus : pianoBus)
-    s.start(t)
-    s.stop(end + release + 0.02)
-  }
-  function hiss(t, len, bus) {
+  function hiss(t, len) {
     const s = ctx.createBufferSource()
     s.buffer = noise
     s.start(t, rand() * 1.5)
     s.stop(t + len)
     return s
   }
-  // an ad wants a little more drive than the room: brushes plus a ride from the start
-  function drums(t0, n) {
-    for (let b = 0; b < 4; b++) {
-      const t = t0 + b * BEAT
-      swish(t, BEAT, 0.05 + (b % 2 ? 0.014 : 0))
-      if (b % 2 === 1) { tap(t + human(5), 0.1); if (chance(0.7)) tap(at(t0, b * 2 - 1) + human(5), 0.035); chick(t + human(4), 0.07) }
-    }
-    if (n >= 2) for (const k of [0, 2, 3, 4, 6, 7]) if (k % 2 === 0 || chance(0.85)) ride(at(t0, k) + human(5), k % 2 ? 0.028 : 0.045)
-    kick(t0 + human(5), 0.09)
-  }
-  function swish(t, len, v) {
-    const bp = ctx.createBiquadFilter(), g = ctx.createGain()
-    bp.type = 'bandpass'; bp.Q.value = 0.7
-    bp.frequency.setValueAtTime(2600, t); bp.frequency.linearRampToValueAtTime(4200, t + len * 0.6); bp.frequency.linearRampToValueAtTime(3000, t + len)
-    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + len * 0.45); g.gain.linearRampToValueAtTime(0.0001, t + len)
-    hiss(t, len + 0.02).connect(bp).connect(g).connect(kitBus)
-  }
-  function tap(t, v) {
-    const bp = ctx.createBiquadFilter(), g = ctx.createGain()
-    bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 0.9
-    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18)
-    hiss(t, 0.2).connect(bp).connect(g).connect(kitBus)
-  }
-  function chick(t, v) {
-    const hp = ctx.createBiquadFilter(), g = ctx.createGain()
-    hp.type = 'highpass'; hp.frequency.value = 7000
-    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05)
-    hiss(t, 0.06).connect(hp).connect(g).connect(kitBus)
-  }
-  function ride(t, v) {
-    const hp = ctx.createBiquadFilter(), bp = ctx.createBiquadFilter(), g = ctx.createGain()
-    hp.type = 'highpass'; hp.frequency.value = 6000
-    bp.type = 'peaking'; bp.frequency.value = 9500; bp.gain.value = 6
-    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(v * 0.25, t + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7)
-    hiss(t, 0.75).connect(hp).connect(bp).connect(g).connect(kitBus)
-  }
-  function kick(t, v) {
+  const env = (g, t, peak, a, d, floor = 0.0001) => { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(floor, t + a + d) }
+
+  // ---------- drums ----------
+  function kick(t, v = 1) {
     const o = ctx.createOscillator(), g = ctx.createGain()
-    o.frequency.setValueAtTime(65, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12)
-    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28)
-    o.connect(g).connect(kitBus); o.start(t); o.stop(t + 0.3)
+    o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(48, t + 0.09)
+    g.gain.setValueAtTime(v, t); g.gain.setValueAtTime(v, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42)
+    o.connect(g).connect(drumBus); o.start(t); o.stop(t + 0.45)
+    const hp = ctx.createBiquadFilter(), cg = ctx.createGain()
+    hp.type = 'highpass'; hp.frequency.value = 2500
+    env(cg, t, 0.25 * v, 0.001, 0.012)
+    hiss(t, 0.02).connect(hp).connect(cg).connect(drumBus)
+    // everything melodic ducks under the kick, so the beat pumps
+    duck.gain.setValueAtTime(1, t - 0.005); duck.gain.linearRampToValueAtTime(0.3, t + 0.01); duck.gain.setTargetAtTime(1, t + 0.04, 0.09)
+  }
+  function clap(t, v = 0.5) {
+    const bp = ctx.createBiquadFilter(), g = ctx.createGain()
+    bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 0.9
+    g.gain.setValueAtTime(0.0001, t)
+    for (const d of [0, 0.011, 0.022]) { g.gain.setValueAtTime(v, t + d); g.gain.exponentialRampToValueAtTime(v * 0.15, t + d + 0.01) }
+    g.gain.setValueAtTime(v * 0.8, t + 0.033); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22)
+    hiss(t, 0.25).connect(bp).connect(g).connect(drumBus)
+    const s = ctx.createGain(); s.gain.value = 0.35; g.connect(s).connect(room)
+  }
+  function hat(t, v = 0.12, open = false) {
+    const hp = ctx.createBiquadFilter(), g = ctx.createGain()
+    hp.type = 'highpass'; hp.frequency.value = open ? 7000 : 8500
+    env(g, t, v, 0.001, open ? 0.16 : 0.035)
+    hiss(t, open ? 0.2 : 0.05).connect(hp).connect(g).connect(drumBus)
+  }
+  function crash(t, v = 0.22) {
+    const hp = ctx.createBiquadFilter(), g = ctx.createGain()
+    hp.type = 'highpass'; hp.frequency.value = 4500
+    env(g, t, v, 0.002, 1.8)
+    hiss(t, 2).connect(hp).connect(g).connect(drumBus)
+    const s = ctx.createGain(); s.gain.value = 0.5; g.connect(s).connect(room)
+  }
+  function riser(t0, t1, v = 0.16) {
+    const bp = ctx.createBiquadFilter(), g = ctx.createGain()
+    bp.type = 'bandpass'; bp.Q.value = 2
+    bp.frequency.setValueAtTime(400, t0); bp.frequency.exponentialRampToValueAtTime(7000, t1)
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(v, t1 - 0.02); g.gain.linearRampToValueAtTime(0.0001, t1)
+    hiss(t0, t1 - t0 + 0.05).connect(bp).connect(g).connect(musicBus)
+  }
+  function snareRoll(t0, t1) {
+    // the build into a drop: claps speeding up and getting louder
+    let t = t0, step = BEAT / 2
+    while (t < t1 - 0.01) {
+      const k = (t - t0) / (t1 - t0)
+      clap(t, 0.12 + 0.3 * k)
+      if (k > 0.5) step = BEAT / 4
+      if (k > 0.8) step = BEAT / 8
+      t += step
+    }
+  }
+
+  // ---------- synths ----------
+  function voice(m, t, len, { type = 'sawtooth', v = 0.1, cut = 2000, cutEnd = null, a = 0.005, rel = 0.12, detune = [0], bus = musicBus, pan = 0, send = 0 }) {
+    const f = ctx.createBiquadFilter(), g = ctx.createGain(), p = ctx.createStereoPanner()
+    f.type = 'lowpass'; f.Q.value = 1.2
+    f.frequency.setValueAtTime(cut, t)
+    if (cutEnd) f.frequency.exponentialRampToValueAtTime(cutEnd, t + len)
+    p.pan.value = pan
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + a)
+    g.gain.setValueAtTime(v, t + Math.max(a, len)); g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(a, len) + rel)
+    f.connect(g).connect(p).connect(bus)
+    if (send) { const s = ctx.createGain(); s.gain.value = send; p.connect(s).connect(echo) }
+    for (const d of detune) {
+      const o = ctx.createOscillator()
+      o.type = type; o.frequency.value = hz(m); o.detune.value = d
+      o.connect(f); o.start(t); o.stop(t + Math.max(a, len) + rel + 0.02)
+    }
+  }
+  function pad(ch, t, len, open) {
+    ch.slice(1).forEach((m, i) => voice(m, t, len, { v: 0.035, cut: open ? 2400 : 900, a: 0.25, rel: 0.6, detune: [-9, 0, 9], pan: i % 2 ? 0.3 : -0.3, send: 0.1 }))
+  }
+  function bass(ch, t) {
+    // offbeat pluck bass with a clean sub underneath
+    const r = ch[0] - 12 < 33 ? ch[0] : ch[0] - 12
+    for (let b = 0; b < 4; b++) {
+      const at = t + b * BEAT + BEAT / 2
+      voice(r, at, BEAT * 0.38, { v: 0.16, cut: 1300, cutEnd: 260, rel: 0.05, detune: [-6, 6] })
+      voice(r, at, BEAT * 0.38, { type: 'sine', v: 0.26, cut: 400, rel: 0.05 })
+    }
+  }
+  const STAB = [0, 1.5, 3, 4.5, 6, 7] // in eighths
+  function stabs(ch, t) {
+    for (const e of STAB) ch.slice(1, 4).forEach((m, i) => voice(m + 12, t + e * BEAT / 2, BEAT * 0.22, { type: 'square', v: 0.028, cut: 3400, cutEnd: 900, rel: 0.08, pan: [-0.25, 0, 0.25][i], send: 0.18 }))
+  }
+  function arp(ch, t, bright) {
+    const notes = [ch[1] + 12, ch[2] + 12, ch[3] + 12, ch[4] + 12, ch[3] + 12, ch[2] + 12, ch[3] + 12, ch[4] + 12]
+    for (let i = 0; i < 16; i++) voice(notes[i % 8] + (i >= 12 && bright ? 12 : 0), t + i * BEAT / 4, BEAT * 0.16, { type: 'triangle', v: 0.05, cut: 6000, rel: 0.06, pan: i % 2 ? 0.35 : -0.35, send: 0.3 })
+  }
+  // a short hook the lead plays over the end card
+  const HOOK = [[0, 76, 1], [1, 79, 1], [2, 81, 1.5], [3.5, 79, 0.5], [4, 76, 1], [5, 74, 1], [6, 72, 2]]
+  function hook(t) {
+    for (const [b, m, l] of HOOK) voice(m, t + b * BEAT, l * BEAT * 0.9, { type: 'square', v: 0.045, cut: 3800, a: 0.01, rel: 0.2, detune: [-7, 7], send: 0.3 })
+  }
+
+  function music(seconds) {
+    for (let n = 0; ; n++) {
+      const t = T0 + n * BAR
+      if (t >= seconds - 0.5) break
+      const ch = CHORDS[((n % 4) + 4) % 4]
+      if (t + BAR <= 0) continue
+      const main = t >= DROP - 0.01 && t < BREAK - 0.01
+      const brk = t >= BREAK - 0.01 && t < END_DROP - 0.01
+      const fin = t >= END_DROP - 0.01
+      const tail = t + BAR > seconds - 1.2
+      pad(ch, Math.max(0, t), BAR, main || fin || brk)
+      if (main || fin) {
+        bass(ch, t)
+        if (t >= 6.4 - 0.01) stabs(ch, t)
+        if (t >= 10.8 - 0.6 || fin) arp(ch, t, fin)
+        for (let b = 0; b < 4; b++) {
+          if (!(tail && b > 1)) kick(t + b * BEAT, 0.95)
+          if (b % 2) clap(t + b * BEAT, 0.42)
+          hat(t + b * BEAT + BEAT / 2, 0.11, true)
+          if (t >= 6.4 - 0.01) { hat(t + b * BEAT + BEAT / 4, 0.045); hat(t + b * BEAT + 3 * BEAT / 4, 0.045) }
+        }
+      }
+      if (fin && n % 2 === 0) hook(t)
+      if (brk) {
+        // the break: open pad, the arp, bass and claps only, then it builds back
+        arp(ch, t, false)
+        bass(ch, t)
+        for (let b = 0; b < 4; b++) { if (b % 2) clap(t + b * BEAT, 0.3); hat(t + b * BEAT + BEAT / 2, 0.07, true) }
+      }
+    }
+    // intro: pad only, then a riser and clap roll into the logo
+    riser(1.4, DROP, 0.12)
+    snareRoll(2.4, DROP)
+    crash(DROP, 0.2)
+    // the 6.4 s cut and the 20 s cut get a lift, the fee loop break builds back into the end card
+    crash(6.4, 0.12); crash(20.0 - 0.6 + 0.6, 0.1)
+    riser(BREAK + 1.2, END_DROP, 0.16)
+    snareRoll(END_DROP - BAR, END_DROP)
+    crash(END_DROP, 0.26)
   }
 
   // ---------- UI sounds ----------
@@ -294,36 +246,36 @@
   window.renderAudio = async function (seconds) {
     ctx = new OfflineAudioContext(2, Math.ceil(SR * seconds), SR)
     const a = ctx
-    // samples
-    const files = [...Object.entries(PIANO).map(([m, n]) => ['piano', +m, `piano-${n}`]), ...Object.entries(BASS).map(([m, n]) => ['bass', +m, `bass-${n}`])]
-    if (MUSIC) await Promise.all(files.map(async ([kind, m, f]) => {
-      const data = await (await fetch(`${BASE}${f}.mp3`)).arrayBuffer()
-      buffers[kind].set(m, await a.decodeAudioData(data))
-    }))
-    out = a.createGain()
-    out.gain.setValueAtTime(0, 0)
-    out.gain.linearRampToValueAtTime(VOLUME, 0.6)
-    out.gain.setValueAtTime(VOLUME, seconds - 2.2)
-    out.gain.linearRampToValueAtTime(0, seconds - 0.1)
-    const glue = a.createDynamicsCompressor()
-    glue.threshold.value = -18; glue.ratio.value = 2.5; glue.attack.value = 0.015; glue.release.value = 0.25
-    const tape = a.createBiquadFilter(); tape.type = 'lowpass'; tape.frequency.value = 9000
-    const master = a.createGain(); master.gain.value = MUSIC ? 1.6 : 0.8
-    out.connect(tape).connect(glue).connect(master).connect(a.destination)
-    const verb = a.createConvolver(); verb.buffer = impulse(a, 1.9)
-    const verbTone = a.createBiquadFilter(); verbTone.type = 'lowpass'; verbTone.frequency.value = 4200
-    room = a.createGain(); room.connect(verb).connect(verbTone).connect(out)
-    pianoBus = bus(a, 0.9, 0.22, -0.12)
-    bassBus = bus(a, 1.05, 0.08, 0.05)
-    kitBus = bus(a, 0.55, 0.18, 0.22)
-    sfxBus = a.createGain(); sfxBus.gain.value = 1.0
-    const sfxSend = a.createGain(); sfxSend.gain.value = 0.12
-    sfxBus.connect(glue); sfxBus.connect(sfxSend).connect(room)
     noise = a.createBuffer(1, SR * 2, SR)
     const d = noise.getChannelData(0)
     for (let i = 0; i < d.length; i++) d[i] = rand() * 2 - 1
-    // a little faster than the room so the cut moves: one bar every ~2.86 s at 84 bpm
-    if (MUSIC) for (let n = 0, t = 0.05; t < seconds; n++, t += BAR) playBar(t, n)
+    const glue = a.createDynamicsCompressor()
+    glue.threshold.value = -14; glue.ratio.value = 3; glue.attack.value = 0.01; glue.release.value = 0.2
+    const master = a.createGain(); master.gain.value = 0.62
+    glue.connect(master).connect(a.destination)
+    // the music fades in over the first beat and out over the last two seconds
+    out = a.createGain()
+    out.gain.setValueAtTime(0.0001, 0); out.gain.linearRampToValueAtTime(1, 0.5)
+    out.gain.setValueAtTime(1, seconds - 2.0); out.gain.linearRampToValueAtTime(0.0001, seconds - 0.05)
+    out.connect(glue)
+    const verb = a.createConvolver(); verb.buffer = impulse(a, 1.6)
+    const verbTone = a.createBiquadFilter(); verbTone.type = 'lowpass'; verbTone.frequency.value = 5000
+    room = a.createGain(); room.gain.value = 0.5; room.connect(verb).connect(verbTone).connect(out)
+    // dotted-eighth echo for the plucks
+    echo = a.createGain()
+    const dl = a.createDelay(1); dl.delayTime.value = BEAT * 0.75
+    const fb = a.createGain(); fb.gain.value = 0.32
+    const et = a.createBiquadFilter(); et.type = 'lowpass'; et.frequency.value = 3500
+    echo.connect(dl).connect(et).connect(fb).connect(dl); et.connect(out)
+    drumBus = a.createGain(); drumBus.gain.value = 0.8; drumBus.connect(out)
+    duck = a.createGain(); duck.connect(out)
+    musicBus = a.createGain(); musicBus.gain.value = 1; musicBus.connect(duck)
+    echo.disconnect(); echo.connect(dl)
+    // UI sounds sit on top of the music
+    sfxBus = a.createGain(); sfxBus.gain.value = 0.9
+    const sfxSend = a.createGain(); sfxSend.gain.value = 0.15
+    sfxBus.connect(glue); sfxBus.connect(sfxSend).connect(room)
+    music(seconds)
     sfx()
     const buf = await a.startRendering()
     const L = buf.getChannelData(0), R = buf.getChannelData(1)
