@@ -9,7 +9,7 @@ import { Roll } from '../ui/Roll'
 import { Page } from './Page'
 
 const FAQ: [string, string][] = [
-  [`Do I need $${MAIN_TICKER} to launch a bot?`, 'No. Connect Phantom with enough SOL for the launch (about 0.03 SOL), your bot’s funding (at least 0.03 SOL) and any dev buy.'],
+  [`Do I need $${MAIN_TICKER} to launch a bot?`, 'No. Connect Phantom with enough SOL for the launch (about 0.03 SOL), your bot’s funding (at least 0.05 SOL) and any dev buy.'],
   ['Does Grok Bot give my bot money?', `No. Your bot runs on 80% of its own coin’s fees plus anything you deposit. Grok Bot trades only with the $${MAIN_TICKER} treasury.`],
   ['Can I take money out of my bot’s wallet?', 'Yes. It’s your Privy wallet. GrokGrid’s signer can’t move funds out, but you can.'],
   ['Can GrokGrid take my funds?', 'No. The signer can only buy and sell on pump.fun under the policy, with no transfers. You can remove it at any time.'],
@@ -73,7 +73,7 @@ const SECTIONS: [string, string, ReactNode][] = [
     'Launching a bot',
     <Fragment key="b">
       <p>Connect Phantom and sign one free message (no transaction, no cost); that is your login. Your bot’s own trading wallet is made for you. Then pick a look, name, ticker, description, links, a bot name, a one-line tagline and limits (max SOL per trade, take-profit up to 60%, stop-loss up to 25%). Pressing Launch gives Grok Bot its limited signer on the bot’s wallet and asks you to approve one transaction in Phantom. That one approval creates the coin with the 80/20 split, funds the bot’s wallet with the amount you chose, and makes your optional dev buy. Afterwards the grid page shows your bot, its status and a stop switch.</p>
-      <p>The launch itself costs about 0.03 SOL in Solana network fees and pump.fun’s coin-creation rent, and your bot needs at least 0.03 SOL of funding; your wallet shows the exact total before you sign. Fund it with 0.25 SOL or more for real trade sizes, since each buy starts at about 2% of what it can spend. Each wallet runs one bot. Your Phantom launches and holds your dev buy; your bot’s own wallet collects 80% of its coin’s fees and does all the trading, by your rules and never past the platform limits above.</p>
+      <p>The launch itself costs about 0.03 SOL in Solana network fees and pump.fun’s coin-creation rent, and your bot needs at least 0.05 SOL of funding; your wallet shows the exact total before you sign. Fund it with 0.25 SOL or more for real trade sizes, since each buy starts at about 2% of what it can spend. Each wallet runs one bot. Your Phantom launches and holds your dev buy; your bot’s own wallet collects 80% of its coin’s fees and does all the trading, by your rules and never past the platform limits above.</p>
     </Fragment>,
   ],
   [

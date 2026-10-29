@@ -49,7 +49,7 @@ const DRAFT_KEY = 'gg-launch-draft'
 // the house exits every bot runs under: an owner can set them tighter, never looser
 const HOUSE = { takeProfit: 60, stopLoss: 25 }
 // what a launch needs from the owner's Phantom, matching api/launch/prepare.ts
-const MIN_FUND = 0.03 // the bot keeps 0.02 in reserve, so less would never trade
+const MIN_FUND = 0.05 // matches MIN_FUND_SOL in api/launch/prepare.ts
 const LAUNCH_COST = 0.03 // about: Solana network fees and pump.fun's coin-creation rent
 const MAX_TRADE = 0.05 // the signer policy's per-buy cap: a higher max could never be used
 const LIMITS = { name: 32, botName: 32, ticker: 10, description: 600, strategy: 140 }
@@ -316,7 +316,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             <p className="gd-note">Your Phantom only signs the launch and holds your dev buy. Your bot’s own wallet collects its fees and does all the trading, only inside its fixed limits. You can stop it at any time.</p>
             <p className="gd-note mono">one bot per Phantom · 80/20 split locked at creation · your wallet shows the exact total before you sign</p>
             <button type="submit" className="btn" disabled={!ready}>
-              <Roll>{step !== null ? STEPS[step] : status === null ? 'Checking launchpad…' : !status.open ? 'Launches paused' : !owner ? 'Connect Phantom' : !agentWallet ? 'Sign the message in Phantom' : !(agentWallet.authorizationReady || agentWallet.authorize) ? 'Checking your wallet…' : 'Launch bot'}</Roll>
+              <Roll>{step !== null ? STEPS[step] : connecting ? 'Setting up your bot’s trading permission…' : status === null ? 'Checking launchpad…' : !status.open ? 'Launches paused' : !owner ? 'Connect Phantom' : !agentWallet ? 'Sign the message in Phantom' : !(agentWallet.authorizationReady || agentWallet.authorize) ? 'Checking your wallet…' : 'Launch bot'}</Roll>
             </button>
             {me && agentWallet && <p className="gd-note mono">launches from <span style={{ overflowWrap: 'anywhere' }}>{me}</span> · trades from <span style={{ overflowWrap: 'anywhere' }}>{agentWallet.address}</span></p>}
             {step !== null && (
