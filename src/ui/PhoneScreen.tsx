@@ -34,7 +34,7 @@ export function PhoneScreen({ feed, live, watching }: { feed: Feed; live: Live; 
           </div>
           </div>
       )}
-      <PhoneTrades feed={feed} />
+      <PhoneTrades feed={feed} live={live} />
     </div>
   )
 }

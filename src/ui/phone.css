@@ -88,5 +88,7 @@
 .pt-sol { flex: none; font-size: 9px; }
 .pt-row.buy .pt-sol { color: var(--gain); }
 .pt-row.sell .pt-sol { color: var(--loss); }
+.pt-row.call { border-color: #8fe0b455; }
+.pt-row.call .pt-sol { color: #8fe0b4; }
 @keyframes pt-in { from { opacity: 0; transform: translateY(-10px) scale(0.94); } }
 @media (prefers-reduced-motion: reduce) { .pt-row { animation: none; transition: opacity 0.3s; } .pt-row.out { transform: none; } }
