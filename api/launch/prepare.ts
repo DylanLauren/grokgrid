@@ -12,7 +12,7 @@ import { verifiedWalletId } from '../_wallet-auth.js'
 
 export { verifiedWalletId }
 const MIN_LAUNCHER_SOL = 0.03
-const MIN_FUND_SOL = 0.03 // the bot keeps a 0.02 reserve, so less would never trade
+const MIN_FUND_SOL = 0.05 // the bot keeps a 0.02 reserve; this leaves it room to trade
 const MAX_FUND_SOL = 10
 
 export async function POST(req: Request) {
