@@ -3,7 +3,7 @@ stage.appendChild(cursor)
 stage.appendChild(ripple)
 // every video ends on black
 const fade = el('div', 'abs')
-css(fade, { inset: '0', background: '#000', zIndex: 60, opacity: 0 })
+css(fade, { inset: '0', background: '#000', zIndex: 60, opacity: 0, pointerEvents: 'none' })
 
 // ---------- seek ----------
 window.seek = function (t) {

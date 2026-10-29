@@ -34,6 +34,8 @@ html, body { background: var(--ink); overflow: hidden; }
 .hl-teal { color: var(--teal); } .hl-orange { color: var(--orange); } .hl-gain { color: var(--gain); } .hl-violet { color: var(--violet); } .hl-blue { color: var(--blue); } .hl-pink { color: var(--pink); }
 
 .clip { position: absolute; display: block; pointer-events: none; }
+/* the real mouse drives the redrawn UI's hover states, so nothing drawn on top may catch it */
+.cursor, .ripple, .h1, .sub, .w, .bubble, .chip, .call, .tag, .coin, .split, .flame, .cta, .url-pill, .mark, .marks { pointer-events: none; }
 
 .window { position: absolute; border-radius: 20px; overflow: hidden; background: #0d0d0d; border: 1px solid var(--hair2);
   box-shadow: 0 40px 120px rgba(0,0,0,.7), 0 0 0 1px rgba(0,0,0,.6); transform-origin: 50% 60%; }

@@ -3,7 +3,8 @@
 #   ./make-ads.sh                         full quality, both cuts
 #   SAMPLES=16 RES=540 ./make-ads.sh      quick draft
 #   SKIP_CLIPS=1 ./make-ads.sh            reuse the 3D clips already in clips/
-# Output: out/grokgrid-ad-16x9.mp4 and out/grokgrid-ad-9x16.mp4
+# Output: out/grokgrid-ad-{16x9,9x16}.mp4 (launch ad) and out/grokgrid-<feature>-{16x9,9x16}.mp4
+#   CUTS="main calls" ./make-ads.sh    only some videos
 set -e
 cd "$(dirname "$0")"
 BLENDER=${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender}
@@ -39,22 +40,31 @@ SRV=$!
 trap 'kill $SRV' EXIT
 sleep 1
 
-echo "== 4/6 soundtrack (the ad's own synth-pop bed + UI sounds timed to the picture)"
-node scripts/audio.js out/soundtrack.wav $SECS
+echo "== 4/6 soundtracks (each video's own phone-ad beat + UI sounds timed to the picture)"
+CUTS=${CUTS:-main desk calls stats matrix launch burn}
+dur() { grep -m1 -o 'DURATION = [0-9.]*' "comp/cuts/$1.js" | awk '{print $3}'; }
+for c in $CUTS; do CUT=$c node scripts/audio.js "out/$c.wav" "$(dur $c)" > /dev/null; done
 
 echo "== 5/6 motion design frames (drawn at ${DSF}x, two halves at once)"
-for cut in "1920 1080 16x9" "1080 1920 9x16"; do
-  set -- $cut
-  DSF=$DSF QS="&ui=../ui&clips=../clips" node scripts/render.js $1 $2 "out/frames-$3" 0 20 > "out/$3-a.log" 2>&1 &
-  DSF=$DSF QS="&ui=../ui&clips=../clips" node scripts/render.js $1 $2 "out/frames-$3" 20 $SECS > "out/$3-b.log" 2>&1 &
-  wait
+for c in $CUTS; do
+  D=$(dur $c); H=$(awk "BEGIN{print int($D/2)}")
+  for cut in "1920 1080 16x9" "1080 1920 9x16"; do
+    set -- $cut
+    DSF=$DSF QS="&ui=../ui&clips=../clips&cut=$c" node scripts/render.js $1 $2 "out/frames-$c-$3" 0 $H > "out/$c-$3-a.log" 2>&1 &
+    DSF=$DSF QS="&ui=../ui&clips=../clips&cut=$c" node scripts/render.js $1 $2 "out/frames-$c-$3" $H $D > "out/$c-$3-b.log" 2>&1 &
+    wait
+  done
+  echo "   $c"
 done
 
 echo "== 6/6 encode (supersampled down to full HD, so type and UI stay razor sharp)"
-for cut in "1920 1080 16x9" "1080 1920 9x16"; do
-  set -- $cut
-  ffmpeg -y -loglevel error -framerate 30 -i "out/frames-$3/f_%05d.png" -i out/soundtrack.wav \
-    -vf "scale=$1:$2:flags=lanczos" -c:v libx264 -preset slow -crf 14 -pix_fmt yuv420p \
-    -af alimiter=limit=0.89 -c:a aac -b:a 256k -shortest -movflags +faststart "out/grokgrid-ad-$3.mp4"
-  echo "   out/grokgrid-ad-$3.mp4"
+for c in $CUTS; do
+  name=$([ $c = main ] && echo grokgrid-ad || echo grokgrid-$c)
+  for cut in "1920 1080 16x9" "1080 1920 9x16"; do
+    set -- $cut
+    ffmpeg -y -loglevel error -framerate 30 -i "out/frames-$c-$3/f_%05d.png" -i "out/$c.wav" \
+      -vf "scale=$1:$2:flags=lanczos" -c:v libx264 -preset slow -crf 14 -pix_fmt yuv420p \
+      -af alimiter=limit=0.89 -c:a aac -b:a 256k -shortest -movflags +faststart "out/$name-$3.mp4"
+    echo "   out/$name-$3.mp4"
+  done
 done
