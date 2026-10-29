@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { canDelegateWallet, embeddedSolanaAccounts, parseWalletReadiness, PUBLIC_AGENT_LAUNCHES_ENABLED, verifyAgentWallet } from '../src/data/agentWallet.ts'
+import { canDelegateWallet, embeddedSolanaAccounts, parseWalletReadiness, verifyAgentWallet } from '../src/data/agentWallet.ts'
 const address = 'GRDiYB47AKJWsQgFtbvLaVv98rmt5NXbEmWir594QSiT'
 const evidence = { canAuthorize: true, walletAuthorizationReady: false, executionEnabled: false, reason: 'delegation-required', address, walletId: 'wallet1', signerId: 'signer1', policyId: 'policy1', policySha256: 'a'.repeat(64), policySummary: 'Reviewed bounded policy', checkedAt: 10_000 }
 test('only newly created embedded Solana accounts qualify; external or imported wallets do not', () => {
@@ -11,7 +11,6 @@ test('only newly created embedded Solana accounts qualify; external or imported 
 test('readiness rejects contradictory execution, authorization and incomplete policy evidence', () => {
   for (const value of [null, {}, { ...evidence, executionEnabled: true }, { ...evidence, canAuthorize: false, walletAuthorizationReady: true }, { ...evidence, policySha256: 'bad' }, { ...evidence, checkedAt: Infinity }, { ...evidence, signerId: '' }]) assert.throws(() => parseWalletReadiness(value))
   assert.equal(parseWalletReadiness({ canAuthorize: false, walletAuthorizationReady: false, executionEnabled: false, reason: 'configuration-missing' }).canAuthorize, false)
-  assert.equal(PUBLIC_AGENT_LAUNCHES_ENABLED, false)
 })
 test('delegation binds the reviewed identity and exact policy IDs, and expires', () => {
   const v = parseWalletReadiness(evidence)

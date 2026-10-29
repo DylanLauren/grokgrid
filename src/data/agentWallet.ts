@@ -1,7 +1,5 @@
 import type { WalletLike } from './wallet'
 
-// Setup is available independently; this release never opens financial execution.
-export const PUBLIC_AGENT_LAUNCHES_ENABLED = false
 export interface AgentWalletSession {
   address: string
   walletId: string

@@ -78,6 +78,9 @@
 .st-tile { padding: 16px; display: grid; gap: 6px; }
 .st-tile b { font-size: clamp(22px, 2.2vw, 28px); font-weight: 520; letter-spacing: -0.035em; }
 .st-tile small { font-size: 12px; color: var(--paper-50); }
+.st-tiles-5 { grid-template-columns: repeat(5, 1fr); }
+.st-tile b.st-up { color: var(--gain); }
+.st-tile b.st-down { color: var(--paper-50); }
 .st-trades { display: grid; }
 .st-tr { display: grid; grid-template-columns: 44px 1.2fr 70px 1fr 1fr 1fr 90px 28px; gap: 12px; align-items: center; padding: 12px 6px; border-bottom: 1px solid var(--hair); font-size: 14px; transition: background 0.2s, padding 0.3s cubic-bezier(.2,.8,.2,1); }
 .st-tr:hover { background: #ffffff06; padding-left: 12px; }
@@ -197,6 +200,7 @@
   .pg-host { display: none; }
   .st-hero { grid-template-columns: 1fr; }
   .st-tiles { grid-template-columns: repeat(3, 1fr); }
+  .st-tiles-5 { grid-template-columns: repeat(5, 1fr); }
   .st-tr { grid-template-columns: 40px 1.4fr 60px 1fr 1fr 28px; }
   .st-tr > :nth-child(5), .st-tr > :nth-child(7) { display: none; }
   .gd-build { grid-template-columns: 1fr; }
@@ -209,6 +213,7 @@
 }
 @media (max-width: 600px) {
   .st-tiles { grid-template-columns: repeat(2, 1fr); }
+  .st-tiles-5 > :last-child { grid-column: 1 / -1; }
   .st-tr { grid-template-columns: 1.4fr 56px 1fr 24px; }
   .st-tr > :nth-child(1), .st-tr > :nth-child(6) { display: none; }
   .gd-line { grid-template-columns: repeat(3, 1fr); padding-top: 44px; }

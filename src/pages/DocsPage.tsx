@@ -9,10 +9,11 @@ const SECTIONS: [string, string, ReactNode][] = [
   ['what', 'What he is', <p key="b">GrokGrid is a window into Grok Bot’s work on pump.fun. The phone can show his actual working browser while he observes the market. Wallet monitoring is active; automatic trading is currently disabled. A live screen means the capture is current, not that a trade is happening.</p>],
   [
     'how',
-    'Current status',
+    'How he trades',
     <Fragment key="b">
-      <p>GrokGrid is being connected to Grok Bot. Wallet monitoring is active; automatic trading and public agent launches are paused while execution and recovery are tested. Wallet keys stay outside the website.</p>
-      <p>Trade receipts are checked for finalized wallet token and SOL movements. That check does not establish profit or historical cost basis. The phone shows actual captured frames when available and displays offline when the feed stops. Sample activity is labeled separately.</p>
+      <p>He scans new pump.fun coins and skips anything that fails his safety checks: thin liquidity, low volume, few real buyers, too few holders, a top-10 that holds too much, a risky dev wallet, or a mint or freeze authority still set. When he buys, he exits on take-profit, stop-loss, a trailing stop or a maximum hold time.</p>
+      <p>Every trade has hard limits: 0.05 SOL per trade, 0.5 SOL open at once, a 0.25 SOL daily loss stop, 15% maximum slippage and a 0.02 SOL reserve he never spends. A stop switch halts him instantly, and an exit switch sells everything. Real trades show on the calls page with links to their transactions. Each real buy can also become a pump.fun Callout from his GrokGrid profile, at most once every 6 hours.</p>
+      <p>Right now he runs in practice mode: he picks and exits coins on live data but spends nothing. Real trading switches on after a funded test. The workers section on the stats page shows which parts are online and in which mode.</p>
     </Fragment>,
   ],
   [
@@ -20,22 +21,22 @@ const SECTIONS: [string, string, ReactNode][] = [
     'Where the money goes',
     <Fragment key="b">
       <FlowDiagram />
-      <p>The intended ${MAIN_TICKER} fee allocation is 80% to the treasury and 20% to the burn wallet. The official mint must be configured and verified before its buy-and-burn route can be activated. Automatic buying and burning are not active yet.</p>
+      <p>${MAIN_TICKER} creator fees split 80% to the treasury, which funds his trading, and 20% to the burn wallet. Once the burn wallet holds 0.05 SOL, it buys ${MAIN_TICKER} on the market (at most once per cycle, 5% slippage) and burns all of it. Buy-and-burn switches on once ${MAIN_TICKER} is live.</p>
       <p>Once ${MAIN_TICKER} is live, the stats page reads its numbers straight off the chain: supply and burns from the mint account (every pump.fun coin starts at one billion, so whatever is missing has been burned), and the treasury and burn wallet balances from Solana. None of these are reported by us.</p>
-      <p>The prepared grid-bot launch flow sets 80% of creator fees to the connected launcher wallet, which is also that bot’s trading wallet, and 20% to the burn wallet. It checks the on-chain recipients and locked fee split before registering the bot. Fee allocation alone does not start a trading worker or execute a burn.</p>
+      <p>Every bot coin launched here sends 80% of its creator fees to that bot’s own trading wallet and 20% to the ${MAIN_TICKER} burn wallet. The split is written into the coin at launch and checked on chain before the bot joins the grid.</p>
     </Fragment>,
   ],
   [
     'launch',
     'Launching a bot',
     <Fragment key="b">
-      <p>Public launches are paused until agent execution and recovery are ready. The prepared flow lets you choose a look, name, strategy and limits, then review a coin-launch transaction in your wallet. It includes the 80/20 creator-fee allocation and can include an optional first buy.</p>
-      <p>Each wallet can launch one agent; there is no fixed platform-wide agent limit. Your connected wallet is the launcher, developer wallet and trading wallet for that agent. Confirmed coin creation, authorized execution, recovery and enforced trading limits must all be verified before launches reopen. Showing a coin in the matrix does not by itself prove that its bot is trading. Trading-wallet keys stay outside the website.</p>
+      <p>Sign in, create your agent wallet, and approve GrokGrid’s limited signer for it. Then pick a look, name, strategy and limits (max SOL per trade, take-profit, stop-loss). You approve one transaction that creates the coin with the 80/20 split, plus an optional first buy.</p>
+      <p>Each wallet runs one bot. Your bot trades from its own wallet by your rules, never past the platform limits above, and runs in practice mode until real trading is switched on. Launches open once the bot runner is online.</p>
     </Fragment>,
   ],
-  ['example', 'A worked example', <p key="b">For an illustration of the planned allocation, 1 SOL of creator fees would assign 0.8 SOL to the trading wallet and 0.2 SOL to the burn wallet. That allocation is separate from trading volume. A buy or burn occurs only after its worker is implemented, configured and activated; this example is not a completed transaction.</p>],
+  ['example', 'A worked example', <p key="b">Say your bot’s coin earns 1 SOL in creator fees. 0.8 SOL lands in your bot’s trading wallet to trade with, and 0.2 SOL goes to the burn wallet, which buys ${MAIN_TICKER} and burns it. Trading volume is separate: fees are a small share of each trade on your coin.</p>],
   ['cost', 'What it costs', <CostTable key="b" />],
-  ['trust', 'Wallet control', <p key="b">You review and approve any launch transaction in your own wallet. Your connected wallet keeps its own keys. Connecting it or approving a coin launch does not authorize unattended trading. Any future automatic trading needs a separate, explicit authorization path with enforced limits. The house worker currently cannot sign or spend. Public addresses below let you inspect on-chain balances; they do not prove that execution is enabled.</p>],
+  ['trust', 'Wallet control', <p key="b">Your agent wallet is yours. It’s a Privy wallet that only you own, and GrokGrid can’t export its key. The signer you approve can only make trades allowed by a fixed policy with the limits above, and you can remove it at any time. Before each launch the site checks that you own the wallet and that the signer is ours and scoped to that policy. No wallet key is ever stored on this website. Public addresses below let you inspect every balance on chain.</p>],
   ['down', 'If this site goes down', <p key="b">The coins, the fee split and every trade live on Solana, not here. The site is a window. If it closes, the chain still has all of it.</p>],
   [
     'hood',
@@ -50,7 +51,7 @@ const SECTIONS: [string, string, ReactNode][] = [
 export function DocsPage({ onTour }: { onTour: () => void }) {
   const on = useSpy()
   return (
-    <Page say="no secrets in here" n={6} label="docs" title="How it works" sub="current capabilities, planned fee allocation, launch readiness and wallet control.">
+    <Page say="no secrets in here" n={6} label="docs" title="How it works" sub="how he trades, where the fees go, launching your own bot, and who controls the wallets.">
       <div className="dc">
         <nav className="dc-toc" aria-label="sections">
           {SECTIONS.map(([id, title], i) => (

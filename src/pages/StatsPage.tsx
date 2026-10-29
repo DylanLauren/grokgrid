@@ -3,6 +3,7 @@ import { MAIN_TICKER, solscan } from '../config'
 import type { Feed } from '../data/types'
 import { stats } from '../data/useFeed'
 import { useToken, type GridToken } from '../data/useToken'
+import { useWorkers, type WorkerName, type Workers } from '../data/useWorkers'
 import { ago, mc, pct, signedUsd, usd } from '../lib/format'
 import { CoinChip } from '../ui/CoinChip'
 import { Addresses } from '../ui/Panels'
@@ -11,6 +12,7 @@ import { Page, Section } from './Page'
 export function StatsPage({ feed }: { feed: Feed }) {
   const s = stats(feed)
   const token = useToken(true)
+  const workers = useWorkers(true)
   const burned = token?.burned ?? feed.burnedMain
   const tiles: [string, string, string?, string?][] = [
     ['trades', `${s.trades}`, `${feed.calls.filter((c) => c.side === 'sell').length} closed`],
@@ -94,10 +96,43 @@ export function StatsPage({ feed }: { feed: Feed }) {
 
       {token?.onChain && <GridSection token={token} />}
 
+      {workers && <WorkersSection workers={workers} />}
+
       <Section title="Addresses">
         <Addresses />
       </Section>
     </Page>
+  )
+}
+
+const WORKERS: [WorkerName, string][] = [
+  ['trading', 'house trader'],
+  ['strategy', 'coin picker'],
+  ['agent-runner', 'bot runner'],
+  ['buyback', 'buy and burn'],
+  ['phone', 'phone feed'],
+]
+const MODE: Record<string, string> = { execute: 'trading for real', paper: 'practice mode', 'observe-only': 'watching only' }
+
+// Every worker reports in each minute. Offline means no report in the last two minutes.
+function WorkersSection({ workers }: { workers: Workers }) {
+  const up = WORKERS.filter(([k]) => workers[k]?.online).length
+  return (
+    <Section title="Workers" note={`${up} of ${WORKERS.length} online`}>
+      <div className="st-tiles st-tiles-5">
+        {WORKERS.map(([k, label]) => {
+          const w = workers[k]
+          const agents = k === 'agent-runner' && w?.online && w.agents !== null ? ` · ${w.agents} bots` : ''
+          return (
+            <div className="card st-tile" key={k}>
+              <span className="st-k mono">{label}</span>
+              <b className={w?.online ? 'st-up' : 'st-down'}>{w?.online ? 'online' : 'offline'}</b>
+              <small className="mono">{w?.online ? `${MODE[w.mode ?? ''] ?? w.mode}${agents}` : w?.seenAt ? `last seen ${ago(w.seenAt)}` : 'not started yet'}</small>
+            </div>
+          )
+        })}
+      </div>
+    </Section>
   )
 }
 

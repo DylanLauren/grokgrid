@@ -3,7 +3,7 @@ import { MAIN_TICKER } from '../config'
 import { STEPS, launchBot, svgToImage, toImage } from '../data/launch'
 import { fetchLaunchStatus, unavailableLaunchStatus, type LaunchStatus } from '../data/launchStatus'
 import { connectWallet, rejected } from '../data/wallet'
-import { PUBLIC_AGENT_LAUNCHES_ENABLED, type AgentWalletSession } from '../data/agentWallet'
+import type { AgentWalletSession } from '../data/agentWallet'
 import { AgentWalletSetup } from '../ui/AgentWalletSetup'
 import type { AgentsFeed } from '../data/types'
 import { BODY, EYES, FAMILY, type Shape } from '../ui/BotMark'
@@ -101,7 +101,8 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
   const errs = check(d)
   const botPic = useMemo(() => botImage(d.look), [d.look])
   const pic = image?.url ?? botPic
-  const ready = PUBLIC_AGENT_LAUNCHES_ENABLED && !!agentWallet?.authorizationReady && !!status?.open && Object.keys(errs).length === 0 && step === null && !connecting && !made
+  // The server decides: launches open only with a live bot runner and the owner's switch on.
+  const ready = !!agentWallet?.authorizationReady && !!status?.open && Object.keys(errs).length === 0 && step === null && !connecting && !made
   const mine = grid.mode === 'live' ? grid.agents.filter((a) => !a.house && a.coin.real !== false) : []
   const userBots = mine.length
   const err = (k: keyof Draft) => (touched[k] ? errs[k] : undefined)
@@ -144,7 +145,7 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
   }
 
   return (
-    <Page say="make me a sibling" n={5} label="the grid" title="Launch a bot" sub={`one agent per wallet, with its own coin on pump.fun. create a wallet you own before launch. that same wallet launches and trades for its agent. public launches are paused while execution is prepared.`}>
+    <Page say="make me a sibling" n={5} label="the grid" title="Launch a bot" sub={`one agent per wallet, with its own coin on pump.fun. create a wallet you own before launch. that same wallet launches and trades for its agent. ${status?.open ? 'launches are open.' : 'launches open once the bot runner is live.'}`}>
       <AgentWalletSetup onWalletChange={onWalletChange} />
       <div className="gd-line" role="radiogroup" aria-label="pick a bot">
         {FAMILY.map((f, i) => (
@@ -286,10 +287,10 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
                 <span>of creator fees go to the ${MAIN_TICKER} burn wallet</span>
               </div>
             </div>
-            <p className="gd-note">Connecting your wallet does not give the bot permission to spend. Automatic trading and buying or burning ${MAIN_TICKER} remain disabled until their execution paths are ready.</p>
+            <p className="gd-note">Your bot can only trade inside the policy you approve for its signer, never past the platform limits, and you can remove the signer at any time.</p>
             <p className="gd-note mono">one agent per wallet · 80/20 split locked at creation · review the exact network fees, rent and optional first buy before signing</p>
             <button type="submit" className="btn" disabled={!ready}>
-              <Roll>{step !== null ? STEPS[step] : 'Launches paused'}</Roll>
+              <Roll>{step !== null ? STEPS[step] : !status?.open ? 'Launches paused' : !agentWallet?.authorizationReady ? 'Set up your agent wallet' : 'Launch bot'}</Roll>
             </button>
             {me && <p className="gd-note mono">launcher + trading wallet: <span style={{ overflowWrap: 'anywhere' }}>{me}</span></p>}
             {step !== null && (
