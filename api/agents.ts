@@ -1,5 +1,5 @@
 import { beats, fresh } from './_heartbeat.js'
-import { tally } from './_tally.js'
+import { curveFrom, tally } from './_tally.js'
 import { balances, hasStore, HOUSE_WALLET, json, MAIN_MINT, markets, parse, redis, solUsd, toHash } from './_lib.js'
 
 // Registry entry, written once by /api/ingest when Grok Bot launches an agent's coin.
@@ -76,7 +76,9 @@ export async function grid(only?: string) {
       }
     }
     const recent = shown[i].map(trade)
-    const curve = only ? ((per[i * step + 2] as unknown[]) ?? []).map((p) => parse<{ ts: number; sol: number }>(p)).filter((p): p is { ts: number; sol: number } => !!p) : undefined
+    const posted = only ? ((per[i * step + 2] as unknown[]) ?? []).map((p) => parse<{ ts: number; sol: number }>(p)).filter((p): p is { ts: number; sol: number } => !!p) : undefined
+    // no snapshots posted: rebuild the history from its own verified trades
+    const curve = posted && posted.length < 2 && bal[r.wallet] !== undefined ? curveFrom(calls, bal[r.wallet]) : posted
     return {
       ...r,
       house: r.id === 'house' || undefined,
