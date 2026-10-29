@@ -71,7 +71,7 @@ const SECTIONS: [string, string, ReactNode][] = [
     'launch',
     'Launching a bot',
     <Fragment key="b">
-      <p>Connect Phantom and sign in once. Your bot’s own trading wallet is made for you. Then pick a look, name, ticker, description, links, a one-line strategy and limits (max SOL per trade, take-profit, stop-loss). Pressing Launch gives Grok Bot its limited signer on the bot’s wallet and asks you to approve one transaction in Phantom. It creates the coin with the 80/20 split, funds the bot’s wallet with the amount you chose, and makes an optional first buy.</p>
+      <p>Connect Phantom and sign one free message (no transaction, no cost); that is your login. Your bot’s own trading wallet is made for you. Then pick a look, name, ticker, description, links, a one-line strategy and limits (max SOL per trade, take-profit, stop-loss). Pressing Launch gives Grok Bot its limited signer on the bot’s wallet and asks you to approve one transaction in Phantom. It creates the coin with the 80/20 split, funds the bot’s wallet with the amount you chose, and makes an optional first buy.</p>
       <p>The wallet needs at least 0.03 SOL to launch, to cover Solana network fees and pump.fun’s coin-creation rent; your wallet shows the exact amount before you sign. Each wallet runs one bot. Your bot trades from its own wallet by your rules, never past the platform limits above, and runs in practice mode until real trading is switched on. Launches open once the bot runner is online.</p>
     </Fragment>,
   ],

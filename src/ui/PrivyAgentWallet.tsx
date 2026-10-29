@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { PrivyProvider, usePrivy, useSigners } from '@privy-io/react-auth'
-import { defaultSolanaRpcsPlugin, useCreateWallet, useSignTransaction, useWallets } from '@privy-io/react-auth/solana'
+import { defaultSolanaRpcsPlugin, toSolanaWalletConnectors, useCreateWallet, useSignTransaction, useWallets } from '@privy-io/react-auth/solana'
 import { privyWalletAdapter } from '../data/privyWalletAdapter'
 import { canDelegateWallet, embeddedSolanaAccounts, verifyAgentWallet, type WalletReadiness } from '../data/agentWallet'
 import type { WalletLike } from '../data/wallet'
 import type { AgentWalletSetupProps } from './AgentWalletSetup'
 
+// Sign-in is the owner's Phantom: connect it and sign one free message (no transaction).
+// Email and Google only show if they are still switched on in the Privy dashboard.
+const solanaWallets = toSolanaWalletConnectors({ shouldAutoConnect: false })
+
 export default function PrivyAgentWallet({ appId, onWalletChange }: AgentWalletSetupProps & { appId: string }) {
   const props = { onWalletChange }
-  return <PrivyProvider appId={appId} config={{ loginMethods: ['email', 'google'], appearance: { theme: 'dark', accentColor: '#40bda6', walletChainType: 'solana-only' }, embeddedWallets: { ethereum: { createOnLogin: 'off' }, solana: { createOnLogin: 'off' } }, plugins: [defaultSolanaRpcsPlugin()] }}><WalletControls {...props} /></PrivyProvider>
+  return <PrivyProvider appId={appId} config={{ loginMethods: ['wallet', 'email', 'google'], appearance: { theme: 'dark', accentColor: '#40bda6', walletChainType: 'solana-only', walletList: ['phantom', 'detected_solana_wallets'], showWalletLoginFirst: true }, externalWallets: { solana: { connectors: solanaWallets } }, embeddedWallets: { ethereum: { createOnLogin: 'off' }, solana: { createOnLogin: 'off' } }, plugins: [defaultSolanaRpcsPlugin()] }}><WalletControls {...props} /></PrivyProvider>
 }
 
 // Connect, and everything else happens on its own: the bot's wallet is created on first sign-in
@@ -90,8 +94,8 @@ function WalletControls({ onWalletChange }: AgentWalletSetupProps) {
 
   if (!ready) return <p role="status">Connecting…</p>
   if (!authenticated) return <div className="gd-connect-row">
-    <div><h2>Make your bot’s wallet</h2><p>Sign in once so the bot’s trading wallet belongs to you. It never holds your Phantom keys.</p></div>
-    <button type="button" className="btn" onClick={() => login()}>Sign in</button>
+    <div><h2>Sign in with Phantom</h2><p>Sign one free message (not a transaction) so your bot’s trading wallet belongs to you. It never holds your Phantom keys.</p></div>
+    <button type="button" className="btn" onClick={() => login()}>Sign in with Phantom</button>
   </div>
   const r = checked && address && checked.address === address ? checked.readiness : null
   return <div className="gd-connect-on">

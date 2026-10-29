@@ -21,7 +21,6 @@ import { MatrixPage } from './pages/MatrixPage'
 import { GridPage } from './pages/GridPage'
 import { DocsPage } from './pages/DocsPage'
 import { ErrorBoundary } from './ui/ErrorBoundary'
-import { isPlaying, onSound, setSound } from './lib/jazz'
 import './app.css'
 
 // his family, hanging around next to the logo
@@ -191,7 +190,6 @@ export default function App() {
           {LINKS.map((l) => (
             <a key={l.href} className="soc" href={l.href} target="_blank" rel="noreferrer" aria-label={l.label} title={l.label}>{l.icon}</a>
           ))}
-          <SoundButton />
           <BuyButton />
         </div>
       </header>
@@ -313,17 +311,6 @@ function MiniBot() {
       <LogoBot size={34} />
       <i className="mb-shadow" />
     </span>
-  )
-}
-
-// the music on or off, remembered for the next visit
-function SoundButton() {
-  const [on, setOn] = useState(isPlaying)
-  useEffect(() => onSound(() => setOn(isPlaying())), [])
-  return (
-    <button className={`soc sound ${on ? 'on' : ''}`} onClick={() => setSound(!on)} aria-pressed={on} aria-label={on ? 'mute music' : 'play music'} title={on ? 'mute music' : 'play music'}>
-      <i aria-hidden="true"><b /><b /><b /><b /></i>
-    </button>
   )
 }
 
