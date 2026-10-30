@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { PrivyProvider, usePrivy, useSigners, type PrivyClientConfig } from '@privy-io/react-auth'
-import { defaultSolanaRpcsPlugin, toSolanaWalletConnectors, useCreateWallet, useSignTransaction, useWallets } from '@privy-io/react-auth/solana'
+import { defaultSolanaRpcsPlugin, toSolanaWalletConnectors, useCreateWallet, useExportWallet, useSignTransaction, useWallets } from '@privy-io/react-auth/solana'
 import { privyWalletAdapter } from '../data/privyWalletAdapter'
 import { canDelegateWallet, embeddedSolanaAccounts, verifyAgentWallet, type WalletReadiness } from '../data/agentWallet'
 import type { WalletLike } from '../data/wallet'
@@ -27,6 +27,7 @@ function WalletControls({ onWalletChange, onSignedIn }: AgentWalletSetupProps & 
   const { ready, authenticated, user, login, logout, getAccessToken } = usePrivy()
   const { wallets } = useWallets()
   const { createWallet } = useCreateWallet()
+  const { exportWallet } = useExportWallet()
   const { signTransaction } = useSignTransaction()
   const { addSigners, removeSigners } = useSigners()
   const signerId = import.meta.env.VITE_PRIVY_AGENT_SIGNER_ID?.trim()
@@ -130,6 +131,8 @@ function WalletControls({ onWalletChange, onSignedIn }: AgentWalletSetupProps & 
     {address && <div className="gd-addr">
       <span className="mono"><small>bot wallet</small> {address}</span>
       <button type="button" className="btn ghost" disabled={busy} onClick={() => void act(async () => { await navigator.clipboard.writeText(address); setMessage('Address copied.') })}>Copy</button>
+      {/* the key opens in Privy's own window, never on this site; import it into Phantom to move the SOL and coins */}
+      <button type="button" className="btn ghost" disabled={busy} onClick={() => void act(async () => { await exportWallet({ address }); setMessage('Import that key in Phantom (Add wallet, Import private key) to move the SOL and coins.') })}>Withdraw</button>
     </div>}
     {r?.canAuthorize && <details className="gd-limits"><summary className="mono">Grok Bot’s limits on this wallet</summary><p style={{ whiteSpace: 'pre-wrap' }}>{r.policySummary}</p>
       {r.walletAuthorizationReady && <button type="button" className="btn ghost" disabled={busy} onClick={() => void act(async () => { setChecked(null); await removeSigners({ address: address! }); setMessage('Grok Bot can no longer trade this wallet.') })}>Stop Grok Bot trading this wallet</button>}
