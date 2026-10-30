@@ -13,7 +13,7 @@ const LOCK_S = 15
 interface Sig { signature: string; blockTime?: number | null }
 interface Tx {
   blockTime?: number | null
-  meta?: { postBalances?: number[] } | null
+  meta?: { postBalances?: number[]; loadedAddresses?: { writable?: string[]; readonly?: string[] } } | null
   transaction?: { message?: { accountKeys?: (string | { pubkey: string })[] } }
 }
 
@@ -44,12 +44,13 @@ async function sync(key: string, wallet: string) {
   }
   // newest first from the chain; read the oldest unread ones first
   const batch = sigs.slice(-PER_SYNC).reverse()
-  const txs = await Promise.all(batch.map((s) => rpc<Tx>('getTransaction', [s.signature, { encoding: 'json', commitment: 'confirmed', maxSupportedTransactionVersion: 0 }])))
+  const txs = await Promise.all(batch.map((s) => rpc<Tx>('getTransaction', [s.signature, { encoding: 'json', commitment: 'confirmed', maxSupportedTransactionVersion: 1 }])))
   const pts: Point[] = []
   for (let i = 0; i < batch.length; i++) {
     const tx = txs[i]
     if (!tx) break // stop at the first one we couldn't read and pick it up next time
-    const keys = (tx.transaction?.message?.accountKeys ?? []).map((k) => (typeof k === 'string' ? k : k.pubkey))
+    // balances follow the message keys, then any keys loaded from lookup tables
+    const keys = [...(tx.transaction?.message?.accountKeys ?? []).map((k) => (typeof k === 'string' ? k : k.pubkey)), ...(tx.meta?.loadedAddresses?.writable ?? []), ...(tx.meta?.loadedAddresses?.readonly ?? [])]
     const at = keys.indexOf(wallet)
     const lamports = at >= 0 ? tx.meta?.postBalances?.[at] : undefined
     const ts = (tx.blockTime ?? batch[i].blockTime ?? 0) * 1000
