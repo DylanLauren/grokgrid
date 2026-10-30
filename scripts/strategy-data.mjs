@@ -32,18 +32,30 @@ export async function candidates(limit, fetchImpl = fetch) {
 const GECKO = 'https://api.geckoterminal.com/api/v2/networks/solana';
 const CURVE_SCAN_LIMIT = 120; // market data is read 30 mints per request; chain checks only for coins that pass
 const CURVE_SEARCHES = ['pumpfun', 'pump fun', 'solana pump'];
-export async function curveCandidates(limit, fetchImpl = fetch) {
+export const curveCandidates = (limit, fetchImpl = fetch) => liveCandidates({
+  searches: CURVE_SEARCHES, geckoDexes: ['pump-fun'], newPools: true, dexIds: ['pumpfun'], geckoIds: ['pump-fun'] }, limit, fetchImpl);
+
+/**
+ * Active pump.fun coins for the house, on the curve or graduated to PumpSwap. The profile and
+ * boost feeds alone are promoted coins, often thin or fading, while liquid active coins go unseen.
+ * Only where the house looks changes; its screen is the same.
+ */
+const HOUSE_SCAN_LIMIT = 90;
+export const houseCandidates = (limit, fetchImpl = fetch) => liveCandidates({
+  searches: ['pumpswap', 'pumpfun'], geckoDexes: ['pumpswap', 'pump-fun'], newPools: false, dexIds: ['pumpswap', 'pumpfun'], geckoIds: ['pumpswap', 'pump-fun'] }, limit, fetchImpl);
+
+async function liveCandidates({ searches, geckoDexes, newPools, dexIds, geckoIds }, limit, fetchImpl) {
   const reads = await Promise.allSettled([
-    ...CURVE_SEARCHES.map(q => getJson(`${DEX}/latest/dex/search?q=${encodeURIComponent(q)}`, fetchImpl)),
-    ...[1, 2].map(page => getJson(`${GECKO}/dexes/pump-fun/pools?page=${page}&sort=h24_tx_count_desc`, fetchImpl)),
-    ...[1, 2].map(page => getJson(`${GECKO}/new_pools?page=${page}`, fetchImpl)),
+    ...searches.map(q => getJson(`${DEX}/latest/dex/search?q=${encodeURIComponent(q)}`, fetchImpl)),
+    ...geckoDexes.flatMap(dex => [1, 2].map(page => getJson(`${GECKO}/dexes/${dex}/pools?page=${page}&sort=h24_tx_count_desc`, fetchImpl))),
+    ...(newPools ? [1, 2].map(page => getJson(`${GECKO}/new_pools?page=${page}`, fetchImpl)) : []),
   ]);
   const mints = [];
   const add = mint => { if (typeof mint === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint) && mint.endsWith('pump') && !mints.includes(mint)) mints.push(mint); };
   for (const r of reads) {
     if (r.status !== 'fulfilled') continue;
-    for (const p of Array.isArray(r.value?.pairs) ? r.value.pairs : []) if (p?.chainId === 'solana' && p.dexId === 'pumpfun') add(p?.baseToken?.address);
-    for (const p of Array.isArray(r.value?.data) ? r.value.data : []) if (p?.relationships?.dex?.data?.id === 'pump-fun') add(String(p.relationships.base_token?.data?.id ?? '').replace(/^solana_/, ''));
+    for (const p of Array.isArray(r.value?.pairs) ? r.value.pairs : []) if (p?.chainId === 'solana' && dexIds.includes(p.dexId)) add(p?.baseToken?.address);
+    for (const p of Array.isArray(r.value?.data) ? r.value.data : []) if (geckoIds.includes(p?.relationships?.dex?.data?.id)) add(String(p.relationships.base_token?.data?.id ?? '').replace(/^solana_/, ''));
   }
   return mints.slice(0, limit);
 }
@@ -110,7 +122,7 @@ async function chainFacts(conn, rpcUrl, mint, minHolders, fetchImpl = fetch) {
 /** Candidates + held coins: market metrics for all, chain facts only where the market screen passes. */
 export async function gatherMarket(c, conn, rpcUrl, heldMints, now) {
   const found = await candidates(c.scanLimit);
-  if (c.curveScreen === true) for (const m of await curveCandidates(CURVE_SCAN_LIMIT)) if (!found.includes(m)) found.push(m);
+  for (const m of await (c.curveScreen === true ? curveCandidates(CURVE_SCAN_LIMIT) : houseCandidates(HOUSE_SCAN_LIMIT))) if (!found.includes(m)) found.push(m);
   const metrics = await marketMetrics([...new Set([...found, ...heldMints])]);
   const facts = new Map();
   let screened = 0;
