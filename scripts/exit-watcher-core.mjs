@@ -32,3 +32,13 @@ export function quotePrices(held, quotes) {
 /** A sell for this coin was already confirmed and planned but expired unsent: re-plan at once. */
 export const sellJustExpired = (intents, mint, now) =>
   (intents || []).some(i => i.side === 'sell' && i.mint === mint && i.state === 'expired' && now - i.createdAt >= 0 && now - i.createdAt < 120_000);
+
+/**
+ * Coins a user bot probably holds, from its own journal: those whose latest finalized trade is a
+ * buy. Only these bots get their wallet read every few seconds, so idle bots cost nothing.
+ */
+export function heldFromJournal(intents) {
+  const last = new Map();
+  for (const i of [...(intents || [])].filter(i => i.state === 'reconciled-confirmed').sort((a, b) => a.createdAt - b.createdAt)) last.set(i.mint, i.side);
+  return new Set([...last].filter(([, side]) => side === 'buy').map(([mint]) => mint));
+}

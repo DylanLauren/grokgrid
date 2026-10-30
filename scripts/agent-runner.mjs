@@ -191,7 +191,10 @@ async function tick() {
         report[agent.id] = executes(policy) ? await runLive(dir, agent, policy, c2, agentMarket, { conn, rpcUrl: rpc.rpcUrl, now, liquidating, stopFilePresent, signerFor })
           : { status: 'awaiting-wallet-id' };
       }
-    } catch (e) { report[agent.id] = { status: 'error', error: String(e?.message || e).slice(0, 120).replace(/api-key=[^&\s]+/gi, '') }; }
+    } catch (e) {
+      // The exit watcher may hold this bot's journal for a moment while it plans a fast sell: busy, not broken.
+      report[agent.id] = e?.code === 'TRADING_LOCKED' ? { status: 'busy' } : { status: 'error', error: String(e?.message || e).slice(0, 120).replace(/api-key=[^&\s]+/gi, '') };
+    }
   });
   const healthy = outbox.healthy && Object.values(report).every(r => r.status !== 'error');
   await savePrivate(join(root, 'agent-runner-status.json'), { observedAt: new Date(now).toISOString(), mode: c.mode, strategyValidated: false, liquidating, stopFilePresent,

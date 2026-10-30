@@ -12,7 +12,7 @@ const round = (x, d = 0) => (num(x) ? Number(x.toFixed(d)) : null);
 /** Facts behind a buy, from the screened metrics snapshot. */
 export function buyWhy(m, now) {
   return { kind: 'buy', ratio: round(m.buys5m / Math.max(1, m.sells5m), 1), buys5m: round(m.buys5m), volume5mUsd: round(m.volume5mUsd),
-    liquidityUsd: round(m.liquidityUsd), marketCapUsd: round(m.marketCapUsd), holders: round(m.holders), top10Share: round(m.top10Share, 3),
+    liquidityUsd: round(m.liquidityUsd), curveSol: round(m.curveSol, 1), marketCapUsd: round(m.marketCapUsd), holders: round(m.holders), top10Share: round(m.top10Share, 3),
     devShare: round(m.devShare, 3), change5m: round(m.change5m, 1), ageMin: num(m.pairCreatedAt) ? Math.max(0, Math.round((now - m.pairCreatedAt) / 60000)) : null };
 }
 
@@ -34,6 +34,7 @@ export function whyText(why, coin = 'it') {
     const parts = [];
     if (num(why.ratio)) parts.push(`buyers outpacing sellers ${why.ratio}×${num(why.buys5m) ? ` (${why.buys5m} buys in 5m)` : ''}`);
     if (num(why.liquidityUsd)) parts.push(`${usd(why.liquidityUsd)} liquidity`);
+    else if (num(why.curveSol)) parts.push(`curve ${why.curveSol} SOL`); // a bonding-curve coin: its SOL is the liquidity
     if (num(why.holders)) parts.push(`${why.holders} holders`);
     if (num(why.top10Share)) parts.push(`top 10 hold ${Math.round(why.top10Share * 100)}%`);
     if (!parts.length) return null;

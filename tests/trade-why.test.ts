@@ -20,6 +20,12 @@ test('a buy explains itself from the numbers it passed the screen on', () => {
   assert.equal(whyText(w, '$GOOD'), 'bought $GOOD: buyers outpacing sellers 2.1× (84 buys in 5m), $48k liquidity, 410 holders, top 10 hold 18%. $250k mc, +8% in 5m, not chasing.')
 })
 
+test('a bonding-curve buy names the SOL in its curve instead of DEX liquidity', () => {
+  const w = buyWhy({ ...good, liquidityUsd: undefined, curveSol: 41.37 }, now)
+  assert.equal(w.curveSol, 41.4)
+  assert.match(whyText(w, '$GOOD') ?? '', /^bought \$GOOD: buyers outpacing sellers 2\.1× \(84 buys in 5m\), curve 41\.4 SOL, 410 holders/)
+})
+
 test('a sell names the exit rule and the move that fired it', () => {
   const p = { entryPriceSol: 1, peakPriceSol: 1.5, openedAt: now - 42 * 60000 }
   assert.equal(whyText(sellWhy('take-profit', p, 1.62, now), '$GOOD'), 'sold $GOOD: took profit at +62% after 42m.')
