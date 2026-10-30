@@ -4,7 +4,7 @@ import type { Feed } from '../data/types'
 import { stats } from '../data/useFeed'
 import { useToken, type GridToken } from '../data/useToken'
 import { useWorkers, type WorkerName, type Workers } from '../data/useWorkers'
-import { ago, compact, mc, pct, signedUsd, usd } from '../lib/format'
+import { ago, compact, mc, pct, signedUsd, usd, sol as amount } from '../lib/format'
 import { CoinChip } from '../ui/CoinChip'
 import { peek, PeekLayer } from '../ui/CoinPeek'
 import { atMc, avgMcs, avgRows, BestWorst, dur, rounds, sol } from '../ui/BestWorst'
@@ -104,7 +104,7 @@ export function StatsPage({ feed }: { feed: Feed }) {
                 </span>
               </span>
               <em className={`mono ${c.side}`}>{c.side}</em>
-              <span className="r mono">{c.spentSol} SOL</span>
+              <span className="r mono">{amount(c.spentSol)} SOL</span>
               <span className="r mono" title={c.tradeMcApprox ? 'estimated from the fill price' : undefined}>{c.tradeMc ? `${c.tradeMcApprox ? '≈' : ''}${mc(c.tradeMc)}` : c.sample ? mc(c.side === 'buy' ? c.entryMc : c.nowMc) : '–'}</span>
               {typeof c.pnlSol === 'number' && c.side === 'sell' ? (
                 <span className={`r mono ${c.pnlSol >= 0 ? 'gain' : 'loss'}`}>{sol(c.pnlSol)}</span>

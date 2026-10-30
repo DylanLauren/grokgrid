@@ -11,3 +11,11 @@ test('the site reads the reason back out of the note the worker wrote', () => {
   assert.equal(whyOf('bought $GOOD for 0.020 SOL · strategy unvalidated'), undefined)
   assert.equal(whyOf(undefined), undefined); assert.equal(whyOf(''), undefined)
 })
+
+test('trade amounts read as short SOL figures, never raw lamport-precision decimals', async () => {
+  const { sol } = await import('../src/lib/format')
+  assert.equal(sol(0.014706754), '0.015')
+  assert.equal(sol(0.005171421), '0.0052')
+  assert.equal(sol(1.0763), '1.08')
+  assert.equal(sol(0), '0')
+})
