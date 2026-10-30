@@ -55,3 +55,43 @@ export function checkInstructions(ixs) {
 export function houseCostOk(preLamports, postLamports, cfg) {
   return Number.isSafeInteger(preLamports) && Number.isSafeInteger(postLamports) && BigInt(preLamports) - BigInt(postLamports) <= BigInt(cfg.maxFeeLamports);
 }
+
+// ---- lifetime creator fees, for the matrix ----
+// pump.fun logs a DistributeCreatorFeesEvent each time a coin's fee-sharing config pays out,
+// as "Program data:" or as an Anchor self-CPI (8-byte event tag, then the event). A coin's
+// lifetime creator fees are everything it has paid out plus what waits to be paid out now.
+const DISTRIBUTE_EVENT = Buffer.from([165, 55, 129, 112, 4, 179, 202, 40]);
+const EVENT_IX_TAG = Buffer.from('e445a52e51cb9a1d', 'hex');
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const b58 = bytes => { let n = BigInt('0x' + (Buffer.from(bytes).toString('hex') || '0')), s = ''; while (n > 0n) { s = B58[Number(n % 58n)] + s; n /= 58n; } for (const b of bytes) { if (b) break; s = '1' + s; } return s; };
+
+/** { mint, distributed } from one event body (starting at its discriminator), or null. */
+export function parseDistributeEvent(buf) {
+  try {
+    if (buf.length < 8 + 8 + 128 + 4 || !buf.subarray(0, 8).equals(DISTRIBUTE_EVENT)) return null;
+    const mint = b58(buf.subarray(16, 48));
+    const n = buf.readUInt32LE(144), at = 148 + n * 34;
+    if (n > 16 || buf.length < at + 8) return null;
+    return { mint, distributed: buf.readBigUInt64LE(at) };
+  } catch { return null; }
+}
+
+/** Lamports paid out for `mint` in one transaction (getTransaction, encoding json). */
+export function distributedIn(tx, mint, decode58) {
+  if (!tx?.meta || tx.meta.err) return 0n;
+  const found = [];
+  for (const l of tx.meta.logMessages || []) if (l.startsWith('Program data: ')) found.push(parseDistributeEvent(Buffer.from(l.slice(14), 'base64')));
+  for (const g of tx.meta.innerInstructions || []) for (const ix of g.instructions || []) {
+    let d; try { d = Buffer.from(decode58(ix.data)); } catch { continue; }
+    if (d.length > 16 && d.subarray(0, 8).equals(EVENT_IX_TAG)) found.push(parseDistributeEvent(d.subarray(8)));
+  }
+  // The same event can show in both places; count each distinct payout once.
+  const seen = new Set();
+  return found.filter(e => e && e.mint === mint).reduce((sum, e) => { const k = e.distributed.toString(); if (seen.has(k)) return sum; seen.add(k); return sum + e.distributed; }, 0n);
+}
+
+/** Lifetime fees in SOL (rounded to 1e-6), or null when the undistributed part is unknown. */
+export function lifetimeFeesSol(distributedLamports, distributableLamports) {
+  if (distributableLamports === null || distributableLamports === undefined) return null;
+  return Math.round(Number(BigInt(distributedLamports) + BigInt(distributableLamports)) / 1e3) / 1e6;
+}

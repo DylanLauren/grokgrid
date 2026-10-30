@@ -12,17 +12,42 @@ import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { ComputeBudgetProgram, PublicKey, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import { connect, loadSigner, signedSignature } from './pump-chain.mjs';
-import { action } from './runtime-ingest.mjs';
-import { DEFAULT_DISTRIBUTOR, validateDistributorConfig, coinsToDistribute, distributeGate, checkInstructions, houseCostOk } from './fee-distributor-core.mjs';
+import { action, postFees } from './runtime-ingest.mjs';
+import { DEFAULT_DISTRIBUTOR, validateDistributorConfig, coinsToDistribute, distributeGate, checkInstructions, houseCostOk, distributedIn, lifetimeFeesSol } from './fee-distributor-core.mjs';
 import { safeError } from './log-safe.mjs';
 
 const require = createRequire(import.meta.url);
-const { OnlinePumpSdk } = require('@pump-fun/pump-sdk');
+const { OnlinePumpSdk, feeSharingConfigPda } = require('@pump-fun/pump-sdk');
+const bs58 = require('bs58');
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
 const ORIGIN = 'https://grokgrid-alpha.vercel.app';
 const read = async (name, fallback) => { try { return JSON.parse(await readFile(join(root, name), 'utf8')); } catch { return fallback; } };
 const save = async (name, value) => { const tmp = join(root, `.${name}.tmp`); await writeFile(tmp, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 }); await rename(tmp, join(root, name)); };
 const exists = p => access(p).then(() => true, () => false);
+/**
+ * Lamports a coin has paid out so far, kept as a running total: only signatures newer than the
+ * last one seen are read, from its fee-sharing config's history (anyone may send a payout).
+ */
+async function tallyDistributed(conn, mint, prev = {}) {
+  const config = feeSharingConfigPda(new PublicKey(mint));
+  const fresh = [];
+  for (let before, page = 0; page < 20; page++) {
+    const sigs = await conn.getSignaturesForAddress(config, { limit: 1000, ...(before ? { before } : {}), ...(prev.until ? { until: prev.until } : {}) }, 'finalized');
+    fresh.push(...sigs);
+    if (sigs.length < 1000) break;
+    before = sigs.at(-1).signature;
+  }
+  let distributed = BigInt(prev.distributed ?? '0');
+  for (const s of fresh.filter(x => !x.err).reverse()) {
+    // Raw RPC: only logs and inner instructions are needed, and web3.js can't decode newer tx versions.
+    const res = await conn._rpcRequest('getTransaction', [s.signature, { encoding: 'json', maxSupportedTransactionVersion: 1, commitment: 'finalized' }]);
+    const tx = res?.result;
+    if (res?.error || !tx) throw Error('payout history not readable yet'); // keep the old total; retry next run
+    distributed += distributedIn(tx, mint, d => bs58.decode(d));
+  }
+  return { distributed: distributed.toString(), until: fresh[0]?.signature ?? prev.until ?? null };
+}
+
 const args = process.argv.slice(2), probe = args.includes('--probe') ? args[args.indexOf('--probe') + 1] : null;
 
 async function tick() {
@@ -78,9 +103,30 @@ async function tick() {
     }
     results.push({ mint, fee: info, result });
   }
+  if (!probe) await reportFees(conn, online, house, registry, buyback.officialMint, state, results);
   if (probe) { console.log(JSON.stringify(results)); return; }
   await save('fee-distributor-status.json', { observedAt: new Date(now).toISOString(), enabled: cfg.enabled, live: !!signer, stopped, coins: results });
   console.log(JSON.stringify({ enabled: cfg.enabled, live: !!signer, coins: results.length, sent: results.filter(r => r.result === 'sent').length }));
+}
+
+/** Lifetime creator fees per coin, posted to the matrix when they change. Never blocks routing. */
+async function reportFees(conn, online, house, registry, officialMint, state, results) {
+  const owners = new Map(registry.filter(a => !a.house && a.coin?.mint).map(a => [a.coin.mint, a.id]));
+  if (officialMint) owners.set(officialMint, 'house');
+  state.fees ??= {};
+  for (const [mint, agent] of owners) {
+    try {
+      const tally = await tallyDistributed(conn, mint, state.fees[mint]);
+      // Read after the tally, so a payout landing in between counts as paid, never twice.
+      let waiting = null;
+      try { waiting = (await online.getMinimumDistributableFee(new PublicKey(mint), house)).distributableFees.toString(); } catch {}
+      const feesSol = lifetimeFeesSol(tally.distributed, waiting);
+      const prev = state.fees[mint] || {};
+      state.fees[mint] = { ...tally, feesSol: feesSol ?? prev.feesSol ?? null, posted: prev.posted ?? null };
+      if (feesSol !== null && feesSol !== prev.posted && (await postFees(root, { agent, feesSol })) === true) state.fees[mint].posted = feesSol;
+    } catch (e) { const r = results.find(x => x.mint === mint); if (r) r.feesError = String(e?.message || e).slice(0, 60); }
+  }
+  await save('fee-distributor-state.json', state);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) tick().catch(e => { console.error(`fee distributor: ${safeError(e)}`); process.exit(1); });
