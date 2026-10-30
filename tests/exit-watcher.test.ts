@@ -58,3 +58,10 @@ test('a sell that expired unsent is re-planned without a second confirmation', a
   assert.equal(sellJustExpired([sell('reconciled-confirmed', now - 1000)], MINT, now), false)
   assert.equal(sellJustExpired([{ ...sell('expired', now - 1000), mint: 'other' }], MINT, now), false)
 })
+
+test('user bots: only coins whose latest finalized trade is a buy count as held', async () => {
+  const { heldFromJournal } = await import('../scripts/exit-watcher-core.mjs')
+  const t = (mint: string, side: string, createdAt: number, state = 'reconciled-confirmed') => ({ mint, side, createdAt, state })
+  assert.deepEqual([...heldFromJournal([t('A', 'buy', 1), t('A', 'sell', 2), t('B', 'buy', 3), t('C', 'sell', 4), t('C', 'buy', 5), t('D', 'buy', 6, 'planned')])].sort(), ['B', 'C'])
+  assert.equal(heldFromJournal(undefined).size, 0)
+})
