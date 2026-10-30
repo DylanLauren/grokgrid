@@ -13,7 +13,7 @@ import { homedir } from 'node:os';
 import { ComputeBudgetProgram, PublicKey, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import { connect, loadSigner, signedSignature } from './pump-chain.mjs';
 import { action, postFees } from './runtime-ingest.mjs';
-import { DEFAULT_DISTRIBUTOR, validateDistributorConfig, coinsToDistribute, distributeGate, checkInstructions, houseCostOk, distributedIn, lifetimeFeesSol } from './fee-distributor-core.mjs';
+import { DEFAULT_DISTRIBUTOR, validateDistributorConfig, coinsToDistribute, distributeGate, checkInstructions, houseCostOk, payoutsIn, lifetimeFeesSol, nextBatch } from './fee-distributor-core.mjs';
 import { safeError } from './log-safe.mjs';
 
 const require = createRequire(import.meta.url);
@@ -25,27 +25,35 @@ const read = async (name, fallback) => { try { return JSON.parse(await readFile(
 const save = async (name, value) => { const tmp = join(root, `.${name}.tmp`); await writeFile(tmp, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 }); await rename(tmp, join(root, name)); };
 const exists = p => access(p).then(() => true, () => false);
 /**
- * Lamports a coin has paid out so far, kept as a running total: only signatures newer than the
- * last one seen are read, from its fee-sharing config's history (anyone may send a payout).
+ * Lamports each coin has paid out so far, as running totals. Every GrokGrid coin pays 20% of each
+ * payout to the burn wallet, so every payout transaction touches it; reading the burn wallet's
+ * history (not each coin's, which every trade on the coin also touches) finds them all, whoever
+ * sent them. At most FEE_READS_PER_RUN transactions per run, oldest first, and the cursor only
+ * moves past what was read.
  */
-async function tallyDistributed(conn, mint, prev = {}) {
-  const config = feeSharingConfigPda(new PublicKey(mint));
+const FEE_READS_PER_RUN = 200;
+async function tallyPayouts(conn, burn, prev = {}) {
   const fresh = [];
-  for (let before, page = 0; page < 20; page++) {
-    const sigs = await conn.getSignaturesForAddress(config, { limit: 1000, ...(before ? { before } : {}), ...(prev.until ? { until: prev.until } : {}) }, 'finalized');
+  for (let before, page = 0; page < 5; page++) {
+    const sigs = await conn.getSignaturesForAddress(new PublicKey(burn), { limit: 1000, ...(before ? { before } : {}), ...(prev.until ? { until: prev.until } : {}) }, 'finalized');
     fresh.push(...sigs);
     if (sigs.length < 1000) break;
     before = sigs.at(-1).signature;
   }
-  let distributed = BigInt(prev.distributed ?? '0');
-  for (const s of fresh.filter(x => !x.err).reverse()) {
-    // Raw RPC: only logs and inner instructions are needed, and web3.js can't decode newer tx versions.
+  const totals = { ...(prev.totals || {}) };
+  let until = prev.until ?? null;
+  // Five full pages means the oldest unread signatures are out of reach (newest come first),
+  // most likely a flood. Read nothing and keep the totals rather than skip a payout.
+  if (fresh.length >= 5000) return { totals, until, complete: false, flooded: true };
+  for (const s of nextBatch(fresh, FEE_READS_PER_RUN)) {
+    // Raw RPC: only inner instructions are needed, and web3.js can't decode newer tx versions.
     const res = await conn._rpcRequest('getTransaction', [s.signature, { encoding: 'json', maxSupportedTransactionVersion: 1, commitment: 'finalized' }]);
     const tx = res?.result;
-    if (res?.error || !tx) throw Error('payout history not readable yet'); // keep the old total; retry next run
-    distributed += distributedIn(tx, mint, d => bs58.decode(d));
+    if (res?.error || !tx) break; // not readable yet: keep what was read, retry the rest next run
+    for (const [mint, lamports] of payoutsIn(tx, burn, d => bs58.decode(d))) totals[mint] = (BigInt(totals[mint] ?? '0') + lamports).toString();
+    until = s.signature;
   }
-  return { distributed: distributed.toString(), until: fresh[0]?.signature ?? prev.until ?? null };
+  return { totals, until, complete: until === (fresh.find(x => !x.err)?.signature ?? until) };
 }
 
 const args = process.argv.slice(2), probe = args.includes('--probe') ? args[args.indexOf('--probe') + 1] : null;
@@ -103,29 +111,32 @@ async function tick() {
     }
     results.push({ mint, fee: info, result });
   }
-  if (!probe) await reportFees(conn, online, house, registry, buyback.officialMint, state, results);
+  // The burn wallet is the 20% shareholder of every GrokGrid coin (buyback-config.json).
+  if (!probe && typeof buyback.burnWallet === 'string') await reportFees(conn, online, house, registry, buyback.officialMint, buyback.burnWallet, state, results);
   if (probe) { console.log(JSON.stringify(results)); return; }
   await save('fee-distributor-status.json', { observedAt: new Date(now).toISOString(), enabled: cfg.enabled, live: !!signer, stopped, coins: results });
   console.log(JSON.stringify({ enabled: cfg.enabled, live: !!signer, coins: results.length, sent: results.filter(r => r.result === 'sent').length }));
 }
 
 /** Lifetime creator fees per coin, posted to the matrix when they change. Never blocks routing. */
-async function reportFees(conn, online, house, registry, officialMint, state, results) {
+async function reportFees(conn, online, house, registry, officialMint, burn, state, results) {
   const owners = new Map(registry.filter(a => !a.house && a.coin?.mint).map(a => [a.coin.mint, a.id]));
   if (officialMint) owners.set(officialMint, 'house');
   state.fees ??= {};
-  for (const [mint, agent] of owners) {
+  let tally;
+  try { tally = await tallyPayouts(conn, burn, state.feeTally); state.feeTally = { totals: tally.totals, until: tally.until }; }
+  catch (e) { results.push({ feesError: String(e?.message || e).slice(0, 60) }); }
+  // While payouts are still unread a total would be low: keep showing the last ones.
+  if (tally?.complete) for (const [mint, agent] of owners) {
     try {
-      const tally = await tallyDistributed(conn, mint, state.fees[mint]);
       // Read after the tally, so a payout landing in between counts as paid, never twice.
-      let waiting = null;
-      try { waiting = (await online.getMinimumDistributableFee(new PublicKey(mint), house)).distributableFees.toString(); } catch {}
-      const feesSol = lifetimeFeesSol(tally.distributed, waiting);
+      const waiting = (await online.getMinimumDistributableFee(new PublicKey(mint), house)).distributableFees.toString();
+      const feesSol = lifetimeFeesSol(tally.totals[mint] ?? '0', waiting);
       const prev = state.fees[mint] || {};
-      state.fees[mint] = { ...tally, feesSol: feesSol ?? prev.feesSol ?? null, posted: prev.posted ?? null };
+      state.fees[mint] = { feesSol, posted: prev.posted ?? null };
       if (feesSol !== null && feesSol !== prev.posted && (await postFees(root, { agent, feesSol })) === true) state.fees[mint].posted = feesSol;
-    } catch (e) { const r = results.find(x => x.mint === mint); if (r) r.feesError = String(e?.message || e).slice(0, 60); }
-  }
+    } catch {}
+  } else if (tally?.flooded) results.push({ feesError: 'burn wallet history flooded; totals held' });
   await save('fee-distributor-state.json', state);
 }
 

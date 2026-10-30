@@ -57,9 +57,11 @@ export function houseCostOk(preLamports, postLamports, cfg) {
 }
 
 // ---- lifetime creator fees, for the matrix ----
-// pump.fun logs a DistributeCreatorFeesEvent each time a coin's fee-sharing config pays out,
-// as "Program data:" or as an Anchor self-CPI (8-byte event tag, then the event). A coin's
-// lifetime creator fees are everything it has paid out plus what waits to be paid out now.
+// pump.fun emits a DistributeCreatorFeesEvent each time a coin's fee-sharing config pays out, as
+// an Anchor self-CPI: an inner instruction to the pump program whose data is an 8-byte event tag
+// and then the event. Only those count. "Program data:" log lines are ignored, because any
+// program can print one, and an inner instruction counts only if the pump program itself ran it.
+// A coin's lifetime creator fees are everything it has paid out plus what waits to be paid out.
 const DISTRIBUTE_EVENT = Buffer.from([165, 55, 129, 112, 4, 179, 202, 40]);
 const EVENT_IX_TAG = Buffer.from('e445a52e51cb9a1d', 'hex');
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -72,22 +74,40 @@ export function parseDistributeEvent(buf) {
     const mint = b58(buf.subarray(16, 48));
     const n = buf.readUInt32LE(144), at = 148 + n * 34;
     if (n > 16 || buf.length < at + 8) return null;
-    return { mint, distributed: buf.readBigUInt64LE(at) };
+    const shareholders = Array.from({ length: n }, (_, i) => b58(buf.subarray(148 + i * 34, 180 + i * 34)));
+    return { mint, shareholders, distributed: buf.readBigUInt64LE(at) };
   } catch { return null; }
 }
 
-/** Lamports paid out for `mint` in one transaction (getTransaction, encoding json). */
-export function distributedIn(tx, mint, decode58) {
-  if (!tx?.meta || tx.meta.err) return 0n;
-  const found = [];
-  for (const l of tx.meta.logMessages || []) if (l.startsWith('Program data: ')) found.push(parseDistributeEvent(Buffer.from(l.slice(14), 'base64')));
+/** Every account key of a getTransaction (encoding json) result, lookup-table addresses included. */
+const accountKeys = tx => [...(tx?.transaction?.message?.accountKeys || []), ...(tx?.meta?.loadedAddresses?.writable || []), ...(tx?.meta?.loadedAddresses?.readonly || [])];
+
+/**
+ * Payouts in one transaction (getTransaction, encoding json): mint -> lamports, for events the
+ * pump program emitted whose shareholders include `burn` (GrokGrid coins only).
+ */
+export function payoutsIn(tx, burn, decode58) {
+  const out = new Map();
+  if (!tx?.meta || tx.meta.err) return out;
+  const keys = accountKeys(tx);
   for (const g of tx.meta.innerInstructions || []) for (const ix of g.instructions || []) {
+    if (keys[ix.programIdIndex] !== PROGRAMS.pump) continue;
     let d; try { d = Buffer.from(decode58(ix.data)); } catch { continue; }
-    if (d.length > 16 && d.subarray(0, 8).equals(EVENT_IX_TAG)) found.push(parseDistributeEvent(d.subarray(8)));
+    if (d.length <= 16 || !d.subarray(0, 8).equals(EVENT_IX_TAG)) continue;
+    const e = parseDistributeEvent(d.subarray(8));
+    if (e && e.shareholders.includes(burn)) out.set(e.mint, (out.get(e.mint) ?? 0n) + e.distributed);
   }
-  // The same event can show in both places; count each distinct payout once.
-  const seen = new Set();
-  return found.filter(e => e && e.mint === mint).reduce((sum, e) => { const k = e.distributed.toString(); if (seen.has(k)) return sum; seen.add(k); return sum + e.distributed; }, 0n);
+  return out;
+}
+
+/**
+ * Which signatures to read this run. `sigs` is newest first (getSignaturesForAddress).
+ * Anyone can put a coin's fee-sharing config into a transaction, so a run reads at most
+ * `budget` of them, oldest first, and the cursor only moves past what was read.
+ */
+export function nextBatch(sigs, budget) {
+  const unread = sigs.filter(x => !x.err).reverse();
+  return unread.slice(0, Math.max(0, budget));
 }
 
 /** Lifetime fees in SOL (rounded to 1e-6), or null when the undistributed part is unknown. */

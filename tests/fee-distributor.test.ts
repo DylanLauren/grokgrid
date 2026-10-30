@@ -34,28 +34,35 @@ test('only pump.fun programs, and the house may lose no more than the fee allowa
   assert.throws(() => validateDistributorConfig({ ...DEFAULT_DISTRIBUTOR, maxFeeLamports: '5000000' }))
 })
 
-test('lifetime fees: payouts are read from the event in logs or self-CPI, once each, for this coin only', async () => {
-  const { parseDistributeEvent, distributedIn, lifetimeFeesSol } = await import('../scripts/fee-distributor-core.mjs')
+test('lifetime fees: only pump-program self-CPI payout events for GrokGrid coins count, never logs', async () => {
+  const { parseDistributeEvent, payoutsIn, nextBatch, lifetimeFeesSol, PROGRAMS } = await import('../scripts/fee-distributor-core.mjs')
   const { PublicKey } = await import('@solana/web3.js')
   const bs58 = (await import('bs58')).default
   const mint = new PublicKey('CoZmJuXuGCw8D5NfoZXmbvEPNMWC1M6ks7P95UxR5ztA'), other = new PublicKey('7vC3gpv9YvSMtEc5QmyQbFLSqnEy7QKK2ETyrjXRTWob')
-  const event = (m: InstanceType<typeof PublicKey>, lamports: bigint, holders = 2) => {
-    const head = Buffer.alloc(8 + 8 + 32 * 5 + 4 + holders * 34 + 8 + 32)
-    Buffer.from([165, 55, 129, 112, 4, 179, 202, 40]).copy(head, 0)
-    m.toBuffer().copy(head, 16)
-    head.writeUInt32LE(holders, 144)
-    head.writeBigUInt64LE(lamports, 148 + holders * 34)
-    return head
+  const burn = 'E3TsHC3J3cxi4sPcRa8Rc31ooL2xSuqA7JiQENuTRGXq', bot = new PublicKey('EDJmQM5xiiF5RDRdYfpXGzG5yi5P7Lp35eRdsyUsKYrP')
+  const event = (m: InstanceType<typeof PublicKey>, lamports: bigint, holders = [bot.toBase58(), burn]) => {
+    const b = Buffer.alloc(8 + 8 + 32 * 5 + 4 + holders.length * 34 + 8 + 32)
+    Buffer.from([165, 55, 129, 112, 4, 179, 202, 40]).copy(b, 0)
+    m.toBuffer().copy(b, 16)
+    b.writeUInt32LE(holders.length, 144)
+    holders.forEach((h, i) => new PublicKey(h).toBuffer().copy(b, 148 + i * 34))
+    b.writeBigUInt64LE(lamports, 148 + holders.length * 34)
+    return b
   }
-  assert.equal(parseDistributeEvent(event(mint, 5_000_000n))?.distributed, 5_000_000n)
-  assert.equal(parseDistributeEvent(event(mint, 5_000_000n))?.mint, mint.toBase58())
+  const e = parseDistributeEvent(event(mint, 5_000_000n))
+  assert.deepEqual([e?.mint, e?.distributed, e?.shareholders], [mint.toBase58(), 5_000_000n, [bot.toBase58(), burn]])
   assert.equal(parseDistributeEvent(Buffer.alloc(40)), null)
-  const tag = Buffer.from('e445a52e51cb9a1d', 'hex')
-  const tx = { meta: { err: null,
-    logMessages: ['Program log: x', `Program data: ${event(mint, 7_000_000n).toString('base64')}`, `Program data: ${event(other, 9n).toString('base64')}`],
-    innerInstructions: [{ instructions: [{ data: bs58.encode(Buffer.concat([tag, event(mint, 7_000_000n)])) }, { data: bs58.encode(Buffer.concat([tag, event(mint, 3_000_000n)])) }] }] } }
-  assert.equal(distributedIn(tx, mint.toBase58(), (d: string) => bs58.decode(d)), 10_000_000n) // 7M seen twice counts once, plus 3M
-  assert.equal(distributedIn({ meta: { ...tx.meta, err: { x: 1 } } }, mint.toBase58(), (d: string) => bs58.decode(d)), 0n)
+  const tag = Buffer.from('e445a52e51cb9a1d', 'hex'), cpi = (b: Buffer, programIdIndex: number) => ({ programIdIndex, data: bs58.encode(Buffer.concat([tag, b])) })
+  const keys = ['payer', 'impostor111111111111111111111111111111111', PROGRAMS.pump] // pump at index 2, loaded addresses after
+  const tx = { transaction: { message: { accountKeys: keys } }, meta: { err: null, loadedAddresses: { writable: [], readonly: [] },
+    logMessages: [`Program data: ${event(mint, 999n).toString('base64')}`], // any program can print this: ignored
+    innerInstructions: [{ instructions: [cpi(event(mint, 7_000_000n), 2), cpi(event(mint, 3_000_000n), 2), cpi(event(mint, 50n), 1), cpi(event(other, 9n, [bot.toBase58()]), 2)] }] } }
+  const got = payoutsIn(tx, burn, (d: string) => bs58.decode(d))
+  assert.deepEqual([...got], [[mint.toBase58(), 10_000_000n]]) // impostor program and non-GrokGrid split are skipped
+  assert.equal(payoutsIn({ ...tx, meta: { ...tx.meta, err: { x: 1 } } }, burn, (d: string) => bs58.decode(d)).size, 0)
+  const sigs = [{ signature: 'c' }, { signature: 'b', err: {} }, { signature: 'a' }]
+  assert.deepEqual(nextBatch(sigs, 5).map((x: { signature: string }) => x.signature), ['a', 'c']) // oldest first, failed skipped
+  assert.deepEqual(nextBatch(sigs, 1).map((x: { signature: string }) => x.signature), ['a'])
   assert.equal(lifetimeFeesSol('10000000', '2500000'), 0.0125)
   assert.equal(lifetimeFeesSol('10000000', null), null)
 })
