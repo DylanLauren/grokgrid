@@ -1,7 +1,7 @@
 import { useEffect, useRef, type PointerEvent, type Ref } from 'react'
 import type { Call } from '../data/types'
 import { solscan } from '../config'
-import { ago, mc, signedUsd, tokens, usd } from '../lib/format'
+import { ago, mc, signedUsd, tokens, usd, sol as amount } from '../lib/format'
 import { BotMark } from './BotMark'
 import { CoinChip } from './CoinChip'
 import './callcard.css'
@@ -63,7 +63,7 @@ function Body({ call, compact }: { call: Call; compact?: boolean }) {
             {call.pnlUsd !== null && <span><i>Profit</i><em className={call.pnlUsd >= 0 ? 'gain' : 'loss'}>{signedUsd(call.pnlUsd)}</em></span>}
           </div>
           <div className="cc-foot">
-            <span><i>{call.side === 'sell' ? 'SOL in' : 'SOL out'}</i>{call.spentSol} SOL</span>
+            <span><i>{call.side === 'sell' ? 'SOL in' : 'SOL out'}</i>{amount(call.spentSol)} SOL</span>
             {call.tradeMc ? <span><i>At</i>{call.tradeMcApprox ? '≈' : ''}{mc(call.tradeMc)} MC</span> : call.entryMc !== null && call.nowMc !== null && <span><i>Avg entry</i>{mc(call.entryMc)} → {mc(call.nowMc)} MC</span>}
             {call.side === 'sell' && typeof call.pnlSol === 'number' && <span><i>P&L</i><em className={call.pnlSol >= 0 ? 'gain' : 'loss'}>{call.pnlSol >= 0 ? '+' : ''}{call.pnlSol.toFixed(5)} SOL</em></span>}
           </div>
