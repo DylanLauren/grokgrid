@@ -2,6 +2,7 @@ import { beats, fresh } from './_heartbeat.js'
 import { chainCurve } from './_curve.js'
 import { curveFrom, tally } from './_tally.js'
 import { balances, hasStore, HOUSE_WALLET, json, MAIN_MINT, markets, parse, redis, solUsd, toHash, readLimited } from './_lib.js'
+import { reservedTicker } from './_launch.js'
 import { tradeMcs } from './_trademc.js'
 
 // Registry entry, written once by /api/ingest when Grok Bot launches an agent's coin.
@@ -32,6 +33,8 @@ export async function grid(only?: string) {
   const all = Object.values(toHash(reg))
     .map((v) => parse<AgentRecord>(v))
     .filter((a): a is AgentRecord => !!a)
+    // a bot whose coin copies the official ticker (launched before it was reserved) stays off the public grid
+    .filter((a) => !reservedTicker(a.coin.symbol))
   const records = only ? all.filter((r) => r.id === only || r.coin.mint === only) : all
   const withHouse = !only || only === 'house' || (!!MAIN_MINT && only === MAIN_MINT)
   const ids = [...(withHouse ? ['house'] : []), ...records.map((r) => r.id)]
