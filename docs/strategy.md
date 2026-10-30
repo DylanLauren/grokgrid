@@ -1,10 +1,10 @@
 # Strategy engine (unvalidated)
 
-`scripts/strategy-worker.mjs --once` runs one autonomous pass. **It defaults to paper mode.** Paper mode runs the whole loop (scan, screen, enter, exit) with simulated fills and keeps a private journal, so there are results to show before any real money moves. The status always says `strategyValidated: false`.
+`scripts/strategy-worker.mjs --once` runs one autonomous pass (launchd: every 60 s). **It defaults to paper mode**; the house runs it **live** now. Paper mode runs the whole loop (scan, screen, enter, exit) with simulated fills and keeps a private journal, so there are results to show before any real money moves. The status always says `strategyValidated: false`.
 
 ## Pipeline
 
-1. **Candidates.** The latest pump.fun coins from DexScreener's profile and boost feeds.
+1. **Candidates.** The latest pump.fun coins from DexScreener's profile and boost feeds. User bots also add DexScreener's pump.fun pair search, for coins still on the bonding curve (see [agent-runner.md](agent-runner.md)).
 2. **Market screen** (DexScreener pair data): pair age, liquidity, market cap, 5m and 24h volume, 5m buys and buy/sell ratio, and trade size as a share of liquidity.
 3. **Chain screen** (RPC/Helius). This runs only for coins that passed step 2:
    - no mint authority and no freeze authority;
@@ -42,6 +42,14 @@ Take `DEFAULT_STRATEGY` from `scripts/strategy-policy.mjs`, then add `"exitFile"
 
 Per-agent rules go through `tighten()`. They can only lower size, take-profit, stop-loss, hold time and open positions, or raise the liquidity and holder floors. They can never loosen a global setting.
 
+## User bots: styles on the bonding curve
+
+User bots use the same pipeline with a **curve screen** chosen by their launch **style** (early, momentum, steady): curve-sized market-cap, age, holder and volume floors, the curve's own SOL as liquidity, and each style's own exits and ranking. Every rug check and money limit stays the same. The table is in [agent-runner.md](agent-runner.md#what-it-buys-styles-on-the-bonding-curve). The house screen above is unchanged.
+
+## The why behind each trade
+
+Every live proposal carries `why`, built from the numbers it was decided on (`scripts/trade-why.mjs`): for a buy the buy/sell ratio, buys in 5m, liquidity or curve SOL, holders, top-10 share, market cap, the 5m move and, for a styled bot, its style; for a sell the exit rule and the move from entry (and peak) that fired it. Workers keep whys in their own private files keyed by intent id (`trade-why-strategy.json`, `trade-why-exit.json`, each bot's `trade-why.json`), so the journal format never changes. The callout note, the pump.fun Callout thesis and the site (Calls, phone pop-ups, hover cards) show it. No model or external API is involved.
+
 ## Fast exits (exit watcher)
 
 The market scan runs about once a minute, and a memecoin can fall through a −25% stop between two scans. Two losses on 2026-10-29 exited at −41% and −43%.
@@ -52,6 +60,7 @@ The market scan runs about once a minute, and a memecoin can fall through a −2
 - **Confirmed twice:** a quote-triggered exit is planned only when two checks in a row (5 seconds apart, within 20 seconds) agree, so one manipulated or glitched quote cannot force a sale.
 - **Sell at once:** a sell it plans goes into the house trading journal, and the trading worker is started immediately to sign it.
 - **Limits:** it never buys, never signs and changes no limits. It keeps its own peak prices in `exit-watcher-state.json`. It runs only when the strategy is live, the house is in execute mode with a dynamic allowlist and there is no STOP file. Status is in `exit-watcher-status.json`.
+- **User bots too:** on the same loop it checks every user bot holding a coin, with that bot's own style and limits, and kicks the agent runner to sign (per-bot state in `exit-watcher-agents.json`).
 
 ## Trade size: budget follows fees and balance
 
@@ -91,7 +100,7 @@ Posts are best effort and never include secrets. Set `GROKGRID_INGEST=off` to se
 - After a real trade reconciles, the trading worker posts it once as a `trade` event (`scripts/trading-callouts.mjs`). The site re-verifies the signature on chain and dedupes by signature. A private ledger (`trading-callouts.json`) records each signature.
   - A 4xx rejection is recorded and not retried.
   - An outage, 429 or 5xx is retried on the next tick.
-- Each posted trade also writes one `action` line, for example "bought $X for 0.050 SOL · strategy unvalidated".
+- Each posted trade's note is its why ("bought $X: buyers outpacing sellers 2.1× … 0.020 SOL."), falling back to "bought $X for 0.020 SOL · strategy unvalidated" when none was recorded. It also writes one `action` line.
 - Paper fills post as `action` lines prefixed **`paper:`**. They are never `trade` events, which need real signatures.
 
 ## pump.fun Callouts (house profile)
@@ -105,5 +114,5 @@ A pump.fun Callout push-notifies the profile's followers and counts on pump.fun'
 - **Which coin.** The newest reconciled **real** buy that the house still holds and hasn't called yet, one per run, so every held buy gets a call. Paper fills never reach this.
 - **Limits.** No wait of our own between calls. No repeat of a signature or of a coin within 24 hours; a refused attempt is retried after 10 minutes. Private ledger `pump-callouts.json`. It's off unless `callout-config.json` has `"pumpCalloutsEnabled": true`.
 - **Dry run.** `node scripts/pump-callout-worker.mjs --dry-run [--mint <mint>]` asks for eligibility and stops before create.
-  - On 2026-10-29 a dry run for FLOATER returned `verdict-INSUFFICIENT_BALANCE`: the house holds nothing yet, so pump.fun's own gate works as expected.
-  - The verdict string pump.fun returns for an allowed call hasn't been seen yet. The worker accepts `OK`, `ELIGIBLE` or `ALLOWED` and fails closed on anything else. Check it with a dry run on a held coin before enabling.
+  - pump.fun refuses a call when the house's position is too small (`verdict-INSUFFICIENT_BALANCE`, seen at 0.001 SOL sizing). At today's sizing calls post: the first ones were $CROWD, $WASTED and FnvQAP… on 2026-10-29/30. The worker accepts `OK`, `ELIGIBLE` or `ALLOWED` and fails closed on anything else.
+- **On now:** `callout-config.json` has `pumpCalloutsEnabled: true`; launchd runs it every 5 minutes. The thesis carries the buy's why.

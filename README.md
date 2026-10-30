@@ -15,9 +15,9 @@ A Grok Bot trades pump.fun live at his desk. Launch your own bot with its own co
 ## What it is
 
 - **The room.** A 3D desk where the house Grok Bot sits with his phone and monitor. His phone shows his **real pump.fun screen, live** ("Watch me trade!"), and every trade he makes is called out on the site.
-- **The grid.** Anyone can launch **their own bot as a coin** on pump.fun. That bot gets its own wallet and its owner's rules (max SOL per trade, take-profit, stop-loss). It joins the Grid and Matrix and trades on its own.
+- **The grid.** Anyone can launch **their own bot as a coin** on pump.fun. That bot gets its own trading wallet, a trading style (early, momentum or steady) and its owner's limits (max SOL per trade, take-profit, stop-loss). It joins the Grid and Matrix and trades on its own.
 - **$GRID.** The main coin. Its creator fees fund the house bot's trading and a **buy-and-burn** that buys $GRID on the market and burns it on chain.
-- **Out loud.** Real trades post to the site, to pump.fun **Callouts** from the GrokGrid profile, and to X with trade cards and short clips.
+- **Out loud.** Every real trade comes with its reason in plain words ("bought $X: buyers outpacing sellers 2.1×, 410 holders…", "sold $X: took profit at +62%"), built from the numbers the strategy decided on. It posts to the site, the live phone and pump.fun **Callouts** from the GrokGrid profile (X posting is built and off).
 
 ## Screens
 
@@ -32,25 +32,38 @@ A Grok Bot trades pump.fun live at his desk. Launch your own bot with its own co
 
 ## How it works
 
-**The house bot.** Grok Bot's wallet trades pump.fun coins, with the same caps as everything else. The strategy engine scans new coins, screens them, and proposes trades. The executor signs at most one trade at a time, writes it to a journal **before** sending it, and settles it from finalized on-chain receipts.
-- **Screen:** DexScreener market data plus on-chain checks: no mint or freeze authority, a holder floor, top-10 and creator concentration, liquidity, and rising real buyers.
-- **Exits:** take-profit, stop-loss, a trailing stop and max hold time.
+**The house bot ("House Trader").** Grok Bot's wallet trades pump.fun coins. The strategy engine scans coins every minute, screens them and proposes trades. The executor signs at most one trade at a time, writes it to a journal **before** sending it, and settles it from finalized on-chain receipts.
+- **Screen:** DexScreener market data plus on-chain checks: no mint or freeze authority, a holder floor, top-10 and creator concentration, liquidity, rising real buyers, and no chasing a coin already up 25% in 5 minutes.
+- **Size:** each buy follows the fees the bot actually received and its spendable balance (0.02 SOL per trade until fees reach 1 SOL a day, then 0.05 / 0.1 / 0.5), always inside the hard limits below.
+- **Exits:** take-profit, stop-loss, a trailing stop and max hold time. The **exit watcher** re-checks every held coin every 5 seconds from on-chain sell quotes (two checks must agree), so a dump between scans is sold near its stop.
+- **The why:** every trade carries the reason it fired, in plain words, on the site, the phone pop-ups, the hover cards and the pump.fun Callout.
 
-**Launching a bot** (one agent per wallet, no platform-wide cap):
-1. The user creates **their own** agent wallet (Privy embedded Solana wallet) and approves GrokGrid's **policy-limited** signer for it. The signer can only make capped pump.fun trades; it can't move SOL elsewhere or export keys.
-2. They pick a look, name, strategy and limits, then approve **one transaction**. It creates the coin on pump.fun with the **80/20 creator-fee split** written into it, plus an optional first buy.
-3. The site verifies the coin and split on chain and registers the bot. It appears on the Grid and Matrix.
-4. The **agent runner** sees the launch in the durable outbox within about 45 seconds and starts trading from that bot's own wallet. It follows the owner's rules, which can only be tighter than the global caps.
-5. Each real trade is verified on chain, shown on the site, and can be posted to X and pump.fun Callouts.
+**Launching a bot** (one bot per Phantom wallet):
+1. Connect **Phantom** and sign one free message. That is the login; it also creates the bot's own **trading wallet** (a Privy embedded wallet tied to that Phantom login) with GrokGrid's **policy-limited** signer: capped pump.fun buys and sells only, no SOL transfers, no key export. Phantom itself is never controlled.
+2. Pick the coin (picture, name, ticker, description, socials), the bot (name, its "edge" line, a **trading style**) and limits (max per trade ≤ 0.05 SOL; take-profit and stop-loss can only be tighter than the style's).
+3. Choose the **funding** for the bot's trading wallet (minimum 0.05 SOL; 0.02 stays in reserve) and an optional **dev buy** (tokens go to your Phantom; the bot never trades them).
+4. Approve **one transaction** in Phantom. It creates the coin on pump.fun with the **80/20 creator-fee split** locked into it (80% to the bot's trading wallet, 20% to the $GRID burn wallet), funds the bot and makes the dev buy.
+5. The site reads the coin back from chain, checks the split and settings, and registers the bot on the Grid and Matrix, with its own profile page (the coin's website).
+6. The **agent runner** on the Mac picks it up within about 45 seconds and starts trading from the bot's own wallet, with its style, inside the hard limits. Its exits are watched every 5 seconds like the house's.
 
-**Buy-and-burn.** Once the burn wallet holds 0.05 SOL, it buys $GRID with up to 1 SOL per cycle (5% max slippage). Then it burns **every** $GRID it holds with an SPL `BurnChecked`. It works on the bonding curve or PumpSwap after graduation.
+**Trading styles** (user bots trade coins still on pump.fun's bonding curve):
 
-**The live phone.** A pinned pump.fun window on the operator's Mac is captured as screenshots plus on-demand WebRTC video (LiveKit). Video streams only while someone has "Watch me trade!" open. If the window isn't capturable, the site says **Screen offline** rather than faking it.
+| Style | Buys | Exits (TP / SL / max hold) |
+|---|---|---|
+| Early | 3–20 min old, $10k–30k market cap, strong early buying | +35% / −15% / 1 h |
+| Momentum | up 5–25% in 5 min on heavy buying, $20k–65k | +45% / −20% / 2 h |
+| Steady (default) | 30+ min old, 100+ holders, rising over the hour, $30k–65k | +60% / −25% / 6 h |
+
+Every style keeps the same rug checks (no authorities, top 10 ≤ 30%, dev ≤ 5%, at least 5 SOL in the curve, no chasing a 5-minute pump) and the same money limits. Each ranks passing coins by its own signal, so bots with different styles buy different coins.
+
+**Buy-and-burn.** Once the burn wallet holds 0.05 SOL, it buys $GRID with up to 1 SOL per cycle (5% max slippage). Then it burns **every** $GRID it holds with an SPL `BurnChecked`. It works on the bonding curve or PumpSwap after graduation. It switches on with the official mint (see [Going live with $GRID](#going-live-with-grid)).
+
+**The live phone.** A pinned pump.fun window on the operator's Mac, following House Trader's trades and callouts, is captured as screenshots plus on-demand WebRTC video (LiveKit). Video streams only while someone has "Watch me trade!" open. Trade and callout pop-ups (with MC, P&L and the why) appear over it and fade. If the window isn't capturable, the site says **Screen offline** rather than faking it.
 
 **Callouts and X.**
-- **Site:** each reconciled real trade is posted once.
-- **pump.fun:** the GrokGrid profile makes a Callout for every coin the house bot buys, while it holds it (pump.fun's own eligibility check decides).
-- **X:** the bot account posts trade cards in the site's style, 7-second motion clips for big wins, burns and launches, and a daily recap. Paper trades never post anywhere as trades.
+- **Site:** each reconciled real trade is posted once, with its why.
+- **pump.fun:** the GrokGrid profile makes a Callout for every coin the house bot buys, while it holds it (pump.fun's own eligibility check decides), with the why as its thesis.
+- **X:** built (trade cards, 7-second clips, daily recap) and off until an X developer app is set up. Paper trades never post anywhere as trades.
 
 ## Where the money goes
 
@@ -59,8 +72,12 @@ A Grok Bot trades pump.fun live at his desk. Launch your own bot with its own co
 | Source | Split | Notes |
 |---|---|---|
 | **$GRID** creator fees | 80% → treasury (the house bot's trading) · 20% → buy-and-burn | Burns are real SPL burns; supply drops on chain |
-| Each **bot coin's** creator fees | 80% → that bot's own wallet · 20% → the $GRID burn wallet | Written into the coin at launch, verified before it joins the grid |
-| A bot's trading money | its own coin fees + whatever its owner deposits | Funds are never pooled between bots |
+| Each **bot coin's** creator fees | 80% → that bot's own trading wallet · 20% → the $GRID burn wallet | Written into the coin at launch, verified before it joins the grid |
+| A bot's trading money | its own coin fees + what its owner funds at launch | Funds are never pooled between bots |
+
+- **Fee router.** pump.fun only pays a coin's shareholders when someone sends its payout instruction. The fee distributor sends it for $GRID and every bot coin every 10 minutes (the house pays only the network fee), so the 80/20 split actually lands.
+- **Matrix fees are read from chain:** each coin's lifetime creator fees = every payout the pump program recorded for it + what waits to be paid out now. Only real pump-program payout events for GrokGrid coins count.
+- **$GRID is reserved:** the ticker and lookalike names can't be used by bot launches.
 
 Today the house bot does not move money into other bots; each bot trades only its own wallet.
 
@@ -68,7 +85,9 @@ Today the house bot does not move money into other bots; each bot trades only it
 
 Everything that can spend money **ships off**. The operator turns each switch on deliberately after a funded test.
 
-- **Caps in config, enforced in code:** 0.05 SOL per trade, 0.5 SOL total exposure, a 0.25 SOL daily-loss stop, 15% max slippage and a 0.02 SOL reserve. User bots can only tighten these.
+- **Hard limits, enforced in code:**
+  - House: 0.5 SOL per trade, 1.5 SOL open exposure, a 1.25 SOL daily-loss stop, 15% max slippage, a 0.02 SOL reserve. The fee-tier sizing keeps real trades far below these (0.02 SOL until fees grow).
+  - Each user bot: 0.05 SOL per trade (also the Privy signer's per-buy cap), 0.15 SOL open, a 0.125 SOL daily-loss stop, 15% slippage, 0.02 SOL reserve, at most 3 coins. Owners can only tighten.
 - **Journal before broadcast:** a transaction's signature is fsync'd to a private journal before it's sent. An outcome that can't be proven is held and **never retried**. Only a passed blockhash with the signature never seen counts as "didn't land".
 - **Stop switches:** a `STOP` file freezes all signing on the next tick. An `EXIT` file sells everything and stops buying.
 - **Keys:** the house and burn keys are 0600 files on the operator's Mac and never leave it. User bots sign through Privy with a **default-deny policy**: capped curve buys, sells and compute budget, and nothing else. No SOL transfers, no account closes, no key export, no message signing.
@@ -95,12 +114,14 @@ Everything that can spend money **ships off**. The operator turns each switch on
 | Part | State |
 |---|---|
 | Site, 3D room, Grid, Matrix, Stats, Docs | Live |
-| Live phone | Live while the pinned window is on screen |
-| House trading | Observe-only until the funded test |
-| Strategy | Paper trading (results shown as `paper:` lines) |
-| Agent runner | Paper; bot launches are paused until execute mode is turned on |
-| Buy-and-burn | Configured, off until $GRID launches |
-| pump.fun Callouts · X posts | Built, off until enabled |
+| Live phone | Live while the pinned window is on screen (Mac awake, on power) |
+| House trading | **Live**, executing inside the limits above |
+| Launches | **Open**: launches stay open while the agent runner is healthy in execute mode |
+| User bots | **Live**: trading from their own wallets with their styles |
+| Fee router · matrix fees | **Live** for every bot coin; $GRID once minted |
+| pump.fun Callouts | **Live** for the house |
+| Buy-and-burn | Ready; switches on with the official $GRID mint |
+| X posts | Built, off until an X developer app is set up |
 | Worker health | `GET /api/status` shows each worker's live heartbeat |
 
 ## Run it
@@ -128,14 +149,26 @@ npx tsx ops/go-live.mjs status   # every switch at a glance
 | Job | What it does | Every |
 |---|---|---|
 | runtime-observer | Wallet balances, launch outbox, phone heartbeat | 30 s |
-| trading-observer | House journal, settlement, executor (when on) | 30 s |
-| strategy | Scan, screen, paper or live proposals | 60 s |
-| agent-runner | Every launched bot | 45 s |
+| trading-observer | House journal, settlement, executor, site callouts; then watches for planned sells for 25 s | 30 s |
+| strategy | Scan, screen, live proposals for the house | 60 s |
+| exit-watcher | 5-second exits for the house and every user bot holding a coin | always on |
+| agent-runner | Every launched bot: launch outbox, rules, scan, buys, sells, signing via Privy | 45 s |
+| fee-distributor | Pays out creator fees 80/20 and posts each coin's lifetime fees to the matrix | 10 min |
 | buyback | Buy-and-burn | 30 s |
-| pump-callouts · x-posts | Callouts and X posts (off by default) | — |
-| phone-renewal | Renews the screen-only upload credential | 30 min |
+| pump-callouts | pump.fun Callouts for the house | 5 min |
+| x-posts | X posts (off) | 5 min |
+| phone-guardian · phone-app · phone-renewal | Keep the live phone window following his trades, the capture app running, its credential fresh | always on · · 30 min |
+| log-rotate | Rotates `runtime/logs/<job>.log` over 5 MB | 1 h |
+| keep-awake | Keeps the Mac from sleeping | always on |
 
-Going live is one gated command each (`house`, `buyback <mint>`, `runner`, `callouts on`, `x on`). Every one checks keys, funds and setup first and asks for a typed phrase. See [docs/runtime.md](docs/runtime.md).
+Going live is one gated command each (`house`, `buyback <mint>`, `runner`, `fees on`, `callouts on`, `x on`). Every one checks keys, funds and setup first and asks for a typed phrase. See [docs/runtime.md](docs/runtime.md).
+
+### Going live with $GRID
+
+1. **Create $GRID on pump.fun** with fee sharing: 80% → `GRDiYB47AKJWsQgFtbvLaVv98rmt5NXbEmWir594QSiT` (treasury, House Trader's wallet) and 20% → `E3TsHC3J3cxi4sPcRa8Rc31ooL2xSuqA7JiQENuTRGXq` (burn wallet), with the fee-sharing admin revoked.
+2. **Verify on chain before switching anything:** exactly those two shareholders at 8000 / 2000 bps, admin revoked, the coin's creator is the fee-sharing config, no mint or freeze authority, no mayhem / cashback / holder-reward mode.
+3. **Turn on buy-and-burn:** `npx tsx ops/go-live.mjs buyback <mint>` (checks the mint and the burn key, asks for a typed phrase). This sets `officialMint`, so the fee router starts paying $GRID fees out and the house row on the matrix shows $GRID's fees.
+4. **Point the site at it:** set `VITE_MAIN_MINT` (and `VITE_MAIN_TICKER` if needed) in Vercel and redeploy, so Stats, the Matrix house row and the room show $GRID.
 
 ## API
 
@@ -155,13 +188,17 @@ Going live is one gated command each (`house`, `buyback <mint>`, `runner`, `call
 
 **Is this official?** No. It's an unofficial fan project, not affiliated with xAI or pump.fun.
 
-**Will the bots make money?** Unknown. The strategy is unvalidated: research into top pump.fun wallets found no reliable rule, so it runs in paper mode first and every status says so. Bots can lose money.
+**Will the bots make money?** Unknown. The strategy is unvalidated: research into top pump.fun wallets found no reliable rule, so sizes start small and grow only with real fee income, and every status says so. Bots can lose money.
 
-**Who holds the keys?** The house and burn keys stay on the operator's Mac (0600 files). User bot wallets belong to their owners (Privy). GrokGrid's signer can only do capped trades, and the owner can revoke it.
+**Who holds the keys?** The house and burn keys stay on the operator's Mac (0600 files). Each user bot's trading wallet belongs to its owner (a Privy wallet tied to their Phantom login). GrokGrid's signer can only do capped pump.fun trades, and the owner can revoke it any time ("Stop Grok Bot trading this wallet"). Phantom itself is never controlled.
 
-**Does the house bot fund other bots?** Not today. Each bot is funded by its own coin's fees and its owner's deposits.
+**Why does my bot get its own wallet instead of trading my Phantom?** Phantom only signs when you click Approve, so no server can trade from it while you sleep, and we never take private keys. The bot's wallet holds only what you fund it with plus its fees, so your main wallet is never at risk.
 
-**How many bots can launch?** No platform-wide cap: one bot per wallet. Launches open only when the runner is healthy.
+**Does the house bot fund other bots?** Not today. Each bot is funded by its own coin's fees (80%) and its owner's launch funding.
+
+**How many bots can launch?** One bot per Phantom wallet, up to the runner's capacity (`AGENT_CAP`, 100 by default). Launches open only while the runner is healthy.
+
+**Can I write my own strategy?** You pick a style (early, momentum, steady) and can only tighten its limits. The "edge" line is your bot's personality on the grid; every bot trades on the house engine and safety screen.
 
 **What if the Mac sleeps or goes offline?** Workers stop; nothing trades. On restart they resume from their journals. Unresolved trades are settled from the chain before anything new is signed. The site shows each worker's heartbeat.
 
@@ -179,15 +216,14 @@ Art in this README is generated from the site's own mascots and fonts: `npx tsx 
 
 ### Launching a grid bot
 
-Public launches remain paused until authorized execution and recovery are implemented and verified. The prepared flow uses the connected launcher/developer wallet as the bot's trading wallet: **one agent per wallet, with no fixed platform-wide agent cap**. There is no spare-wallet requirement for new launches.
+Launches are open while the agent runner is healthy in execute mode and `LAUNCHES_ENABLED=1`. The connected **Phantom** wallet launches the coin and makes the optional dev buy; the bot trades from its **own trading wallet** (a Privy embedded wallet tied to that Phantom login): **one bot per Phantom wallet**.
 
-1. The browser makes a fresh mint key and uploads the coin picture (`POST /api/launch/asset`, served at `/i/<mint>`; metadata at `/m/<mint>`).
-2. `POST /api/launch/prepare` builds a pump.fun transaction that creates the coin, assigns 80% of creator fees to the connected launcher/trading wallet and 20% to `VITE_BURN_WALLET`, and revokes the fee-sharing admin so the split is permanent. An optional first buy can be included. The transaction is simulated before it is returned.
-3. The connected wallet approves the transaction and the mint key signs. `POST /api/launch/send` validates the signed transaction before submission.
-4. `POST /api/launch/confirm` verifies the coin and locked recipients on chain before atomically registering and queueing the agent with its owner and trading rules.
+1. The browser makes a fresh mint key and uploads the coin picture (`POST /api/launch/asset`, served at `/i/<mint>`; metadata at `/m/<mint>`, whose website is the bot's GrokGrid profile).
+2. `POST /api/launch/prepare` checks the draft (names and ticker, reserved house/$GRID names refused; funding 0.05–10 SOL; style; limits) and the launcher's balance, then builds one transaction: create the coin, assign 80% of creator fees to the **bot's trading wallet** and 20% to `VITE_BURN_WALLET`, revoke the fee-sharing admin so the split is permanent, fund the bot's wallet, and the optional dev buy. The browser refuses to sign anything that calls programs outside pump.fun and Solana system programs or moves funds anywhere else.
+3. Phantom approves the transaction and the mint key signs. `POST /api/launch/send` validates the signed transaction before submission.
+4. `POST /api/launch/confirm` reads the coin back from chain (split, admin revoked, creator = the fee-sharing config, a plain SOL-quoted curve, no fee-diverting modes) before atomically registering and queueing the bot with its owner, style and limits.
 
-Connecting a wallet or approving a coin launch does **not** grant unattended signing permission. User keys stay in their wallet. Automatic trading requires a separately authorized execution path with enforced limits and recovery; it is not enabled by the fee split or registration. The operator's house wallet remains a separate runtime concern.
-
+Pressing **Launch bot** is also the approval for GrokGrid's policy-limited signer on the bot's wallet: capped curve buys, sells and compute budget, nothing else. The owner can revoke it any time. The agent runner signs only through that signer, inside the hard limits.
 
 #### Durable launch observation
 
@@ -252,7 +288,7 @@ screen demonstrates capture only; it does not prove the bot is trading.
 #### Runtime and launch recovery
 
 `VITE_BOT_WALLET` is the house bot's public address; `VITE_BURN_WALLET` is the
-separate buy-and-burn public address. New user agents use their own connected launcher wallet for trading.
+separate buy-and-burn public address. User bots trade from their own Privy trading wallets, created at Phantom sign-in.
 Private keys stay outside this repository and outside Vercel.
 
 Preparing a launch does not reserve a public wallet address. After verifying the launcher's real transaction signature, submission claims that wallet's single agent slot. An authorized send or ambiguous chain result must retain its claim until reconciliation establishes the outcome. Do not release uncertain claims or start another launch to work around a pending one. Confirmation atomically registers and queues each mint once. Historical spare-wallet records are compatibility data, not a prerequisite for new launches.
