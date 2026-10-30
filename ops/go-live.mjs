@@ -3,7 +3,8 @@
 // confirmation, and changes only its own config. Nothing here moves funds or signs.
 //   npx tsx ops/go-live.mjs status
 //   npx tsx ops/go-live.mjs house            house bot: strategy live + trading execute
-//   npx tsx ops/go-live.mjs buyback <mint>   buy-and-burn on, for the official $GRID mint
+//   npx tsx ops/go-live.mjs buyback <mint> [--pending]   buy-and-burn on, for the official $GRID mint
+//                                            (--pending: arm it before the coin exists; nothing buys or routes until it verifies)
 //   npx tsx ops/go-live.mjs runner           user agents sign through Privy
 //   npx tsx ops/go-live.mjs callouts on|off  pump.fun Callouts from the GrokGrid profile
 //   npx tsx ops/go-live.mjs fees on|off      route creator fees ($GRID and bot coins) to their shareholders
@@ -20,6 +21,7 @@ import { validateTradingPolicy } from '../scripts/trading-policy.mjs';
 import { validateBuybackConfig } from '../scripts/buyback-policy.mjs';
 import { validateRunnerConfig } from '../scripts/agent-runner-core.mjs';
 import { DEFAULT_STRATEGY, validateStrategyConfig } from '../scripts/strategy-policy.mjs';
+import { verifyOfficialMint } from '../scripts/official-mint.mjs';
 
 const GG = join(homedir(), '.config/grokgrid'), R = process.env.GROKGRID_RUNTIME_DIR || join(GG, 'runtime');
 const f = n => join(R, n);
@@ -74,12 +76,17 @@ async function house() {
   write('strategy-config.json', strategy);
 }
 
-async function buyback(mint) {
-  if (!address(mint)) throw Error('Usage: go-live.mjs buyback <official $GRID mint>');
+async function buyback(mint, pending = false) {
+  if (!address(mint)) throw Error('Usage: go-live.mjs buyback <official $GRID mint> [--pending]');
   if (mint === 'So11111111111111111111111111111111111111112') throw Error('That is wrapped SOL, not $GRID.');
   const b = read('buyback-config.json'), obs = read('observer-config.json');
-  const m = await readMint(connect(obs.rpcUrl), mint);
-  if (!m.verified) throw Error('That mint is not a fixed-supply token (it has a mint or freeze authority, or does not exist).');
+  const conn = connect(obs.rpcUrl), check = await verifyOfficialMint(conn, mint, { treasury: obs.houseWallet, burn: b.burnWallet });
+  if (check.reason === 'mint-not-on-chain') {
+    // Armed ahead of the coin: the buyback and fee router verify it every tick and stay idle until it passes.
+    if (!pending) throw Error('That mint is not on chain yet. Create it first, or use --pending to arm buy-and-burn ahead of it.');
+    console.log('  Not on chain yet: buy-and-burn and $GRID fee routing will wait until it exists and verifies (80/20 split, admin revoked, no authorities).');
+  } else if (!check.ok) throw Error(`That mint does not verify as the official $GRID: ${check.reason}.`);
+  else { const m = await readMint(conn, mint); if (!m.verified) throw Error('That mint has a mint or freeze authority.'); console.log('  Verified on chain: 80/20 split locked, no authorities.'); }
   const keypairFile = join(GG, 'wallets', 'grid-burn.json');
   await loadSigner(keypairFile, b.burnWallet);
   await confirm(`Buy-and-burn will spend the burn wallet's SOL on ${mint} and burn every token it buys.`, 'go live burn');
@@ -125,7 +132,7 @@ const touch = n => { writeFileSync(f(n), '', { mode: 0o600 }); console.log(`  ${
 const remove = n => { if (existsSync(f(n))) unlinkSync(f(n)); console.log(`  ${n} file removed`); };
 try {
   if (cmd === 'house') await house();
-  else if (cmd === 'buyback') await buyback(arg);
+  else if (cmd === 'buyback') await buyback(arg, process.argv.includes('--pending'));
   else if (cmd === 'runner') await runner();
   else if (cmd === 'fees') await flag('fee-distributor-config.json', 'enabled', arg, 'The house wallet will pay network fees to trigger pump.fun creator-fee payouts for $GRID and every bot coin.', 'go live fees');
   else if (cmd === 'callouts') await flag('callout-config.json', 'pumpCalloutsEnabled', arg, 'The GrokGrid pump.fun profile will make a public Callout for every coin the house really holds.', 'go live callouts');
@@ -135,6 +142,6 @@ try {
   else if (cmd === 'exit') touch('EXIT');
   else if (cmd === 'unexit') remove('EXIT');
   else if (cmd === 'off') { await confirm('Every worker goes back to observe-only / paper.', 'all off'); off(); }
-  else if (cmd !== 'status') { console.log('Commands: status | house | buyback <mint> | runner | callouts on|off | fees on|off | x on|off | stop | resume | exit | unexit | off'); process.exit(1); }
+  else if (cmd !== 'status') { console.log('Commands: status | house | buyback <mint> [--pending] | runner | callouts on|off | fees on|off | x on|off | stop | resume | exit | unexit | off'); process.exit(1); }
   console.log('\nNow:'); status();
 } catch (e) { console.error(`Not changed: ${String(e?.message || e).slice(0, 200)}`); process.exit(1); }
