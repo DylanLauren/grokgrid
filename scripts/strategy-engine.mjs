@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { screen, exitDecision, approve, pruneAllowlist } from './strategy-policy.mjs';
+import { screen, exitDecision, approve, pruneAllowlist, styleOf } from './strategy-policy.mjs';
 import { tradeBudget } from './trade-budget.mjs';
 import { journalRisk } from './trading-executor.mjs';
 import { buyWhy, sellWhy } from './trade-why.mjs';
@@ -15,7 +15,15 @@ export function emptyPaper(bankrollLamports = '1000000000') {
 const lamports = sol => BigInt(Math.max(0, Math.floor(sol * 1e9)));
 const log = (s, now, line) => { s.log = [...s.log, { at: now, line }].slice(-LOG_LIMIT); };
 
-/** Rank screened coins: most 5m buy pressure per unit of liquidity first. */
+const ratio = m => m.buys5m / Math.max(1, m.sells5m);
+// Each style ranks the coins that pass its screen by its own signal (strategy-policy STYLES).
+const STYLE_RANK = {
+  early: (m, now) => Math.log(1 + m.buys5m) - Math.log(Math.max(1, (now - m.pairCreatedAt) / 60000)), // youngest with strong buys
+  momentum: m => m.change5m * ratio(m),                                                              // moving up on heavy buying
+  steady: m => Math.log(Math.max(1, m.holders)) + Math.min(m.change1h, 50) / 100,                    // wide holder base, a calm rising hour
+};
+
+/** Rank screened coins: most 5m buy pressure per unit of liquidity first, or by the bot's style. */
 function entries(market, c, now, held, cooling = new Set()) {
   const picks = [];
   for (const [mint, m] of market.metrics) {
@@ -23,7 +31,7 @@ function entries(market, c, now, held, cooling = new Set()) {
     const facts = market.facts.get(mint);
     const merged = { ...m, ...(facts || {}) };
     const verdict = facts ? screen(merged, c, now) : { ok: false, reasons: ['chain-facts-unavailable'] };
-    if (verdict.ok) picks.push({ mint, m: merged, score: (m.buys5m / Math.max(1, m.sells5m)) * (m.volume5mUsd / m.liquidityUsd) });
+    if (verdict.ok) picks.push({ mint, m: merged, score: c.style ? STYLE_RANK[styleOf(c.style)](merged, now) : ratio(m) * (m.volume5mUsd / m.liquidityUsd) });
   }
   return picks.sort((a, b) => b.score - a.score);
 }
@@ -136,7 +144,7 @@ export function livePlan({ tradingState, policy, c, peaks, entries: entryPrices 
     if (pick) {
       allowlist = approve(allowlist, pick.mint, c, now, {});
       const spend = sizing ? budget.perTradeLamports : (BigInt(c.tradeLamports) < BigInt(policy.maxTradeLamports) ? c.tradeLamports : policy.maxTradeLamports);
-      proposals.push({ ...base, id: `buy-${randomUUID()}`, mint: pick.mint, side: 'buy', spendLamports: spend, reason: 'screen-passed', why: buyWhy(pick.m, now) });
+      proposals.push({ ...base, id: `buy-${randomUUID()}`, mint: pick.mint, side: 'buy', spendLamports: spend, reason: 'screen-passed', why: buyWhy(pick.m, now, c.style ? styleOf(c.style) : null) });
       if (pick.m.priceSol > 0) nextEntries[pick.mint] = { priceSol: pick.m.priceSol, at: now };
     }
   }

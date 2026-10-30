@@ -3,7 +3,7 @@
 import { createHash } from 'node:crypto';
 import { VersionedTransaction } from '@solana/web3.js';
 import { validateTradingPolicy } from './trading-policy.mjs';
-import { tighten } from './strategy-policy.mjs';
+import { tighten, STYLES, styleOf } from './strategy-policy.mjs';
 
 const integer = x => typeof x === 'string' && /^(0|[1-9]\d*)$/.test(x);
 const absolute = x => typeof x === 'string' && x.startsWith('/');
@@ -51,7 +51,9 @@ export function agentTradingPolicy(c, agent) {
 
 /** The agent's strategy: the global one, tightened by its owner's take-profit and stop-loss. */
 export function agentStrategy(global, agent) {
-  return tighten({ ...global, curveScreen: true }, {
+  // The bot's style sets its screen and exits; the owner's TP/SL can only tighten them.
+  const style = styleOf(agent.style);
+  return tighten({ ...global, curveScreen: true, style, ...STYLES[style].exits }, {
     tradeLamports: agent.maxTradeLamports,
     takeProfit: Number(agent.takeProfitBasisPoints) / 10000,
     stopLoss: Number(agent.stopLossBasisPoints) / 10000,
