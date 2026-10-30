@@ -53,7 +53,7 @@ export interface Agent {
   launchedAt: number // ms
   wallet: string // its trading wallet (public address)
   owner?: string // the Phantom that launched it
-  rules?: { maxSol: number; takeProfit: number; stopLoss: number } // as its owner set them at launch
+  rules?: { maxSol: number; takeProfit: number; stopLoss: number; style?: 'early' | 'momentum' | 'steady' } // as its owner set them at launch
   coin: {
     mint: string
     symbol: string

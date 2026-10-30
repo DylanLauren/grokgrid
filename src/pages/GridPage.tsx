@@ -26,6 +26,7 @@ const CAST: { habit: Habit; say: string; trick: string }[] = [
   { habit: 'squish', say: 'i hold forever', trick: 'squash' },
   { habit: 'doze', say: 'wake me at 2x', trick: 'wake' },
 ]
+const styleOf = (id: Style) => STYLES.find((s) => s.id === id) ?? STYLES[2]
 
 // Everything pump.fun asks for when a coin is created, plus how the bot should trade.
 interface Draft {
@@ -40,14 +41,22 @@ interface Draft {
   maxSol: string
   takeProfit: string
   stopLoss: string
+  style: Style
   firstBuy: string
   fund: string // SOL sent from the owner's wallet to the bot's trading wallet at launch
 }
 
-const EMPTY: Draft = { look: 3, name: '', botName: '', ticker: '', description: '', x: '', telegram: '', strategy: '', maxSol: '0.05', takeProfit: '60', stopLoss: '25', firstBuy: '', fund: '0.05' }
+const EMPTY: Draft = { look: 3, name: '', botName: '', ticker: '', description: '', x: '', telegram: '', strategy: '', maxSol: '0.05', takeProfit: '60', stopLoss: '25', style: 'steady', firstBuy: '', fund: '0.05' }
 const DRAFT_KEY = 'gg-launch-draft'
 // the house exits every bot runs under: an owner can set them tighter, never looser
 const HOUSE = { takeProfit: 60, stopLoss: 25 }
+// how a bot hunts (matches api/_launch.ts): each looks for different coins and exits on its own clock
+type Style = 'early' | 'momentum' | 'steady'
+const STYLES: { id: Style; label: string; line: string; takeProfit: number; stopLoss: number }[] = [
+  { id: 'early', label: 'early', line: 'young curve coins with fresh buying. quick in, quick out.', takeProfit: 35, stopLoss: 15 },
+  { id: 'momentum', label: 'momentum', line: 'coins already climbing with buyers in control. rides the move.', takeProfit: 45, stopLoss: 20 },
+  { id: 'steady', label: 'steady', line: 'older coins with lots of holders. patient, wider exits.', takeProfit: 60, stopLoss: 25 },
+]
 // what a launch needs from the owner's Phantom, matching api/launch/prepare.ts
 const MIN_FUND = 0.05 // matches MIN_FUND_SOL in api/launch/prepare.ts
 const LAUNCH_COST = 0.03 // about: Solana network fees and pump.fun's coin-creation rent
@@ -75,8 +84,9 @@ function check(d: Draft) {
   if (!d.strategy.trim()) e.strategy = 'describe its edge'
   const n = (v: string, lo: number, hi: number) => v !== '' && !(Number(v) >= lo && Number(v) <= hi)
   if (n(d.maxSol, 0.01, MAX_TRADE)) e.maxSol = `0.01 to ${MAX_TRADE} SOL`
-  if (n(d.takeProfit, 5, HOUSE.takeProfit)) e.takeProfit = `5% to ${HOUSE.takeProfit}%`
-  if (n(d.stopLoss, 1, HOUSE.stopLoss)) e.stopLoss = `1% to ${HOUSE.stopLoss}%`
+  const cap = STYLES.find((s) => s.id === d.style) ?? HOUSE // a style's exits are the loosest it runs
+  if (n(d.takeProfit, 5, cap.takeProfit)) e.takeProfit = `5% to ${cap.takeProfit}%`
+  if (n(d.stopLoss, 1, cap.stopLoss)) e.stopLoss = `1% to ${cap.stopLoss}%`
   if (!(Number(d.fund) >= MIN_FUND && Number(d.fund) <= 10)) e.fund = `at least ${MIN_FUND} SOL, up to 10`
   if (d.firstBuy && !(Number(d.firstBuy) === 0 || (Number(d.firstBuy) >= 0.001 && Number(d.firstBuy) <= 10))) e.firstBuy = '0, or 0.001 to 10 SOL'
   return e
@@ -278,14 +288,24 @@ export function GridPage({ grid }: { grid: AgentsFeed }) {
             <Field label="edge" count={`${bytes(d.strategy)}/${LIMITS.strategy}`} error={err('strategy')} hint="shown on its card and profile. every bot trades inside the house safety rules.">
               <input className="gd-edge" value={d.strategy} placeholder="configure your personal edge on our grok trading bots" onBlur={() => touch('strategy')} onChange={(e) => set('strategy', e.target.value)} />
             </Field>
+            <Field label="style" hint={STYLES.find((s) => s.id === d.style)?.line}>
+              <div className="gd-style" role="radiogroup" aria-label="trading style">
+                {STYLES.map((s) => (
+                  <button key={s.id} type="button" role="radio" aria-checked={d.style === s.id} className={d.style === s.id ? 'on' : ''}
+                    onClick={() => setD((v) => ({ ...v, style: s.id, takeProfit: String(s.takeProfit), stopLoss: String(s.stopLoss) }))}>
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </Field>
             <div className="gd-row three">
               <Field label="max per trade" unit="SOL" hint={`signer cap: ${MAX_TRADE}`} error={err('maxSol')}>
                 <input inputMode="decimal" value={d.maxSol} onBlur={() => touch('maxSol')} onChange={(e) => set('maxSol', num(e.target.value))} />
               </Field>
-              <Field label="take profit" unit="%" hint={`${HOUSE.takeProfit}% at most`} error={err('takeProfit')}>
+              <Field label="take profit" unit="%" hint={`${styleOf(d.style).takeProfit}% at most`} error={err('takeProfit')}>
                 <input inputMode="decimal" value={d.takeProfit} onBlur={() => touch('takeProfit')} onChange={(e) => set('takeProfit', num(e.target.value))} />
               </Field>
-              <Field label="stop loss" unit="%" hint={`${HOUSE.stopLoss}% at most`} error={err('stopLoss')}>
+              <Field label="stop loss" unit="%" hint={`${styleOf(d.style).stopLoss}% at most`} error={err('stopLoss')}>
                 <input inputMode="decimal" value={d.stopLoss} onBlur={() => touch('stopLoss')} onChange={(e) => set('stopLoss', num(e.target.value))} />
               </Field>
             </div>

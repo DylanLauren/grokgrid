@@ -14,7 +14,7 @@ export interface AgentRecord {
   launchedAt: number
   wallet: string
   owner?: string // the wallet that launched it
-  rules?: { maxSol: number; takeProfit: number; stopLoss: number } // how its owner asked it to trade
+  rules?: { maxSol: number; takeProfit: number; stopLoss: number; style?: 'early' | 'momentum' | 'steady' } // how its owner asked it to trade
   coin: { mint: string; symbol: string; name: string; image?: string; hue: string }
   privyWalletId?: string // the verified Privy wallet the agent runner signs from
 }
