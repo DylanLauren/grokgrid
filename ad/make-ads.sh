@@ -38,9 +38,11 @@ for c in $CUTS; do
   D=$(dur $c); H=$(awk "BEGIN{print int($D/2)}")
   for cut in "${SIZES[@]}"; do
     set -- $cut
-    DSF=$DSF QS="&ui=../ui&clips=../clips&cut=$c" node scripts/render.js $1 $2 "out/frames-$c-$3" 0 $H > "out/$c-$3-a.log" 2>&1 &
-    DSF=$DSF QS="&ui=../ui&clips=../clips&cut=$c" node scripts/render.js $1 $2 "out/frames-$c-$3" $H $D > "out/$c-$3-b.log" 2>&1 &
-    wait
+    DSF=$DSF QS="&ui=../ui&cut=$c" node scripts/render.js $1 $2 "out/frames-$c-$3" 0 $H > "out/$c-$3-a.log" 2>&1 &
+    A=$!
+    DSF=$DSF QS="&ui=../ui&cut=$c" node scripts/render.js $1 $2 "out/frames-$c-$3" $H $D > "out/$c-$3-b.log" 2>&1 &
+    # wait for the two halves only (a bare wait would also wait on the http server)
+    wait $A $!
   done
   echo "   $c"
 done
