@@ -33,18 +33,20 @@ const exists = p => access(p).then(() => true, () => false);
  */
 const FEE_READS_PER_RUN = 200;
 async function tallyPayouts(conn, burn, prev = {}) {
+  const totals = { ...(prev.totals || {}) };
+  let until = prev.until ?? null, before = prev.before ?? null;
+  // Newest come first, so a backlog is walked downward across runs (`before`) until it meets
+  // the last signature read (`until`); only then is the oldest unread part known and read.
   const fresh = [];
-  for (let before, page = 0; page < 5; page++) {
-    const sigs = await conn.getSignaturesForAddress(new PublicKey(burn), { limit: 1000, ...(before ? { before } : {}), ...(prev.until ? { until: prev.until } : {}) }, 'finalized');
+  let reached = false;
+  for (let page = 0; page < 5; page++) {
+    const sigs = await conn.getSignaturesForAddress(new PublicKey(burn), { limit: 1000, ...(before ? { before } : {}), ...(until ? { until } : {}) }, 'finalized');
     fresh.push(...sigs);
-    if (sigs.length < 1000) break;
+    if (sigs.length < 1000) { reached = true; break; }
     before = sigs.at(-1).signature;
   }
-  const totals = { ...(prev.totals || {}) };
-  let until = prev.until ?? null;
-  // Five full pages means the oldest unread signatures are out of reach (newest come first),
-  // most likely a flood. Read nothing and keep the totals rather than skip a payout.
-  if (fresh.length >= 5000) return { totals, until, complete: false, flooded: true };
+  if (!reached) return { totals, until, before, complete: false }; // keep walking down next run
+  const window = prev.before ?? null; // set: signatures newer than this are still unread
   for (const s of nextBatch(fresh, FEE_READS_PER_RUN)) {
     // Raw RPC: only inner instructions are needed, and web3.js can't decode newer tx versions.
     const res = await conn._rpcRequest('getTransaction', [s.signature, { encoding: 'json', maxSupportedTransactionVersion: 1, commitment: 'finalized' }]);
@@ -53,7 +55,10 @@ async function tallyPayouts(conn, burn, prev = {}) {
     for (const [mint, lamports] of payoutsIn(tx, burn, d => bs58.decode(d))) totals[mint] = (BigInt(totals[mint] ?? '0') + lamports).toString();
     until = s.signature;
   }
-  return { totals, until, complete: until === (fresh.find(x => !x.err)?.signature ?? until) };
+  const doneHere = until === (fresh.find(x => !x.err)?.signature ?? until);
+  // Each run reads the oldest 200 unread, so the tally always moves forward, however busy
+  // the burn wallet is. Totals are posted only when nothing is left unread.
+  return { totals, until, before: doneHere ? null : window, complete: doneHere && !window };
 }
 
 const args = process.argv.slice(2), probe = args.includes('--probe') ? args[args.indexOf('--probe') + 1] : null;
@@ -124,7 +129,7 @@ async function reportFees(conn, online, house, registry, officialMint, burn, sta
   if (officialMint) owners.set(officialMint, 'house');
   state.fees ??= {};
   let tally;
-  try { tally = await tallyPayouts(conn, burn, state.feeTally); state.feeTally = { totals: tally.totals, until: tally.until }; }
+  try { tally = await tallyPayouts(conn, burn, state.feeTally); state.feeTally = { totals: tally.totals, until: tally.until, before: tally.before }; }
   catch (e) { results.push({ feesError: String(e?.message || e).slice(0, 60) }); }
   // While payouts are still unread a total would be low: keep showing the last ones.
   if (tally?.complete) for (const [mint, agent] of owners) {
@@ -136,7 +141,7 @@ async function reportFees(conn, online, house, registry, officialMint, burn, sta
       state.fees[mint] = { feesSol, posted: prev.posted ?? null };
       if (feesSol !== null && feesSol !== prev.posted && (await postFees(root, { agent, feesSol })) === true) state.fees[mint].posted = feesSol;
     } catch {}
-  } else if (tally?.flooded) results.push({ feesError: 'burn wallet history flooded; totals held' });
+  } else if (tally) results.push({ feesError: 'payout history still being read; totals held' });
   await save('fee-distributor-state.json', state);
 }
 
