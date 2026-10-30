@@ -1,5 +1,7 @@
 # GrokGrid runtime
 
+> **Current state (2026-10-30):** house trading, the agent runner, the fee router and pump.fun Callouts are live; buy-and-burn waits for the official $GRID mint. See the README's [status table](../README.md#status-right-now) and [Going live with $GRID](../README.md#going-live-with-grid). The observer section below describes the original read-only observer, which still runs alongside the workers.
+
 The current runtime is an **observer**, not an automatic trader. It cannot load
 keys, build transactions, sign, buy, sell, distribute fees, or burn tokens.
 
