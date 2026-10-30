@@ -24,6 +24,21 @@ export async function candidates(limit, fetchImpl = fetch) {
   return mints.slice(0, limit);
 }
 
+/**
+ * Active coins still on pump.fun's bonding curve. Profiles and boosts are mostly graduated or
+ * dead coins, so the curve screen (user bots) adds DexScreener's pump.fun pair search.
+ */
+export async function curveCandidates(limit, fetchImpl = fetch) {
+  let pairs = [];
+  try { pairs = (await getJson(`${DEX}/latest/dex/search?q=pumpfun`, fetchImpl))?.pairs || []; } catch {}
+  const mints = [];
+  for (const p of Array.isArray(pairs) ? pairs : []) {
+    const mint = p?.baseToken?.address;
+    if (p?.chainId === 'solana' && p.dexId === 'pumpfun' && typeof mint === 'string' && mint.endsWith('pump') && !mints.includes(mint)) mints.push(mint);
+  }
+  return mints.slice(0, limit);
+}
+
 /** Best pump.fun / PumpSwap pair per mint, as plain metrics. */
 export async function marketMetrics(mints, fetchImpl = fetch) {
   const out = new Map();
@@ -68,28 +83,32 @@ async function chainFacts(conn, rpcUrl, mint, minHolders, fetchImpl = fetch) {
   const holders = largest.map((a, i) => ({ amount: Number(a.amount), owner: parsed.value[i].data.parsed.info.owner })).filter(x => !venues.has(x.owner));
   const top10Share = holders.slice(0, 10).reduce((n, x) => n + x.amount, 0) / supply;
   // The creator's share across all of its token accounts for this mint; unknown fails closed.
-  let devShare = null;
+  let devShare = null, curveSol = null;
   try {
-    const creator = (await new OnlinePumpSdk(conn).fetchBondingCurve(key)).creator;
+    const curve = await new OnlinePumpSdk(conn).fetchBondingCurve(key), creator = curve.creator;
+    // SOL the bonding curve holds: what a sell on the curve is paid from (curve screen only).
+    const real = curve.realQuoteReserves ?? curve.realSolReserves; // renamed in newer pump-sdk
+    if (!curve.complete && real) curveSol = Number(real.toString()) / 1e9;
     const accounts = await conn.getParsedTokenAccountsByOwner(creator, { mint: key }, 'confirmed');
     devShare = accounts.value.reduce((n, a) => n + Number(a.account.data.parsed.info.tokenAmount.amount), 0) / supply;
   } catch { devShare = null; }
   let holderCount = null;
   try { holderCount = await dasHolders(rpcUrl, mint, minHolders, fetchImpl); } catch { holderCount = null; }
   return { mintAuthority: info.mintAuthority ? info.mintAuthority.toBase58() : null, freezeAuthority: info.freezeAuthority ? info.freezeAuthority.toBase58() : null,
-    decimals: info.decimals, top10Share, devShare, holders: holderCount, tokenProgram: account.owner.toBase58() };
+    decimals: info.decimals, top10Share, devShare, holders: holderCount, curveSol, tokenProgram: account.owner.toBase58() };
 }
 
 /** Candidates + held coins: market metrics for all, chain facts only where the market screen passes. */
 export async function gatherMarket(c, conn, rpcUrl, heldMints, now) {
   const found = await candidates(c.scanLimit);
+  if (c.curveScreen === true) for (const m of await curveCandidates(c.scanLimit)) if (!found.includes(m)) found.push(m);
   const metrics = await marketMetrics([...new Set([...found, ...heldMints])]);
   const facts = new Map();
   let screened = 0;
   for (const [mint, m] of metrics) {
     if (heldMints.includes(mint)) continue;
     // Only spend RPC calls on coins whose market metrics already pass.
-    const pre = screen({ ...m, mintAuthority: null, freezeAuthority: null, holders: Number.MAX_SAFE_INTEGER, top10Share: 0, devShare: 0 }, c, now);
+    const pre = screen({ ...m, mintAuthority: null, freezeAuthority: null, holders: Number.MAX_SAFE_INTEGER, top10Share: 0, devShare: 0, curveSol: Number.MAX_SAFE_INTEGER }, c, now);
     if (!pre.ok) continue;
     screened++;
     try { const f = await chainFacts(conn, rpcUrl, mint, c.minHolders); if (f) facts.set(mint, f); } catch {}

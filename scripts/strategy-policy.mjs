@@ -24,6 +24,23 @@ export const DEFAULT_STRATEGY = Object.freeze({
   allowlistMinutes: 30, paperSlippage: 0.03, slippageBps: 1500, scanLimit: 30,
 });
 
+/**
+ * User bots only buy coins still on pump.fun's bonding curve (their signer can't wrap SOL for
+ * PumpSwap), and curve coins rarely reach the house's $15k liquidity / $30k market cap. With
+ * `curveScreen` set, a curve coin is judged by these instead. Everything that guards against
+ * rugs stays as strict as the house's: no authorities, top 10 ≤ 30%, dev ≤ 5%, buy pressure,
+ * no chasing a 5m pump. The curve's own SOL is the liquidity: it is what a sell is paid from.
+ * Money limits are untouched; trade size still comes from trade-budget.mjs and the policy.
+ */
+export const CURVE_SCREEN = Object.freeze({
+  minAgeMinutes: 3,          // past the first-minutes sniper and bundle churn
+  minMarketCapUsd: 10_000,   // above a fresh launch (~$4-6k)
+  maxMarketCapUsd: 65_000,   // below graduation (~$70k+), so a buy doesn't land on the migration
+  minCurveSol: 5,            // a 0.05 SOL trade stays ≤ 1% of what the curve can pay a sell from
+  minHolders: 40,
+  minVolume5mUsd: 1_000, minVolume24hUsd: 5_000, minBuys5m: 10,
+});
+
 export function validateStrategyConfig(c) {
   if (!c || c.version !== 1 || !['paper', 'live'].includes(c.mode) || typeof c.flavor !== 'string') throw Error('Unsupported strategy config');
   for (const k of ['minAgeMinutes', 'maxAgeMinutes', 'minLiquidityUsd', 'minMarketCapUsd', 'maxMarketCapUsd', 'minVolume5mUsd', 'minVolume24hUsd', 'minBuys5m', 'minBuySellRatio5m', 'minHolders', 'maxHoldMinutes', 'allowlistMinutes', 'maxOpenPositions', 'scanLimit', 'maxChange5mPct', 'reentryCooldownMinutes'])
@@ -51,12 +68,16 @@ export function tighten(global, agent = {}) {
  * fails closed: an unknown holder count or authority never passes.
  */
 export function screen(m, c, now) {
+  // A bonding-curve coin under a curve screen: same checks, curve-sized floors (CURVE_SCREEN).
+  const curve = c.curveScreen === true && m?.dexId === 'pumpfun';
+  if (curve) c = { ...c, ...CURVE_SCREEN };
   const reasons = [];
   const need = (ok, why) => { if (!ok) reasons.push(why); };
   const age = num(m?.pairCreatedAt) ? (now - m.pairCreatedAt) / 60000 : NaN;
   need(m?.chainId === 'solana' && typeof m.mint === 'string', 'not-solana');
   need(num(age) && age >= c.minAgeMinutes && age <= c.maxAgeMinutes, 'age');
-  need(num(m?.liquidityUsd) && m.liquidityUsd >= c.minLiquidityUsd, 'liquidity');
+  if (curve) need(num(m?.curveSol) && m.curveSol >= c.minCurveSol, 'curve-sol');
+  else need(num(m?.liquidityUsd) && m.liquidityUsd >= c.minLiquidityUsd, 'liquidity');
   need(num(m?.marketCapUsd) && m.marketCapUsd >= c.minMarketCapUsd && m.marketCapUsd <= c.maxMarketCapUsd, 'market-cap');
   need(num(m?.volume5mUsd) && m.volume5mUsd >= c.minVolume5mUsd, 'volume-5m');
   need(num(m?.volume24hUsd) && m.volume24hUsd >= c.minVolume24hUsd, 'volume-24h');
@@ -68,7 +89,8 @@ export function screen(m, c, now) {
   need(num(m?.top10Share) && m.top10Share <= c.maxTop10Share, 'concentration');
   need(num(m?.devShare) && m.devShare <= c.maxDevShare, 'dev-holding');
   need(num(m?.priceSol) && m.priceSol > 0 && num(m?.solUsd) && m.solUsd > 0, 'price');
-  if (num(m?.liquidityUsd) && num(m?.solUsd)) need(Number(BigInt(c.tradeLamports)) / 1e9 * m.solUsd <= m.liquidityUsd * c.maxTradeShareOfLiquidity, 'trade-too-large-for-liquidity');
+  const depthUsd = curve ? (num(m?.curveSol) && num(m?.solUsd) ? m.curveSol * m.solUsd : NaN) : m?.liquidityUsd;
+  if (num(depthUsd) && num(m?.solUsd)) need(Number(BigInt(c.tradeLamports)) / 1e9 * m.solUsd <= depthUsd * c.maxTradeShareOfLiquidity, 'trade-too-large-for-liquidity');
   return { ok: reasons.length === 0, reasons };
 }
 

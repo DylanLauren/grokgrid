@@ -172,7 +172,8 @@ async function tick() {
     return privySigner({ wallets: privy.wallets(), walletId: agent.privyWalletId, address: agent.wallet, authorizationKey })(tx);
   };
   // One market read for every agent: candidates plus everything any agent holds.
-  const market = await gatherMarket(global, conn, rpc.rpcUrl, [], now);
+  // User bots trade bonding-curve coins, so the scan pre-screens them with the curve screen.
+  const market = await gatherMarket({ ...global, curveScreen: true }, conn, rpc.rpcUrl, [], now);
   const report = {};
   // Agents share the one market read and run a few at a time; each has its own wallet, journal
   // and directory, and one agent's error never stops the others.
