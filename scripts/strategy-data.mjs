@@ -26,15 +26,24 @@ export async function candidates(limit, fetchImpl = fetch) {
 
 /**
  * Active coins still on pump.fun's bonding curve. Profiles and boosts are mostly graduated or
- * dead coins, so the curve screen (user bots) adds DexScreener's pump.fun pair search.
+ * dead coins, so the curve screen (user bots) adds DexScreener's pump.fun pair searches and
+ * GeckoTerminal's newest and most-traded pump.fun pools. Any source may fail; the rest still count.
  */
+const GECKO = 'https://api.geckoterminal.com/api/v2/networks/solana';
+const CURVE_SCAN_LIMIT = 120; // market data is read 30 mints per request; chain checks only for coins that pass
+const CURVE_SEARCHES = ['pumpfun', 'pump fun', 'solana pump'];
 export async function curveCandidates(limit, fetchImpl = fetch) {
-  let pairs = [];
-  try { pairs = (await getJson(`${DEX}/latest/dex/search?q=pumpfun`, fetchImpl))?.pairs || []; } catch {}
+  const reads = await Promise.allSettled([
+    ...CURVE_SEARCHES.map(q => getJson(`${DEX}/latest/dex/search?q=${encodeURIComponent(q)}`, fetchImpl)),
+    ...[1, 2].map(page => getJson(`${GECKO}/dexes/pump-fun/pools?page=${page}&sort=h24_tx_count_desc`, fetchImpl)),
+    ...[1, 2].map(page => getJson(`${GECKO}/new_pools?page=${page}`, fetchImpl)),
+  ]);
   const mints = [];
-  for (const p of Array.isArray(pairs) ? pairs : []) {
-    const mint = p?.baseToken?.address;
-    if (p?.chainId === 'solana' && p.dexId === 'pumpfun' && typeof mint === 'string' && mint.endsWith('pump') && !mints.includes(mint)) mints.push(mint);
+  const add = mint => { if (typeof mint === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint) && mint.endsWith('pump') && !mints.includes(mint)) mints.push(mint); };
+  for (const r of reads) {
+    if (r.status !== 'fulfilled') continue;
+    for (const p of Array.isArray(r.value?.pairs) ? r.value.pairs : []) if (p?.chainId === 'solana' && p.dexId === 'pumpfun') add(p?.baseToken?.address);
+    for (const p of Array.isArray(r.value?.data) ? r.value.data : []) if (p?.relationships?.dex?.data?.id === 'pump-fun') add(String(p.relationships.base_token?.data?.id ?? '').replace(/^solana_/, ''));
   }
   return mints.slice(0, limit);
 }
@@ -101,7 +110,7 @@ async function chainFacts(conn, rpcUrl, mint, minHolders, fetchImpl = fetch) {
 /** Candidates + held coins: market metrics for all, chain facts only where the market screen passes. */
 export async function gatherMarket(c, conn, rpcUrl, heldMints, now) {
   const found = await candidates(c.scanLimit);
-  if (c.curveScreen === true) for (const m of await curveCandidates(c.scanLimit)) if (!found.includes(m)) found.push(m);
+  if (c.curveScreen === true) for (const m of await curveCandidates(CURVE_SCAN_LIMIT)) if (!found.includes(m)) found.push(m);
   const metrics = await marketMetrics([...new Set([...found, ...heldMints])]);
   const facts = new Map();
   let screened = 0;
