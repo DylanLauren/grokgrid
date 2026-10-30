@@ -60,3 +60,12 @@ test('launches close once the grid is full, and when the count is unknown', asyn
   assert.equal(isFull(100, 100), true)
   assert.equal(isFull(100, null), true)
 })
+
+test('a SOL-paired curve counts as SOL whether it stores the default key or wrapped SOL', async () => {
+  const { solQuoted } = await import('../api/_pump')
+  const { PublicKey } = await import('@solana/web3.js')
+  const { NATIVE_MINT } = await import('@solana/spl-token')
+  assert.equal(solQuoted(PublicKey.default), true) // what pump.fun actually stores, seen on $TEAL and $WASTED
+  assert.equal(solQuoted(NATIVE_MINT), true)
+  assert.equal(solQuoted(new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')), false) // a USDC-quoted coin is not ours
+})
