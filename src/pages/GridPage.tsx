@@ -53,7 +53,9 @@ const MIN_FUND = 0.05 // matches MIN_FUND_SOL in api/launch/prepare.ts
 const LAUNCH_COST = 0.03 // about: Solana network fees and pump.fun's coin-creation rent
 const MAX_TRADE = 0.05 // the signer policy's per-buy cap: a higher max could never be used
 const LIMITS = { name: 32, botName: 32, ticker: 10, description: 600, strategy: 140 }
-const RESERVED = ['house', 'housetrader', 'housebot', 'grokgrid', 'grokgridofficial', 'grok', 'grokbot', 'thegrokbot', 'official', 'admin'] // matches api/_launch.ts
+const RESERVED = ['house', 'housetrader', 'housebot', 'grokgrid', 'grokgridofficial', 'grok', 'grokbot', 'thegrokbot', 'official', 'admin', 'grid', 'gridcoin', 'grokgridcoin', 'officialgrid'] // matches api/_launch.ts
+const RESERVED_TICKERS = ['GRID', 'GROK', 'GROKGRID', 'GRIDS', 'GG']
+const reserved = (s: string) => RESERVED.includes(s.toLowerCase().replace(/[^a-z0-9]/g, ''))
 const bytes = (s: string) => new TextEncoder().encode(s).length
 
 // What a field says is wrong with it, or nothing.
@@ -61,10 +63,12 @@ function check(d: Draft) {
   const e: Partial<Record<keyof Draft | 'image', string>> = {}
   if (!d.name.trim()) e.name = 'give it a name'
   else if (bytes(d.name) > LIMITS.name) e.name = `${LIMITS.name} bytes at most`
+  else if (reserved(d.name)) e.name = 'that name belongs to the house'
   if (bytes(d.botName) > LIMITS.botName) e.botName = `${LIMITS.botName} bytes at most`
-  else if (RESERVED.includes((d.botName.trim() || d.name).toLowerCase().replace(/[^a-z0-9]/g, ''))) e.botName = 'that name belongs to the house'
+  else if (reserved(d.botName.trim() || d.name)) e.botName = 'that name belongs to the house'
   if (!d.ticker) e.ticker = 'pick a ticker'
   else if (!/^[A-Z0-9]{2,10}$/.test(d.ticker)) e.ticker = '2 to 10 letters or numbers'
+  else if (RESERVED_TICKERS.includes(d.ticker)) e.ticker = 'that ticker belongs to the official coin'
   if (bytes(d.description) > LIMITS.description) e.description = `${LIMITS.description} bytes at most`
   if (d.x && !/^https:\/\/(x|twitter)\.com\/[A-Za-z0-9_]{1,15}(\/status\/\d+)?\/?$/.test(d.x)) e.x = 'an x.com link to a profile or post'
   if (d.telegram && !/^https:\/\/t\.me\/[A-Za-z0-9_+]{3,}\/?$/.test(d.telegram)) e.telegram = 'a t.me link'

@@ -61,8 +61,11 @@ function number(v: unknown, lo: number, hi: number, what: string) {
 }
 
 // Names only the house bot and the site itself may use, so nobody can pass as them.
-const RESERVED = ['house', 'housetrader', 'housebot', 'grokgrid', 'grokgridofficial', 'grok', 'grokbot', 'thegrokbot', 'official', 'admin']
+const RESERVED = ['house', 'housetrader', 'housebot', 'grokgrid', 'grokgridofficial', 'grok', 'grokbot', 'thegrokbot', 'official', 'admin', 'grid', 'gridcoin', 'grokgridcoin', 'officialgrid']
 export const reservedName = (name: string) => RESERVED.includes(name.toLowerCase().replace(/[^a-z0-9]/g, ''))
+// The official coin's ticker and close copies of it, so nobody can launch a lookalike $GRID.
+const RESERVED_TICKERS = ['GRID', 'GROK', 'GROKGRID', 'GRIDS', 'GG']
+export const reservedTicker = (t: string) => RESERVED_TICKERS.includes(t.toUpperCase())
 
 // Cleans and checks a draft. Throws a message fit to show the launcher.
 export function cleanDraft(value: unknown): Draft {
@@ -85,8 +88,9 @@ export function cleanDraft(value: unknown): Draft {
   }
   if (!d.name || bytes(d.name) > 32 || CONTROL.test(d.name)) throw Error('Name needs 1 to 32 characters.')
   if (bytes(d.botName) > 32 || CONTROL.test(d.botName)) throw Error('Bot name needs 32 characters at most.')
-  if (reservedName(d.botName)) throw Error('That bot name belongs to the house. Pick another.')
+  if (reservedName(d.botName) || reservedName(d.name)) throw Error('That name belongs to the house. Pick another.')
   if (!/^[A-Z0-9]{2,10}$/.test(d.ticker)) throw Error('Ticker needs 2 to 10 letters or numbers.')
+  if (reservedTicker(d.ticker)) throw Error('That ticker belongs to the official coin. Pick another.')
   if (bytes(d.description) > 600 || CONTROL.test(d.description)) throw Error('Description must be 600 bytes or fewer.')
   if (!d.strategy || bytes(d.strategy) > 140 || CONTROL.test(d.strategy)) throw Error('Strategy needs one line, 140 bytes at most.')
   return d
