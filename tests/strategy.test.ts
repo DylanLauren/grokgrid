@@ -249,3 +249,25 @@ test('steady style fits the bonding curve: 15+ minutes, 70+ holders, $25k-65k', 
   const { STYLES } = await import('../scripts/strategy-policy.mjs')
   assert.deepEqual([STYLES.steady.screen.minAgeMinutes, STYLES.steady.screen.minHolders, STYLES.steady.screen.minMarketCapUsd, STYLES.steady.screen.maxMarketCapUsd], [15, 70, 25000, 65000])
 })
+
+test('house candidates: active pump.fun coins on the curve or PumpSwap, from searches and GeckoTerminal pools; the house screen is unchanged', async () => {
+  const { houseCandidates } = await import('../scripts/strategy-data.mjs')
+  const A = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAApump', B = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBpump', C = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCpump', X = 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
+  const seen: string[] = []
+  const fake = (async (url: string) => {
+    const u = String(url); seen.push(u)
+    if (u.includes('q=pumpswap')) return { ok: true, json: async () => ({ pairs: [{ chainId: 'solana', dexId: 'pumpswap', baseToken: { address: A } }, { chainId: 'solana', dexId: 'raydium', baseToken: { address: C } }, { chainId: 'solana', dexId: 'pumpswap', baseToken: { address: X } }] }) }
+    if (u.includes('q=pumpfun')) return { ok: true, json: async () => ({ pairs: [{ chainId: 'solana', dexId: 'pumpfun', baseToken: { address: B } }, { chainId: 'solana', dexId: 'pumpswap', baseToken: { address: A } }] }) }
+    if (u.includes('dexes/pumpswap/pools')) throw Error('rate limited')
+    if (u.includes('dexes/pump-fun/pools')) return { ok: true, json: async () => ({ data: [{ relationships: { dex: { data: { id: 'pump-fun' } }, base_token: { data: { id: `solana_${C}` } } } }] }) }
+    return { ok: false, status: 404, json: async () => ({}) }
+  }) as unknown as typeof fetch
+  assert.deepEqual(await houseCandidates(10, fake), [A, B, C]) // non-pump dex and non-pump.fun mints dropped, deduped, a failed source skipped
+  assert.ok(!seen.some(u => u.includes('new_pools')), 'the house does not scan brand-new pools')
+  // the house screen and its defaults are untouched by this change
+  const { DEFAULT_STRATEGY: d } = await import('../scripts/strategy-policy.mjs')
+  assert.deepEqual([d.minAgeMinutes, d.maxAgeMinutes, d.minLiquidityUsd, d.minMarketCapUsd, d.maxMarketCapUsd, d.minVolume5mUsd, d.minVolume24hUsd, d.minBuys5m, d.minBuySellRatio5m, d.maxChange5mPct, d.minHolders, d.maxTop10Share, d.maxDevShare, d.maxTradeShareOfLiquidity, d.takeProfit, d.stopLoss, d.trailArm, d.trailStop, d.maxHoldMinutes, d.maxOpenPositions],
+    [10, 1440, 15000, 30000, 5_000_000, 3000, 50000, 20, 1.2, 25, 150, 0.30, 0.05, 0.01, 0.60, 0.25, 0.25, 0.20, 360, 3])
+  assert.deepEqual(screen(good, c, now), { ok: true, reasons: [] })
+  assert.ok(screen({ ...good, liquidityUsd: 10000 }, c, now).reasons.includes('liquidity'))
+})
