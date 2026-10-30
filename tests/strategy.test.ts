@@ -229,3 +229,23 @@ test('launch rules: a style is accepted and kept; records without one keep their
   assert.throws(() => normalizeLaunchPolicy(entry, agent({ maxSol: 0.05, takeProfit: 35, stopLoss: 15, style: 'yolo' })), /style/)
   assert.throws(() => normalizeLaunchPolicy(entry, agent({ maxSol: 0.05, takeProfit: 35, stopLoss: 15, extra: 1 })), /schema/)
 })
+
+test('curve candidates: DexScreener searches and GeckoTerminal pump.fun pools, curve coins only, deduped; a failed source is skipped', async () => {
+  const { curveCandidates } = await import('../scripts/strategy-data.mjs')
+  const A = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAApump', B = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBpump', C = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCpump'
+  const fake = (async (url: string) => {
+    const u = String(url)
+    if (u.includes('q=pumpfun')) return { ok: true, json: async () => ({ pairs: [{ chainId: 'solana', dexId: 'pumpfun', baseToken: { address: A } }, { chainId: 'solana', dexId: 'pumpswap', baseToken: { address: C } }] }) }
+    if (u.includes('q=pump%20fun')) throw Error('down')
+    if (u.includes('dexes/pump-fun/pools')) return { ok: true, json: async () => ({ data: [{ relationships: { dex: { data: { id: 'pump-fun' } }, base_token: { data: { id: `solana_${B}` } } } }, { relationships: { dex: { data: { id: 'pump-fun' } }, base_token: { data: { id: `solana_${A}` } } } }] }) }
+    if (u.includes('new_pools')) return { ok: true, json: async () => ({ data: [{ relationships: { dex: { data: { id: 'meteora' } }, base_token: { data: { id: `solana_${C}` } } } }] }) }
+    return { ok: false, status: 500, json: async () => ({}) }
+  }) as unknown as typeof fetch
+  assert.deepEqual(await curveCandidates(10, fake), [A, B])
+  assert.deepEqual(await curveCandidates(1, fake), [A])
+})
+
+test('steady style fits the bonding curve: 15+ minutes, 70+ holders, $25k-65k', async () => {
+  const { STYLES } = await import('../scripts/strategy-policy.mjs')
+  assert.deepEqual([STYLES.steady.screen.minAgeMinutes, STYLES.steady.screen.minHolders, STYLES.steady.screen.minMarketCapUsd, STYLES.steady.screen.maxMarketCapUsd], [15, 70, 25000, 65000])
+})

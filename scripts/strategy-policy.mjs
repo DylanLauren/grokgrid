@@ -48,7 +48,7 @@ export const CURVE_SCREEN = Object.freeze({
  * tighter. A bot with no style is 'steady'.
  *   early     young coins with strong early buying; quick, small exits
  *   momentum  coins already moving up with heavy buying; medium exits
- *   steady    older coins with a wide holder base and a rising hour; the house's exits
+ *   steady    settled curve coins (15+ min, 70+ holders) with a rising hour; the house's exits
  */
 export const STYLES = Object.freeze({
   early: Object.freeze({
@@ -59,8 +59,10 @@ export const STYLES = Object.freeze({
     screen: { minMarketCapUsd: 20_000, maxMarketCapUsd: 65_000, minAgeMinutes: 5, minHolders: 60, minBuySellRatio5m: 1.5, minChange5mPct: 5, minVolume5mUsd: 2_000 },
     exits: { takeProfit: 0.45, stopLoss: 0.20, trailArm: 0.20, trailStop: 0.15, maxHoldMinutes: 120 },
   }),
+  // Curve coins top out near $65-70k mc, so steady wants the settled part of the curve, not
+  // graduated-coin maturity: 15+ minutes, 70+ holders, a rising hour.
   steady: Object.freeze({
-    screen: { minMarketCapUsd: 30_000, maxMarketCapUsd: 65_000, minAgeMinutes: 30, minHolders: 100, minBuySellRatio5m: 1.2, minChange1hPct: 0 },
+    screen: { minMarketCapUsd: 25_000, maxMarketCapUsd: 65_000, minAgeMinutes: 15, minHolders: 70, minBuySellRatio5m: 1.2, minChange1hPct: 0 },
     exits: { takeProfit: 0.60, stopLoss: 0.25, trailArm: 0.25, trailStop: 0.20, maxHoldMinutes: 360 },
   }),
 });
