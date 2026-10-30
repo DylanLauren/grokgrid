@@ -114,28 +114,130 @@ function markSVG(color, shape, lx = 0.45, ly = -0.35, open = 1) {
   return `<svg viewBox="0 0 100 100" width="100%" height="100%"><path d="${BODY[shape]}" fill="${fill}"${stroke}/><path d="${a}" fill="${ink}"/><path d="${b}" fill="${ink}"/></svg>`
 }
 
-// ---------- character clips (Blender PNG sequences) ----------
+// ---------- characters (flat, the site's own bot marks animated in code) ----------
+// The old Blender clips are gone: clipImg(name) builds the same shots from the BotMark geometry above, so a
+// cut still does clipImg('hero') + playClip(el, t, t0) + place(el, x, y, w, h). Shots: hero (he hops in),
+// phone (he trades on his phone, wins at 2.5 s), face (close up), lineup / lineup_v (the family lands around
+// him) and family_run (the family runs across). Everything is drawn in % of the box, so it scales with place().
 const CLIP = {
-  hero: { n: 91, size: [960, 960] }, phone: { n: 121, size: [960, 960] }, face: { n: 91, size: [960, 960] },
-  lineup: { n: 91, size: [1600, 900] }, lineup_v: { n: 91, size: [960, 960] }, family_run: { n: 106, size: [1600, 900] },
+  hero: { n: 91, sq: true }, phone: { n: 121, sq: true }, face: { n: 91, sq: true },
+  lineup: { n: 91, sq: false }, lineup_v: { n: 91, sq: true }, family_run: { n: 106, sq: false },
 }
-const pad = (n) => String(n).padStart(4, '0')
+const HOUSE = ['house', 'sphere']
+// one flat bot: x, y (centre) and size in % of the box width (y in % of box height)
+function flatBot(parent, look) {
+  const sh = el('div', 'fb-shadow', parent)
+  const b = el('div', 'fb', parent)
+  b._look = look
+  b._sh = sh
+  return b
+}
+function drawBot(b, { x, y, s, ground = y, sx = 1, sy = 1, rot = 0, lx = 0.45, ly = -0.35, open = 1, o = 1, lift = 0 }) {
+  const [col, shape] = b._look
+  const key = [lx.toFixed(2), ly.toFixed(2), open.toFixed(2)].join()
+  if (b._key !== key) { b.innerHTML = markSVG(col, shape, lx, ly, open); b._key = key }
+  css(b, { left: x + '%', top: y + '%', width: s + '%', opacity: o, transform: `translate(-50%, -50%) translateY(${-lift}%) rotate(${rot}deg) scale(${sx}, ${sy})` })
+  const k = clamp(1 - lift / 120)
+  css(b._sh, { left: x + '%', top: `calc(${ground}% + ${s * 0.47}cqw)`, width: s * 0.8 + '%', opacity: o * (0.25 + 0.45 * k), transform: `translate(-50%, -50%) scale(${0.6 + 0.4 * k}, 1)` })
+}
+const blinkAt = (lt, ts) => { for (const b of ts) { const d = lt - b; if (d > 0 && d < 0.16) return 0.12 + 0.88 * Math.abs(d - 0.08) / 0.08 } return 1 }
+// a hop: 0 -> 1 -> 0 over dur, with squash on landing
+const hopY = (lt, t0, dur, h) => { const k = (lt - t0) / dur; return k > 0 && k < 1 ? h * 4 * k * (1 - k) : 0 }
+const squash = (lt, tLand) => { const d = lt - tLand; return d > 0 && d < 0.25 ? 1 - 0.16 * Math.sin((d / 0.25) * Math.PI) : 1 }
+// the phone he trades on: the site's own dark card style, a live chart and a BUY pill
+function flatPhone(parent) {
+  const ph = el('div', 'fb-phone', parent)
+  ph.innerHTML = `<div class="fp-top"><i></i><b>grokgrid</b><span>live</span></div>
+    <svg class="fp-chart" viewBox="0 0 100 60" preserveAspectRatio="none"><path class="fp-area" d=""/><path class="fp-line" d=""/></svg>
+    <div class="fp-row"><span class="fp-coin">$HYPEDOG</span><span class="fp-pill">BUY</span></div>
+    <div class="fp-row dim"><span>0.02 SOL</span><span class="fp-pnl">+0.0%</span></div>
+    <div class="fp-btn">tap to trade</div>`
+  return ph
+}
+function drawPhone(ph, lt, win) {
+  // the chart climbs, then jumps on the win
+  let d = '', pts = []
+  for (let i = 0; i <= 24; i++) {
+    const x = i / 24 * 100
+    const base = 40 - i * 0.6 + Math.sin(i * 1.7 + lt * 2) * 4 + Math.sin(i * 0.6) * 5
+    const up = win * clamp((i - 14) / 10) * 26
+    pts.push([x, clamp(base - up, 4, 56)])
+  }
+  d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('')
+  ph.querySelector('.fp-line').setAttribute('d', d)
+  ph.querySelector('.fp-area').setAttribute('d', d + 'L100 60L0 60Z')
+  ph.querySelector('.fp-pnl').textContent = '+' + (win * 60).toFixed(1) + '%'
+  ph.querySelector('.fp-pnl').style.color = win > 0.02 ? 'var(--gain)' : 'rgba(255,255,255,.5)'
+}
 function clipImg(name) {
-  const im = el('img', 'clip')
-  im._clip = name
-  im.style.visibility = 'hidden'
-  im.onload = () => (im.style.visibility = 'visible')
-  im.onerror = () => (im.style.visibility = 'hidden')
-  return im
+  const box = el('div', 'clip flat')
+  box._clip = name
+  const c = CLIP[name]
+  if (name === 'lineup' || name === 'lineup_v' || name === 'family_run') {
+    const fam = [...FAMILY.slice(0, 4), HOUSE, ...FAMILY.slice(4, 8)]
+    box._bots = fam.map((f) => flatBot(box, f))
+  } else {
+    box._bots = [flatBot(box, HOUSE)]
+    if (name === 'phone') box._phone = flatPhone(box)
+  }
+  void c
+  return box
 }
-// play clip name from t0; holds the last frame after it ends
-function playClip(im, t, t0, opts = {}) {
-  const c = CLIP[im._clip]
-  let f = Math.floor((t - t0) * FPS)
-  if (opts.loop) f = ((f % c.n) + c.n) % c.n
-  f = clamp(f, 0, c.n - 1)
-  const src = `${CLIPS}/${im._clip}/f_${pad(f)}.png`
-  if (im._src !== src) { im.src = src; im._src = src }
+// play shot name from t0 (opts.loop repeats it)
+function playClip(box, t, t0, opts = {}) {
+  const c = CLIP[box._clip]
+  const len = c.n / FPS
+  let lt = t - t0
+  if (opts.loop) lt = ((lt % len) + len) % len
+  lt = clamp(lt, 0, len + 60)
+  const name = box._clip, B = box._bots
+  const idle = Math.sin(lt * 2.4) * 1.2
+  if (name === 'hero') {
+    // drops in from above, squashes on landing, settles and looks around
+    const fall = 1 - eIn(rng(lt, 0, 0.42), 2)
+    const land = 0.42
+    const lift = fall * 140 + hopY(lt, 1.6, 0.5, 18) + (lt > 2.2 ? Math.max(0, idle) : 0)
+    const sq = squash(lt, land) * squash(lt, 2.1)
+    drawBot(B[0], { x: 50, y: 55, s: 40, sx: 2 - sq, sy: sq, lift, rot: Math.sin(lt * 1.3) * 3, lx: 0.45 * Math.cos(lt * 0.9), ly: -0.3 + 0.2 * Math.sin(lt * 0.7), open: blinkAt(lt, [1.2, 2.9]), o: rng(lt, 0, 0.08) })
+  } else if (name === 'face') {
+    const k = backOut(rng(lt, 0, 0.5), 1.3)
+    drawBot(B[0], { x: 50, y: 52, s: 64 * (0.85 + 0.15 * k), lift: idle * 0.6, lx: 0.5 * Math.sin(lt * 0.8), ly: -0.25 + 0.2 * Math.cos(lt * 1.1), open: blinkAt(lt, [1.1, 2.6]), o: rng(lt, 0, 0.12) })
+  } else if (name === 'phone') {
+    // he holds his phone, taps it, then wins at 2.5 s and hops
+    const win = eOut(rng(lt, 2.4, 2.9))
+    const hop = hopY(lt, 2.55, 0.5, 30)
+    const tap = Math.max(0, Math.sin(lt * 9)) * (lt < 2.4 ? 1 : 0)
+    const lookPhone = 1 - eInOut(rng(lt, 2.6, 2.9))
+    drawBot(B[0], { x: 32, y: 56, s: 38, lift: hop + idle, sy: squash(lt, 3.05), sx: 2 - squash(lt, 3.05), rot: -4 * lookPhone + 4 * (1 - lookPhone), lx: 0.65 * lookPhone, ly: 0.2 * lookPhone - 0.3 * (1 - lookPhone), open: lt > 2.6 && lt < 3.3 ? 0.55 : blinkAt(lt, [1.3]) })
+    const py = 52 - hop * 0.4 + idle * 0.3
+    css(box._phone, { left: '64%', top: py + '%', transform: `translate(-50%, -50%) rotate(${6 - 8 * win}deg) scale(${1 + 0.04 * win})` })
+    drawPhone(box._phone, lt, win)
+    // each tap nudges the phone, like a thumb on the screen
+    box._phone.style.marginTop = tap * 0.6 + '%'
+  } else if (name === 'lineup' || name === 'lineup_v') {
+    const n = B.length, mid = 4
+    B.forEach((b, i) => {
+      const house = i === mid
+      let x, y, s
+      if (name === 'lineup') { x = 50 + (i - mid) * 9.4; y = 66; s = house ? 13 : 8.5 }
+      else { const row = house ? 0 : i < mid ? 1 : 2; const k = house ? 0 : i < mid ? i : i - mid - 1; x = house ? 50 : 20 + k * 20; y = [30, 54, 74][row]; s = house ? 26 : 15 }
+      const d = Math.abs(i - mid) * 0.07 + (house ? 0.25 : 0)
+      const fall = 1 - eIn(rng(lt, d, d + 0.38), 2)
+      const lift = fall * 200 + Math.max(0, Math.sin(lt * 2.2 + i)) * 2
+      const sq = squash(lt, d + 0.38)
+      drawBot(b, { x, y, s, sx: 2 - sq, sy: sq, lift, rot: Math.sin(lt * 1.5 + i) * 3, lx: (50 - x) / 60, ly: -0.25, open: blinkAt(lt, [1.4 + i * 0.13]), o: rng(lt, d, d + 0.06) })
+    })
+  } else if (name === 'family_run') {
+    // they run across left to right, hopping, house bot in the middle of the pack
+    B.forEach((b, i) => {
+      const order = [7, 2, 5, 0, 4, 6, 1, 8, 3][i] ?? i
+      const x = -12 + lt * 40 - order * 10.5
+      const ph = lt * 9 + order * 1.3
+      const lift = Math.abs(Math.sin(ph)) * 22
+      const s = i === 4 ? 13 : 9.5
+      drawBot(b, { x, y: 66, s, lift, sy: 1 + 0.06 * Math.cos(ph * 2), sx: 1 - 0.06 * Math.cos(ph * 2), rot: 6 + Math.sin(ph) * 6, lx: 0.7, ly: -0.15, open: 1 })
+    })
+  }
 }
 
 // ---------- background ----------

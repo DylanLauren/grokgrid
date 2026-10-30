@@ -34,6 +34,24 @@ html, body { background: var(--ink); overflow: hidden; }
 .hl-teal { color: var(--teal); } .hl-orange { color: var(--orange); } .hl-gain { color: var(--gain); } .hl-violet { color: var(--violet); } .hl-blue { color: var(--blue); } .hl-pink { color: var(--pink); }
 
 .clip { position: absolute; display: block; pointer-events: none; }
+/* flat characters */
+.clip.flat { position: absolute; overflow: visible; container-type: size; }
+.fb { position: absolute; aspect-ratio: 1; will-change: transform; filter: drop-shadow(0 18px 30px rgba(0,0,0,.45)); }
+.fb svg { display: block; }
+.fb-shadow { position: absolute; aspect-ratio: 5 / 1; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.6), transparent); }
+.fb-phone { position: absolute; width: 22%; aspect-ratio: 9 / 18.5; border-radius: 14% / 7%; background: #0d0d0d; border: 0.35vmin solid #2a2a2a;
+  box-shadow: 0 30px 60px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.06); padding: 9% 7%; display: flex; flex-direction: column; gap: 6%; container-type: inline-size; }
+.fp-top { display: flex; align-items: center; gap: 4cqw; font: 600 9cqw 'Geist'; color: #fff; }
+.fp-top i { width: 12cqw; height: 12cqw; border-radius: 50%; background: #fff; }
+.fp-top span { margin-left: auto; font: 600 7cqw 'Geist Mono'; color: var(--gain); }
+.fp-chart { width: 100%; height: 34%; }
+.fp-line { fill: none; stroke: var(--gain); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+.fp-area { fill: rgba(74,222,128,.12); }
+.fp-row { display: flex; justify-content: space-between; align-items: center; font: 600 8.5cqw 'Geist'; color: #fff; }
+.fp-row.dim { font: 500 7.5cqw 'Geist Mono'; color: rgba(255,255,255,.55); }
+.fp-pill { font: 700 7cqw 'Geist Mono'; padding: 2cqw 5cqw; border-radius: 4cqw; background: rgba(74,222,128,.16); color: var(--gain); }
+.fp-btn { margin-top: auto; text-align: center; font: 600 8cqw 'Geist'; color: #0a0a0a; background: #fff; border-radius: 20cqw; padding: 5cqw 0; }
+.fb-hand { position: absolute; width: 5%; aspect-ratio: 1.25; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #d9d9d9); transform: translate(-50%, -50%); box-shadow: 0 6px 14px rgba(0,0,0,.35); }
 /* the real mouse drives the redrawn UI's hover states, so nothing drawn on top may catch it */
 .cursor, .ripple, .h1, .sub, .w, .bubble, .chip, .call, .tag, .coin, .split, .flame, .cta, .url-pill, .mark, .marks { pointer-events: none; }
 

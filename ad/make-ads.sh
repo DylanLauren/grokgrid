@@ -1,19 +1,13 @@
 #!/bin/bash
-# Builds the GrokGrid motion ads end to end on a Mac with Blender installed.
+# Builds the GrokGrid motion ads end to end (Node, Chromium via Playwright, ffmpeg).
 #   ./make-ads.sh                         full quality, both cuts
-#   SAMPLES=16 RES=540 ./make-ads.sh      quick draft
-#   SKIP_CLIPS=1 ./make-ads.sh            reuse the 3D clips already in clips/
 # Output: out/grokgrid-ad-{16x9,9x16}.mp4 (launch ad) and out/grokgrid-<feature>-{16x9,9x16}.mp4
 #   CUTS="main calls" ./make-ads.sh    only some videos
 #   WIDE_ONLY=1 ./make-ads.sh          16:9 only
 set -e
 cd "$(dirname "$0")"
-BLENDER=${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender}
-GPU=${GPU:-METAL}
-SAMPLES=${SAMPLES:-64}
-RES=${RES:-1080}
 SECS=40
-mkdir -p ui ui-dom clips out assets
+mkdir -p ui ui-dom out assets
 DSF=${DSF:-2}
 # WIDE_ONLY=1 skips the 9:16 cuts
 SIZES=("1920 1080 16x9"); [ -n "$WIDE_ONLY" ] || SIZES+=("1080 1920 9x16")
@@ -26,18 +20,8 @@ cp ../public/fonts/*.woff2 assets/
 
 echo "== 2/6 live UI from grokgrid.fun (markup + styles, redrawn as code in the ad)"
 BASE=${BASE:-https://grokgrid.fun/} node scripts/snapshot.js "$PWD/ui-dom"
-# the phone screen in the 3D clips still uses a picture of the mobile matrix page
-BASE=${BASE:-https://grokgrid.fun/} ONLY=m-matrix-full node scripts/capture.js "$PWD/ui"
 
-if [ -z "$SKIP_CLIPS" ]; then
-  echo "== 3/6 3D clips in Blender"
-  CLIPS="hero phone face lineup family_run"; [ -n "$WIDE_ONLY" ] || CLIPS="$CLIPS lineup_v"
-  for c in $CLIPS; do
-    "$BLENDER" -b --python scripts/chars.py -- --clip $c --res $RES --samples $SAMPLES --gpu $GPU \
-      --phone-tex "$PWD/ui/m-matrix-full.png" --out "$PWD/clips/$c" > "clips/$c.log" 2>&1
-    echo "   $c: $(ls clips/$c | wc -l | tr -d ' ') frames"
-  done
-fi
+# the characters are flat, drawn in code (comp/core.js): no Blender step
 
 python3 -m http.server 8811 --bind 127.0.0.1 >/dev/null 2>&1 &
 SRV=$!
