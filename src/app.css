@@ -93,6 +93,16 @@
 @media (prefers-reduced-motion: reduce) { .soc, .soc svg { transition: color 0.2s, background 0.2s, border-color 0.2s; } .soc:hover { translate: none; } }
 .bar .buy, a.buy { display: inline-flex; align-items: center; height: 36px; background: var(--paper); color: var(--ink); border-radius: var(--r-pill); padding: 0 16px; font-size: 14px; font-weight: 560; white-space: nowrap; }
 .bar .buy.off { background: #ffffff12; color: var(--paper-50); font-weight: 450; font-size: 13px; border: 1px solid var(--hair); }
+/* the contract address and the buy link share one pill */
+.buy-group { flex-shrink: 0; white-space: nowrap; display: inline-flex; align-items: center; height: 36px; padding: 3px; gap: 2px; border-radius: var(--r-pill); background: #ffffff08; border: 1px solid var(--hair-strong); }
+.buy-group .ca { display: inline-flex; align-items: center; gap: 8px; height: 100%; padding: 0 10px 0 11px; border-radius: var(--r-pill); color: var(--paper-70); transition: color 0.2s, background 0.2s; }
+.buy-group .ca:hover, .buy-group .ca:focus-visible { color: var(--paper); background: #ffffff0f; }
+.ca-k { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; color: var(--paper-50); }
+.ca-v { font-size: 12px; min-width: 9ch; text-align: left; }
+.buy-group .ca.done, .buy-group .ca.done .ca-k { color: var(--gain); }
+.buy-group .buy { height: 100%; padding: 0 14px; font-size: 13px; }
+@media (max-width: 600px) { .bar-right .soc { display: none; } }
+@media (max-width: 440px) { .ca-k { display: none; } .buy-group .ca { padding: 0 8px 0 10px; } }
 
 /* bottom row over the room: calls left, camera centre, numbers right, all on one baseline */
 .calls-dock, .views, .strip { position: absolute; bottom: var(--edge); z-index: 20; transition: opacity 0.3s, transform 0.4s cubic-bezier(.2,.8,.2,1); }
