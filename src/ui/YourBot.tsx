@@ -9,6 +9,8 @@ import type { Shape } from './BotMark'
 // The connected owner's own bot: how it's doing, the rules it trades by, and the switch.
 // Trading rules can only be tighter than the house's, so the card shows what really applies.
 const HOUSE = { maxSol: 0.05, takeProfit: 60, stopLoss: 25 }
+// each style's own exits (matches the engine); bots launched before styles trade as steady
+const STYLE_EXITS = { early: { takeProfit: 35, stopLoss: 15 }, momentum: { takeProfit: 45, stopLoss: 20 }, steady: { takeProfit: 60, stopLoss: 25 } }
 
 export function YourBot({ bot, pending, wallet }: { bot?: Agent; pending?: { mint: string; name: string }; wallet: AgentWalletSession | null }) {
   const [busy, setBusy] = useState(false)
@@ -18,10 +20,12 @@ export function YourBot({ bot, pending, wallet }: { bot?: Agent; pending?: { min
   const mine = !!wallet && (!bot || bot.wallet === wallet.address)
   const trading = mine && wallet.authorizationReady
   const r = bot?.rules
+  const style = r?.style ?? 'steady', cap = STYLE_EXITS[style]
   const rules: [string, string][] = [
+    ['style', style],
     ['max per trade', `${sol(Math.min(r?.maxSol ?? HOUSE.maxSol, HOUSE.maxSol))} SOL`],
-    ['take profit', `+${Math.min(r?.takeProfit ?? HOUSE.takeProfit, HOUSE.takeProfit)}%`],
-    ['stop loss', `-${Math.min(r?.stopLoss ?? HOUSE.stopLoss, HOUSE.stopLoss)}%`],
+    ['take profit', `+${Math.min(r?.takeProfit ?? cap.takeProfit, cap.takeProfit)}%`],
+    ['stop loss', `-${Math.min(r?.stopLoss ?? cap.stopLoss, cap.stopLoss)}%`],
   ]
   const last = bot?.recent?.[0]
   const why = whyOf(last?.note)

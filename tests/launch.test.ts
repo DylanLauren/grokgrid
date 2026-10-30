@@ -73,3 +73,10 @@ test('a SOL-paired curve counts as SOL whether it stores the default key or wrap
   assert.equal(solQuoted(NATIVE_MINT), true)
   assert.equal(solQuoted(new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')), false) // a USDC-quoted coin is not ours
 })
+
+test('a launch keeps its trading style, and anything else trades steady', () => {
+  assert.equal(cleanDraft({ ...good, style: 'early' }).style, 'early')
+  assert.equal(cleanDraft({ ...good, style: 'momentum' }).style, 'momentum')
+  assert.equal(cleanDraft({ ...good, style: 'yolo' }).style, 'steady')
+  assert.equal(cleanDraft(good).style, 'steady')
+})

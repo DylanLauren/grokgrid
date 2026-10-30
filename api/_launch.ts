@@ -35,8 +35,13 @@ export interface Draft {
   maxSol: number
   takeProfit: number
   stopLoss: number
+  style: Style
   firstBuy: string
 }
+
+// How a bot hunts: each style screens for different coins and exits on its own clock, inside the house rules.
+export const STYLES = ['early', 'momentum', 'steady'] as const
+export type Style = (typeof STYLES)[number]
 
 const bytes = (s: string) => new TextEncoder().encode(s).length
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/
@@ -84,6 +89,7 @@ export function cleanDraft(value: unknown): Draft {
     maxSol: number(v.maxSol, 0.01, 10, 'Max per trade'),
     takeProfit: number(v.takeProfit, 5, 60, 'Take profit'), // the house exits are the loosest a bot may run
     stopLoss: number(v.stopLoss, 1, 25, 'Stop loss'),
+    style: STYLES.includes(v.style as Style) ? (v.style as Style) : 'steady',
     firstBuy: str('firstBuy'),
   }
   if (!d.name || bytes(d.name) > 32 || CONTROL.test(d.name)) throw Error('Name needs 1 to 32 characters.')

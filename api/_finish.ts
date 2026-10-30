@@ -58,7 +58,7 @@ export async function finishLaunch(mint: string): Promise<Result> {
     launchedAt: Date.now(),
     wallet: p.bot,
     owner: p.launcher,
-    rules: { maxSol: d.maxSol, takeProfit: d.takeProfit, stopLoss: d.stopLoss },
+    rules: { maxSol: d.maxSol, takeProfit: d.takeProfit, stopLoss: d.stopLoss, style: d.style ?? 'steady' },
     coin: { mint, symbol: d.ticker, name: d.name, image: `/i/${mint}`, hue: color },
     ...(p.privyWalletId ? { privyWalletId: p.privyWalletId } : {}),
   }
