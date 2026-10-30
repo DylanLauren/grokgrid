@@ -51,7 +51,7 @@ export function agentTradingPolicy(c, agent) {
 
 /** The agent's strategy: the global one, tightened by its owner's take-profit and stop-loss. */
 export function agentStrategy(global, agent) {
-  return tighten(global, {
+  return tighten({ ...global, curveScreen: true }, {
     tradeLamports: agent.maxTradeLamports,
     takeProfit: Number(agent.takeProfitBasisPoints) / 10000,
     stopLoss: Number(agent.stopLossBasisPoints) / 10000,

@@ -153,3 +153,23 @@ test('live buys use the fee/balance budget and stop at its exposure limit', () =
   const open = { id: 'b', agentId: 'house', wallet: policy.wallet, mint: 'So11111111111111111111111111111111111111112', side: 'buy', state: 'reconciled-confirmed', createdAt: now - 1000, receipt: { spentLamports: '480000000', receivedTokenUnits: '1' } }
   assert.equal(plan({ walletLamports: '1000000000', feesLamports24h: '0' }, [open]).proposals.filter(p => p.side === 'buy').length, 0) // 0.48 open > 25% of what is left: no room
 })
+
+test('curve screen: user bots judge bonding-curve coins by curve-sized floors; rug checks and the house screen are unchanged', async () => {
+  const { CURVE_SCREEN } = await import('../scripts/strategy-policy.mjs')
+  const { agentStrategy } = await import('../scripts/agent-runner-core.mjs')
+  const curve = { ...good, dexId: 'pumpfun', liquidityUsd: undefined, marketCapUsd: 20000, volume5mUsd: 1500, volume24hUsd: 8000, buys5m: 14, sells5m: 9, holders: 60, curveSol: 30, pairCreatedAt: now - 5 * 60000 }
+  const bot = agentStrategy(c, { maxTradeLamports: '50000000', takeProfitBasisPoints: '6000', stopLossBasisPoints: '2500' })
+  assert.equal(bot.curveScreen, true)
+  assert.deepEqual(screen(curve, bot, now), { ok: true, reasons: [] })
+  assert.ok(!screen(curve, c, now).ok) // the house screen still wants $15k liquidity, $30k mc, 150 holders
+  for (const [patch, why] of [[{ curveSol: 2 }, 'curve-sol'], [{ curveSol: undefined }, 'curve-sol'], [{ marketCapUsd: 5000 }, 'market-cap'], [{ marketCapUsd: 80000 }, 'market-cap'],
+    [{ holders: 20 }, 'holders'], [{ pairCreatedAt: now - 60000 }, 'age'], [{ buys5m: 9, sells5m: 9 }, 'buy-pressure'], [{ change5m: 40 }, 'chasing-5m-pump'],
+    [{ top10Share: 0.5 }, 'concentration'], [{ devShare: 0.2 }, 'dev-holding'], [{ mintAuthority: 'x' }, 'authorities'], [{ volume5mUsd: 400 }, 'volume-5m']] as const)
+    assert.ok(screen({ ...curve, ...patch }, bot, now).reasons.includes(why), why)
+  // a graduated (PumpSwap) coin under a bot strategy still gets the house screen
+  assert.ok(screen({ ...curve, dexId: 'pumpswap' }, bot, now).reasons.includes('liquidity'))
+  // a buy must stay within 1% of the curve's SOL: 0.05 SOL fits a 5 SOL curve, 0.06 doesn't
+  assert.ok(screen({ ...curve, curveSol: 5 }, { ...bot, tradeLamports: '50000000' }, now).ok)
+  assert.ok(screen({ ...curve, curveSol: 5 }, { ...bot, tradeLamports: '60000000' }, now).reasons.includes('trade-too-large-for-liquidity'))
+  assert.equal(CURVE_SCREEN.minCurveSol, 5)
+})
