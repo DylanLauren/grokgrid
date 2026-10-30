@@ -317,10 +317,13 @@ function MiniBot() {
 function BuyButton() {
   const [copied, setCopied] = useState(false)
   if (!MAIN_MINT) return <span className="buy off">${MAIN_TICKER} not live yet</span>
+  // one pill: the contract address (click to copy) and the buy link
   return (
     <span className="buy-group">
       <button
-        className="ca mono"
+        className={`ca ${copied ? 'done' : ''}`}
+        aria-label={copied ? 'contract address copied' : `copy the $${MAIN_TICKER} contract address`}
+        title={MAIN_MINT}
         onClick={async () => {
           try {
             await navigator.clipboard.writeText(MAIN_MINT)
@@ -331,7 +334,11 @@ function BuyButton() {
           }
         }}
       >
-        {copied ? 'copied' : `${MAIN_MINT.slice(0, 4)}…${MAIN_MINT.slice(-4)}`}
+        <span className="ca-k">CA</span>
+        <span className="ca-v mono">{copied ? 'copied' : `${MAIN_MINT.slice(0, 4)}…${MAIN_MINT.slice(-4)}`}</span>
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          {copied ? <path d="M3.5 8.5l3 3 6-7" /> : <><rect x="5.5" y="5.5" width="8" height="8" rx="2" /><path d="M10.5 3.5v-.5a1.5 1.5 0 0 0-1.5-1.5H4a1.5 1.5 0 0 0-1.5 1.5V9A1.5 1.5 0 0 0 4 10.5h.5" /></>}
+        </svg>
       </button>
       <a className="buy" href={buyUrl()} target="_blank" rel="noreferrer"><Roll>{`Buy $${MAIN_TICKER}`}</Roll></a>
     </span>
