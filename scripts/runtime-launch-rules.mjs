@@ -20,10 +20,13 @@ export function normalizeLaunchPolicy(entry,agent){
   // eslint-disable-next-line no-control-regex -- reject control characters in untrusted strategy text
   if(typeof agent.strategy!=='string'||!agent.strategy.trim()||Buffer.byteLength(agent.strategy)>140||/[\u0000-\u001f\u007f]/.test(agent.strategy))throw Error('strategy-description-invalid');
   const rules=agent.rules;
-  if(!rules||Object.keys(rules).sort().join(',')!=='maxSol,stopLoss,takeProfit')throw Error('rule-schema-unsupported');
+  const keys=rules?Object.keys(rules).sort().join(','):'';
+  if(!rules||(keys!=='maxSol,stopLoss,takeProfit'&&keys!=='maxSol,stopLoss,style,takeProfit'))throw Error('rule-schema-unsupported');
+  if('style' in rules&&!['early','momentum','steady'].includes(rules.style))throw Error('rule-style-unsupported');
+  // style is added only when present, so records launched before styles keep their policy hash.
   return {policySchemaVersion:1,identity:{id:entry.id,wallet:entry.wallet,mint:entry.mint,queuedAt:entry.queuedAt},
     maxTradeLamports:decimal(rules.maxSol,9,0.01,10),takeProfitBasisPoints:decimal(rules.takeProfit,2,5,10000),stopLossBasisPoints:decimal(rules.stopLoss,2,1,95),
-    strategyDescription:agent.strategy};
+    ...('style' in rules?{style:rules.style}:{}),strategyDescription:agent.strategy};
 }
 function empty(pins){return {version:1,...pins,revision:0,historyComplete:false,activePolicy:null,acknowledged:false,executionEnabled:false,entries:[]};}
 export function planLaunchRuleSnapshots(previous,pins,queue,registry,now){

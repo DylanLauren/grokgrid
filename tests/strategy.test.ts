@@ -157,9 +157,9 @@ test('live buys use the fee/balance budget and stop at its exposure limit', () =
 test('curve screen: user bots judge bonding-curve coins by curve-sized floors; rug checks and the house screen are unchanged', async () => {
   const { CURVE_SCREEN } = await import('../scripts/strategy-policy.mjs')
   const { agentStrategy } = await import('../scripts/agent-runner-core.mjs')
-  const curve = { ...good, dexId: 'pumpfun', liquidityUsd: undefined, marketCapUsd: 20000, volume5mUsd: 1500, volume24hUsd: 8000, buys5m: 14, sells5m: 9, holders: 60, curveSol: 30, pairCreatedAt: now - 5 * 60000 }
+  const curve = { ...good, dexId: 'pumpfun', liquidityUsd: undefined, marketCapUsd: 40000, volume5mUsd: 1500, volume24hUsd: 8000, buys5m: 14, sells5m: 9, holders: 120, curveSol: 30, change1h: 5, pairCreatedAt: now - 45 * 60000 }
   const bot = agentStrategy(c, { maxTradeLamports: '50000000', takeProfitBasisPoints: '6000', stopLossBasisPoints: '2500' })
-  assert.equal(bot.curveScreen, true)
+  assert.equal(bot.curveScreen, true); assert.equal(bot.style, 'steady') // no style picked: steady
   assert.deepEqual(screen(curve, bot, now), { ok: true, reasons: [] })
   assert.ok(!screen(curve, c, now).ok) // the house screen still wants $15k liquidity, $30k mc, 150 holders
   for (const [patch, why] of [[{ curveSol: 2 }, 'curve-sol'], [{ curveSol: undefined }, 'curve-sol'], [{ marketCapUsd: 5000 }, 'market-cap'], [{ marketCapUsd: 80000 }, 'market-cap'],
@@ -172,4 +172,60 @@ test('curve screen: user bots judge bonding-curve coins by curve-sized floors; r
   assert.ok(screen({ ...curve, curveSol: 5 }, { ...bot, tradeLamports: '50000000' }, now).ok)
   assert.ok(screen({ ...curve, curveSol: 5 }, { ...bot, tradeLamports: '60000000' }, now).reasons.includes('trade-too-large-for-liquidity'))
   assert.equal(CURVE_SCREEN.minCurveSol, 5)
+})
+
+test('launch styles: each finds different coins with its own exits; owner TP/SL only tighten; rug checks hold for all', async () => {
+  const { STYLES } = await import('../scripts/strategy-policy.mjs')
+  const { agentStrategy } = await import('../scripts/agent-runner-core.mjs')
+  const { whyText } = await import('../scripts/trade-why.mjs')
+  const rules = (style?: string, tp = '6000', sl = '2500') => ({ maxTradeLamports: '50000000', takeProfitBasisPoints: tp, stopLossBasisPoints: sl, ...(style ? { style } : {}) })
+  const base = { ...good, dexId: 'pumpfun', liquidityUsd: undefined, curveSol: 30, volume5mUsd: 2500, volume24hUsd: 9000, sells5m: 10 }
+  const young = { ...base, marketCapUsd: 18000, pairCreatedAt: now - 8 * 60000, holders: 50, buys5m: 18, change5m: 10, change1h: 30 }
+  const moving = { ...base, marketCapUsd: 45000, pairCreatedAt: now - 40 * 60000, holders: 90, buys5m: 20, change5m: 12, change1h: -5 }
+  const calm = { ...base, marketCapUsd: 50000, pairCreatedAt: now - 120 * 60000, holders: 300, buys5m: 13, change5m: 2, change1h: 8 }
+  const early = agentStrategy(c, rules('early')), momentum = agentStrategy(c, rules('momentum')), steady = agentStrategy(c, rules('steady'))
+  const passes = (cfg: typeof c) => [young, moving, calm].map(m => screen(m, cfg, now).ok)
+  assert.deepEqual(passes(early), [true, false, false])
+  assert.deepEqual(passes(momentum), [false, true, false])
+  assert.deepEqual(passes(steady), [false, false, true])
+  // exits come from the style; owner values only tighten
+  assert.deepEqual([early.takeProfit, early.stopLoss, early.trailArm, early.trailStop, early.maxHoldMinutes], [0.35, 0.15, 0.15, 0.12, 60])
+  assert.deepEqual([momentum.takeProfit, momentum.stopLoss, momentum.maxHoldMinutes], [0.45, 0.2, 120])
+  assert.equal(agentStrategy(c, rules('early', '2000', '1000')).takeProfit, 0.2)
+  assert.equal(agentStrategy(c, rules('early', '2000', '1000')).stopLoss, 0.1)
+  assert.equal(agentStrategy(c, rules('momentum', '9000', '5000')).stopLoss, 0.2) // looser owner value ignored
+  assert.equal(agentStrategy(c, rules('nonsense')).style, 'steady')
+  for (const cfg of [early, momentum, steady]) for (const [patch, why] of [[{ mintAuthority: 'x' }, 'authorities'], [{ top10Share: 0.5 }, 'concentration'], [{ devShare: 0.2 }, 'dev-holding'], [{ curveSol: 2 }, 'curve-sol'], [{ change5m: 40 }, 'chasing-5m-pump']] as const) {
+    const m = cfg === early ? young : cfg === momentum ? moving : calm
+    assert.ok(screen({ ...m, ...patch }, cfg, now).reasons.includes(why), `${cfg.style} ${why}`)
+  }
+  assert.ok(screen({ ...moving, change5m: 2 }, momentum, now).reasons.includes('not-moving'))
+  assert.ok(screen({ ...calm, change1h: -1 }, steady, now).reasons.includes('hour-not-rising'))
+  assert.equal(STYLES.early.screen.maxAgeMinutes, 20)
+  // each style ranks by its own signal, and its why says so
+  const market = (...ms: (typeof base)[]) => ({ metrics: new Map(ms.map((m, i) => [`M${i}`, { ...m, mint: `M${i}` }])), facts: new Map(ms.map((m, i) => [`M${i}`, { ...m, mint: `M${i}` }])) })
+  const pol = validateTradingPolicy({ ...policy, allowedMints: 'dynamic' })
+  const pick = (cfg: typeof c, mk: ReturnType<typeof market>) => livePlan({ tradingState: emptyTradingState(pol), policy: pol, c: cfg, peaks: {}, positions, market: mk, now, liquidating: false }).proposals[0]
+  const younger = { ...young, pairCreatedAt: now - 4 * 60000, buys5m: 15 }
+  assert.equal(pick(early, market(young, younger)).mint, 'M1') // youngest with strong buys
+  const hotter = { ...moving, change5m: 20, buys5m: 30 }
+  assert.equal(pick(momentum, market(moving, hotter)).mint, 'M1')
+  const wider = { ...calm, holders: 900 }
+  assert.equal(pick(steady, market(calm, wider)).mint, 'M1')
+  assert.match(whyText(pick(early, market(young)).why, '$Y') ?? '', /^bought \$Y: early style, 8 min old, buyers outpacing sellers/)
+  assert.match(whyText(pick(momentum, market(moving)).why, '$M') ?? '', /^bought \$M: momentum style, \+12% in 5m, /)
+  assert.doesNotMatch(whyText(pick(momentum, market(moving)).why, '$M') ?? '', /not chasing/)
+  assert.match(whyText(pick(steady, market(calm)).why, '$S') ?? '', /^bought \$S: steady style, \+8% in 1h, /)
+})
+
+test('launch rules: a style is accepted and kept; records without one keep their policy unchanged', async () => {
+  const { normalizeLaunchPolicy } = await import('../scripts/runtime-launch-rules.mjs')
+  const entry = { id: 'teal-cozmj', wallet: 'EDJmQM5xiiF5RDRdYfpXGzG5yi5P7Lp35eRdsyUsKYrP', mint: 'CoZmJuXuGCw8D5NfoZXmbvEPNMWC1M6ks7P95UxR5ztA', queuedAt: 1 }
+  const agent = (rules: Record<string, unknown>) => ({ id: entry.id, wallet: entry.wallet, coin: { mint: entry.mint }, strategy: 'edge', rules })
+  const old = normalizeLaunchPolicy(entry, agent({ maxSol: 0.05, takeProfit: 60, stopLoss: 25 }))
+  assert.equal('style' in old, false)
+  assert.deepEqual(Object.keys(old), ['policySchemaVersion', 'identity', 'maxTradeLamports', 'takeProfitBasisPoints', 'stopLossBasisPoints', 'strategyDescription'])
+  assert.equal(normalizeLaunchPolicy(entry, agent({ maxSol: 0.05, takeProfit: 35, stopLoss: 15, style: 'early' })).style, 'early')
+  assert.throws(() => normalizeLaunchPolicy(entry, agent({ maxSol: 0.05, takeProfit: 35, stopLoss: 15, style: 'yolo' })), /style/)
+  assert.throws(() => normalizeLaunchPolicy(entry, agent({ maxSol: 0.05, takeProfit: 35, stopLoss: 15, extra: 1 })), /schema/)
 })

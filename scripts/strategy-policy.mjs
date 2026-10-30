@@ -41,6 +41,31 @@ export const CURVE_SCREEN = Object.freeze({
   minVolume5mUsd: 1_000, minVolume24hUsd: 5_000, minBuys5m: 10,
 });
 
+/**
+ * Trading styles a launcher picks for a user bot. Each is a variant of the curve screen with its
+ * own exits; every rug check (no authorities, top 10 ≤ 30%, dev ≤ 5%, curve SOL ≥ 5, no +25% 5m
+ * chase) and every money limit stays the same. An owner's take-profit / stop-loss apply only when
+ * tighter. A bot with no style is 'steady'.
+ *   early     young coins with strong early buying; quick, small exits
+ *   momentum  coins already moving up with heavy buying; medium exits
+ *   steady    older coins with a wide holder base and a rising hour; the house's exits
+ */
+export const STYLES = Object.freeze({
+  early: Object.freeze({
+    screen: { minMarketCapUsd: 10_000, maxMarketCapUsd: 30_000, minAgeMinutes: 3, maxAgeMinutes: 20, minHolders: 40, minBuySellRatio5m: 1.3, minBuys5m: 12 },
+    exits: { takeProfit: 0.35, stopLoss: 0.15, trailArm: 0.15, trailStop: 0.12, maxHoldMinutes: 60 },
+  }),
+  momentum: Object.freeze({
+    screen: { minMarketCapUsd: 20_000, maxMarketCapUsd: 65_000, minAgeMinutes: 5, minHolders: 60, minBuySellRatio5m: 1.5, minChange5mPct: 5, minVolume5mUsd: 2_000 },
+    exits: { takeProfit: 0.45, stopLoss: 0.20, trailArm: 0.20, trailStop: 0.15, maxHoldMinutes: 120 },
+  }),
+  steady: Object.freeze({
+    screen: { minMarketCapUsd: 30_000, maxMarketCapUsd: 65_000, minAgeMinutes: 30, minHolders: 100, minBuySellRatio5m: 1.2, minChange1hPct: 0 },
+    exits: { takeProfit: 0.60, stopLoss: 0.25, trailArm: 0.25, trailStop: 0.20, maxHoldMinutes: 360 },
+  }),
+});
+export const styleOf = s => (typeof s === 'string' && Object.hasOwn(STYLES, s) ? s : 'steady');
+
 export function validateStrategyConfig(c) {
   if (!c || c.version !== 1 || !['paper', 'live'].includes(c.mode) || typeof c.flavor !== 'string') throw Error('Unsupported strategy config');
   for (const k of ['minAgeMinutes', 'maxAgeMinutes', 'minLiquidityUsd', 'minMarketCapUsd', 'maxMarketCapUsd', 'minVolume5mUsd', 'minVolume24hUsd', 'minBuys5m', 'minBuySellRatio5m', 'minHolders', 'maxHoldMinutes', 'allowlistMinutes', 'maxOpenPositions', 'scanLimit', 'maxChange5mPct', 'reentryCooldownMinutes'])
@@ -70,7 +95,7 @@ export function tighten(global, agent = {}) {
 export function screen(m, c, now) {
   // A bonding-curve coin under a curve screen: same checks, curve-sized floors (CURVE_SCREEN).
   const curve = c.curveScreen === true && m?.dexId === 'pumpfun';
-  if (curve) c = { ...c, ...CURVE_SCREEN };
+  if (curve) c = { ...c, ...CURVE_SCREEN, ...(c.style ? STYLES[styleOf(c.style)].screen : {}) };
   const reasons = [];
   const need = (ok, why) => { if (!ok) reasons.push(why); };
   const age = num(m?.pairCreatedAt) ? (now - m.pairCreatedAt) / 60000 : NaN;
@@ -84,6 +109,8 @@ export function screen(m, c, now) {
   need(num(m?.buys5m) && m.buys5m >= c.minBuys5m, 'buys-5m');
   need(num(m?.buys5m) && num(m?.sells5m) && m.buys5m / Math.max(1, m.sells5m) >= c.minBuySellRatio5m, 'buy-pressure');
   need(num(m?.change5m) && m.change5m <= c.maxChange5mPct, 'chasing-5m-pump');
+  if (curve && num(c.minChange5mPct)) need(num(m?.change5m) && m.change5m >= c.minChange5mPct, 'not-moving');
+  if (curve && num(c.minChange1hPct)) need(num(m?.change1h) && m.change1h > c.minChange1hPct, 'hour-not-rising');
   need(m?.mintAuthority === null && m?.freezeAuthority === null, 'authorities');
   need(num(m?.holders) && m.holders >= c.minHolders, 'holders');
   need(num(m?.top10Share) && m.top10Share <= c.maxTop10Share, 'concentration');
