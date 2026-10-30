@@ -66,3 +66,9 @@ export function postTradeMc(root, { agent, sig, mint, mcUsd, approx = true }, fe
   if (!Number.isFinite(mcUsd) || mcUsd <= 0) return Promise.resolve(0);
   return postIngest(root, { type: 'tradeMc', agent, sig, mint, mcUsd: Math.round(mcUsd), approx: approx === true }, fetchImpl);
 }
+
+/** A coin's lifetime creator fees in SOL, a running total the matrix shows. True when stored. */
+export function postFees(root, { agent, feesSol }, fetchImpl) {
+  if (typeof agent !== 'string' || !Number.isFinite(feesSol) || feesSol < 0) return Promise.resolve(false);
+  return postIngest(root, { type: 'fees', agent, feesSol }, fetchImpl);
+}
