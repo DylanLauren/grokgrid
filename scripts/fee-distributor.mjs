@@ -15,6 +15,7 @@ import { connect, loadSigner, signedSignature } from './pump-chain.mjs';
 import { action, postFees } from './runtime-ingest.mjs';
 import { DEFAULT_DISTRIBUTOR, validateDistributorConfig, coinsToDistribute, distributeGate, checkInstructions, houseCostOk, payoutsIn, lifetimeFeesSol, nextBatch } from './fee-distributor-core.mjs';
 import { safeError } from './log-safe.mjs';
+import { verifyOfficialMint } from './official-mint.mjs';
 
 const require = createRequire(import.meta.url);
 const { OnlinePumpSdk, feeSharingConfigPda } = require('@pump-fun/pump-sdk');
@@ -81,7 +82,12 @@ async function tick() {
   const live = !probe && cfg.enabled && !stopped && trading.keypairFile;
   const signer = live ? await loadSigner(trading.keypairFile, trading.wallet) : null;
   const results = [];
-  for (const mint of probe ? [probe] : coinsToDistribute(buyback.officialMint, registry)) {
+  // $GRID is routed (and its fees shown) only once it verifies on chain with the locked 80/20 split
+  // to the pinned treasury and burn wallets; before that it's skipped and the status says why.
+  const official = buyback.officialMint && typeof buyback.burnWallet === 'string'
+    ? await verifyOfficialMint(conn, buyback.officialMint, { treasury: obs.houseWallet, burn: buyback.burnWallet }) : null;
+  const officialMint = official?.ok ? buyback.officialMint : null;
+  for (const mint of probe ? [probe] : coinsToDistribute(officialMint, registry)) {
     let fee = null;
     try { fee = await online.getMinimumDistributableFee(new PublicKey(mint), house); } catch {}
     const info = fee ? { distributableFees: fee.distributableFees.toString(), minimumRequired: fee.minimumRequired.toString(), canDistribute: fee.canDistribute } : null;
@@ -117,9 +123,9 @@ async function tick() {
     results.push({ mint, fee: info, result });
   }
   // The burn wallet is the 20% shareholder of every GrokGrid coin (buyback-config.json).
-  if (!probe && typeof buyback.burnWallet === 'string') await reportFees(conn, online, house, registry, buyback.officialMint, buyback.burnWallet, state, results);
+  if (!probe && typeof buyback.burnWallet === 'string') await reportFees(conn, online, house, registry, officialMint, buyback.burnWallet, state, results);
   if (probe) { console.log(JSON.stringify(results)); return; }
-  await save('fee-distributor-status.json', { observedAt: new Date(now).toISOString(), enabled: cfg.enabled, live: !!signer, stopped, coins: results });
+  await save('fee-distributor-status.json', { observedAt: new Date(now).toISOString(), enabled: cfg.enabled, live: !!signer, stopped, officialMint: buyback.officialMint ?? null, officialCheck: official?.reason ?? null, coins: results });
   console.log(JSON.stringify({ enabled: cfg.enabled, live: !!signer, coins: results.length, sent: results.filter(r => r.result === 'sent').length }));
 }
 

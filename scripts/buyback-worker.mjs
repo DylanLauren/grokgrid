@@ -11,6 +11,7 @@ import { homedir } from 'node:os';
 import { validateBuybackConfig, executionBlockers, plannedSpend, openCycle, recordBuy, settleLeg, recordBurn, closeEmpty } from './buyback-policy.mjs';
 import { withBuybackStore } from './buyback-store.mjs';
 import { heartbeat } from './runtime-ingest.mjs';
+import { verifyOfficialMint } from './official-mint.mjs';
 import { connect, readMint, readWallet, signatureStatus, buildBuy, buildBurn, loadSigner, signedSignature } from './pump-chain.mjs';
 
 const root = resolve(process.env.GROKGRID_RUNTIME_DIR || join(homedir(), '.config/grokgrid/runtime'));
@@ -41,7 +42,11 @@ async function tick() {
   const conn = connect(rpc.rpcUrl);
 
   const stopFilePresent = await exists(config.stopFile);
-  const mint = config.officialMint ? await readMint(conn, config.officialMint) : { verified: false };
+  const fixed = config.officialMint ? await readMint(conn, config.officialMint) : { verified: false };
+  // Configured before the coin exists: no buy until it's on chain with the locked 80/20 split
+  // to the pinned treasury and burn wallets (official-mint.mjs). Until then: blocked, and why.
+  const official = config.officialMint ? await verifyOfficialMint(conn, config.officialMint, { treasury: rpc.houseWallet, burn: config.burnWallet }) : { ok: false, reason: 'awaiting-official-mint' };
+  const mint = { ...fixed, verified: fixed.verified === true && official.ok };
   let wallet = await readWallet(conn, config.burnWallet, config.officialMint, mint.tokenProgram);
   let keypairMatches = false, signer = null;
   const gates = { stopFilePresent, mintVerified: mint.verified, observedMint: config.officialMint, keypairMatches };
@@ -90,11 +95,11 @@ async function tick() {
   const open = openCycle(state);
   await savePrivate('buyback-status.json', {
     observedAt: new Date().toISOString(), executionEnabled: config.executionEnabled, signingEnabled: config.signingEnabled,
-    live, blockers, action, detail, burnWallet: config.burnWallet, officialMint: config.officialMint, mintVerified: mint.verified,
+    live, blockers, action, detail, burnWallet: config.burnWallet, officialMint: config.officialMint, mintVerified: mint.verified, officialCheck: official.reason,
     balanceLamports: wallet.lamports, tokenUnits: wallet.tokenUnits, openCycle: open ? { id: open.id, state: open.state } : null,
     cyclesBurned: state.cycles.filter(x => x.state === 'burned').length,
   });
-  await heartbeat(root, 'buyback', { mode: live ? 'execute' : 'observe-only', healthy: true, note: action });
+  await heartbeat(root, 'buyback', { mode: live ? 'execute' : 'observe-only', healthy: true, note: config.officialMint && !official.ok ? `$GRID ${official.reason}` : action });
 }
 
 tick().catch(async e => {
